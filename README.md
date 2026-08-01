@@ -1,12 +1,13 @@
 # StratumStats
 
-StratumStats is an independent Bitcoin mining-pool measurement service written
-in Go. It records observable Stratum behavior as append-only JSONL and publishes
-latency, availability, payout custody, pool-fee, TLS, and confidence data.
+StratumStats is a Go service for measuring observable Bitcoin mining-pool
+behavior. It records Stratum observations as append-only JSONL and publishes
+latency, availability, protocol response times, TLS, and sample counts.
+Coinbase output observations and pool-fee estimates are kept in a separate
+view.
 
-It deliberately does **not** assign pools a composite score, letter grade, or
-rank. Those require subjective weights and would undermine the goal of an
-unbiased report.
+Reports keep these dimensions separate and do not calculate an overall score
+or ranking.
 
 The pool registry is reproducibly seeded from the local `stratum-race` and
 `PoolCensus` registries. Endpoints still require ongoing verification. Demo data
@@ -20,12 +21,13 @@ _Regenerate this synthetic dashboard screenshot with `./scripts/screenshot.sh`._
 
 - **Measurements over claims.** Reports use automated observations, never paid
   placement, popularity, sponsorship, or operator questionnaires.
-- **Metrics stay separate.** Availability, median latency, tail latency, payout
-  custody, pool fee, TLS, sample count, and confidence remain independent facts.
+- **Metrics stay separate.** Availability, median latency, tail latency,
+  protocol response, TLS, and sample counts remain independent facts. Coinbase
+  output evidence has its own page.
 - **Same block, same vantage.** Delivery delay is compared only for the same
   block observed from the same location, reducing geography and clock bias.
-- **Uncertainty stays visible.** Confidence comes from eligible block count;
-  small datasets remain explicitly provisional.
+- **Sample size stays visible.** Eligible block and protocol-attempt counts are
+  published directly beside their measurements.
 - **Raw evidence is canonical.** JSONL is append-only and independently
   recomputable. A future database may index it but will not replace it.
 - **Pseudonymous, not magically anonymous.** Connections rotate a valid Bitcoin
@@ -52,7 +54,7 @@ go run . serve
 ```
 
 Configuration is in `config/pools.json`. The collector never submits shares.
-Current records use observation schema version 3 with `block_id` terminology.
+Current records use observation schema version 4 with `block_id` terminology.
 
 Compiling a reusable binary is optional:
 
@@ -60,6 +62,74 @@ Compiling a reusable binary is optional:
 go build -o stratumstats .
 ./stratumstats collect -vantage us-west
 ```
+
+## Managed Bitcoin Core (optional)
+
+The node helper installs Bitcoin Core 31.1 inside this workspace without `sudo`
+or PATH changes. It verifies the official archive against reviewed, pinned
+SHA-256 values and configures local cookie-authenticated RPC, no wallet,
+outbound-only peers, and pruning.
+
+```bash
+./scripts/bitcoin-node.sh install
+./scripts/bitcoin-node.sh start
+./scripts/bitcoin-node.sh status
+./scripts/bitcoin-node.sh logs --follow
+./scripts/bitcoin-node.sh stop
+```
+
+The binaries, manager state, and default chain data live under `.bitcoin-node/`,
+which is ignored by Git. Shutdown uses the Bitcoin Core RPC and never
+force-kills the process. `./scripts/bitcoin-node.sh paths` shows the active
+locations.
+
+To keep chain data on another mounted drive, mount it and create a dedicated
+empty directory first. The manager deliberately refuses to create a missing
+external path:
+
+```bash
+./scripts/bitcoin-node.sh install --data-dir /mnt/bitcoin-ssd/stratumstats-node
+```
+
+The choice is remembered for later commands. If that drive disappears, the
+manager stops with a mount reminder instead of silently creating a replacement
+directory on another disk. It also refuses to take over a non-empty directory
+it did not initialize.
+
+The managed config is copied from `config/bitcoin.conf` on first setup. Its
+`prune=10000` target retains roughly 10 GiB of block and undo files; it is not a
+cap on total node storage or initial-sync traffic. Initial sync still downloads
+and validates the complete chain, which the [official download page](https://bitcoincore.org/en/download/)
+currently estimates at about 600 GB. For an archival node, remove the `prune`
+line from the selected data directory before the first start. A node is ready
+for comparisons only when `status` reports `initialblockdownload: false`.
+
+To become usable near the network tip before historical validation finishes,
+load a local [AssumeUTXO](https://github.com/bitcoin/bitcoin/blob/v31.1/doc/assumeutxo.md)
+snapshot after the node has synchronized headers through the snapshot base
+height:
+
+```bash
+./scripts/bitcoin-node.sh start
+./scripts/bitcoin-node.sh fast-sync /path/to/utxo-935000.dat
+./scripts/bitcoin-node.sh status
+```
+
+Bitcoin Core has no canonical snapshot download source. Obtain one from a node
+you control or a source you choose; `fast-sync` passes it to `loadtxoutset`,
+which rejects any UTXO set whose hash and base height do not match commitments
+compiled into Bitcoin Core 31.1. This release recognizes mainnet snapshots at
+heights 840,000, 880,000, 910,000, and 935,000. The newest recognized height
+usually reaches the tip fastest.
+
+AssumeUTXO accelerates availability, not full verification or total download
+traffic. Core synchronizes the snapshot chain to the tip first, then continues
+the normal genesis-to-snapshot validation in the background. `status` displays
+both chainstates. After `fast-sync` succeeds, the original snapshot file is no
+longer needed and may be removed manually.
+
+This helper manages Bitcoin Core lifecycle now; automatic RPC/ZMQ corroboration
+inside the collector remains a later integration step.
 
 ## Published pool report
 
@@ -71,12 +141,28 @@ The deterministic aggregation is implemented in `internal/report/report.go`.
 | Availability | 95% Wilson lower bound of valid arrivals over eligible blocks |
 | Median latency | Median delay behind the earliest valid template for the same block and vantage |
 | P95 latency | 95th-percentile relative delay, exposing intermittent stalls |
-| Confidence | Insufficient, provisional (10 blocks), moderate (30), or established (100) |
 | TLS | Whether a configured TLS Stratum endpoint completed a measured session |
-| Payout custody | Direct coinbase, trust pool, mixed, or unknown |
-| Pool fee | Effective fee inferred from direct coinbase outputs |
 
 Reports are sorted alphabetically by pool name, not by performance.
+Coinbase output evidence is deliberately omitted from this table and published
+separately at `/coinbase`.
+
+## Protocol response timings
+
+Protocol operations are stored as independent version 4 JSONL records rather
+than repeated on every block observation. Reports publish successful-operation
+median and P95 durations plus outcome counts for:
+
+- TCP connect, including local name resolution;
+- TLS handshake on TLS endpoints;
+- `mining.subscribe`;
+- `mining.authorize`; and
+- `mining.ping` / `pong`.
+
+`mining.ping` is an optional Stratum V1 extension. Unsupported responses and
+timeouts are reported as compatibility facts, not availability failures. A
+supported session may be sampled again every 60 seconds. Raw records retain the
+endpoint, coarse vantage, duration, response status, and error category.
 
 ## Empty templates
 
@@ -91,32 +177,38 @@ transaction-fee opportunity cost—not whether an empty template appeared at all
 Bitcoin Core's `getblocktemplate` long poll wakes immediately for a new best
 block, while transaction-only changes are checked less frequently.
 
-## Payout custody and pool fee
+## Coinbase output observations
 
 The probe reconstructs each structurally valid coinbase using its negotiated
-extranonces and matches the exact generated worker payout script.
+extranonces and checks for the exact generated worker address script. The
+dedicated `/coinbase` page groups pools by the literal observed result:
 
-- **Direct coinbase:** the worker script appears in the coinbase outputs.
-- **Trust pool:** the worker script is absent, so payment depends on the pool's
-  separate accounting system.
-- **Mixed:** both behaviors were observed.
-- **Unknown:** there is not enough decoded evidence.
+- **Observed in every sample**
+- **Not observed in sampled outputs**
+- **Changed across samples**
+- **No decoded coinbase samples**
 
-For direct payment, the observed pool fee is:
+These are output-presence observations, not pool types or judgments about
+payment correctness. A pool can account for earnings outside the coinbase
+transaction.
+
+When a worker output is present, the observed pool fee is:
 
 ```text
 100 × (all coinbase outputs − worker outputs) / all coinbase outputs
 ```
 
 Optional donations and configured payout splits can be included in this
-effective percentage. Custodial payout fees and payment correctness cannot be
-inferred from Stratum alone; they need a controlled hashrate/payment study.
+effective percentage. No fee is inferred from a job where the worker address is
+absent. Payment correctness cannot be inferred from Stratum alone; it needs a
+controlled hashrate/payment study.
 
-Version 3 JSONL fields include `coinbase_analyzed`,
+Current version 4 JSONL retains `coinbase_analyzed`,
 `worker_wallet_in_coinbase`, `coinbase_total_sats`, `worker_payout_sats`, and
-`estimated_pool_fee_pct`. Reports expose `payout_mode`,
-`direct_coinbase_pct`, `median_pool_fee_pct`, the observed fee range, and
-`observed_fee_class` (`zero`, `positive`, `variable`, or `unknown`).
+`estimated_pool_fee_pct`. Reports expose `coinbase_samples`,
+`worker_address_observed_pct`, `worker_address_status`,
+`median_pool_fee_pct`, the observed fee range, and `observed_fee_class`
+(`zero`, `positive`, `variable`, or `unknown`).
 
 ## Job verification
 
@@ -137,19 +229,40 @@ verification layer.
 
 ## Pool registry
 
+The generated `config/pools.json` is enriched by the manually researched
+`config/pool-metadata.json`. The current registry contains 33 distinct pool or
+product records after regional and duplicate aliases are consolidated.
+
+Context kept separate from telemetry includes:
+
+- canonical pool and operator names;
+- `solo`, `shared`, `hybrid`, or `decentralized` type;
+- researched operating status and collector compatibility;
+- advertised products and fee text with a check date;
+- endpoint regions/roles and direct research-source links.
+
+The complete research method, decisions, and per-pool summary are in
+[`docs/pool-registry.md`](docs/pool-registry.md). The dashboard exposes the same
+context at `/pools`; none of it changes measured reports.
+
 Regenerate the combined registry with:
 
 ```bash
 ./scripts/merge-pools.sh
 ```
 
-Each pool and endpoint retains provenance from `stratum-race`, `PoolCensus`, or
-both. The merge deduplicates normalized host/port/TLS tuples.
+The merge combines `stratum-race`, `PoolCensus`, and the research layer, applies
+canonical aliases, excludes stale unsupported imports, replaces researched
+endpoint sets, and deduplicates normalized host/port/TLS tuples.
+
+The web interface publishes the separately grouped coinbase observations at
+`GET /coinbase`.
 
 ## HTTP API
 
 - `GET /api/v1/reports` — current pool reports and disclosures
-- `GET /api/v1/methodology` — published metrics and confidence thresholds
+- `GET /api/v1/pools` — researched pool identity, type, status, terms, endpoints, and sources
+- `GET /api/v1/methodology` — published metric names and methodology version
 - `GET /healthz` — liveness
 
 There is intentionally no public ingestion endpoint yet. This avoids exposing

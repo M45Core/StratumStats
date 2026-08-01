@@ -52,6 +52,11 @@ type Config struct {
 // relative to the first full template seen by the same vantage for a block.
 type Observation struct {
 	Version                int       `json:"version"`
+	RecordType             string    `json:"record_type,omitempty"`
+	Endpoint               string    `json:"endpoint,omitempty"`
+	ProtocolMethod         string    `json:"protocol_method,omitempty"`
+	DurationMS             *float64  `json:"duration_ms,omitempty"`
+	ResponseStatus         string    `json:"response_status,omitempty"`
 	ObservedAt             time.Time `json:"observed_at"`
 	Vantage                string    `json:"vantage"`
 	BlockID                string    `json:"block_id"`
@@ -71,24 +76,28 @@ type Observation struct {
 }
 
 type PoolReport struct {
-	PoolID          string   `json:"pool_id"`
-	PoolName        string   `json:"pool_name"`
-	Category        string   `json:"category,omitempty"`
-	Sources         []string `json:"sources,omitempty"`
-	Confidence      string   `json:"confidence"`
-	Blocks          int      `json:"blocks"`
-	Arrivals        int      `json:"arrivals"`
-	MedianMS        *float64 `json:"median_ms"`
-	P95MS           *float64 `json:"p95_ms"`
-	Availability    float64  `json:"availability_pct"`
-	TLSObserved     bool     `json:"tls_observed"`
-	PayoutSamples   int      `json:"payout_samples"`
-	DirectPayoutPct *float64 `json:"direct_coinbase_pct"`
-	PoolFeePct      *float64 `json:"median_pool_fee_pct"`
-	PoolFeeMinPct   *float64 `json:"min_pool_fee_pct"`
-	PoolFeeMaxPct   *float64 `json:"max_pool_fee_pct"`
-	FeeClass        string   `json:"observed_fee_class"`
-	PayoutMode      string   `json:"payout_mode"`
+	PoolID                   string      `json:"pool_id"`
+	PoolName                 string      `json:"pool_name"`
+	Category                 string      `json:"category,omitempty"`
+	Sources                  []string    `json:"sources,omitempty"`
+	Blocks                   int         `json:"blocks"`
+	Arrivals                 int         `json:"arrivals"`
+	MedianMS                 *float64    `json:"median_ms"`
+	P95MS                    *float64    `json:"p95_ms"`
+	Availability             float64     `json:"availability_pct"`
+	TLSObserved              bool        `json:"tls_observed"`
+	ConnectTiming            TimingStats `json:"connect_timing"`
+	TLSTiming                TimingStats `json:"tls_handshake_timing"`
+	SubscribeTiming          TimingStats `json:"subscribe_timing"`
+	AuthorizeTiming          TimingStats `json:"authorize_timing"`
+	PingTiming               TimingStats `json:"ping_timing"`
+	CoinbaseSamples          int         `json:"coinbase_samples"`
+	WorkerAddressObservedPct *float64    `json:"worker_address_observed_pct"`
+	WorkerAddressStatus      string      `json:"worker_address_status"`
+	PoolFeePct               *float64    `json:"median_pool_fee_pct"`
+	PoolFeeMinPct            *float64    `json:"min_pool_fee_pct"`
+	PoolFeeMaxPct            *float64    `json:"max_pool_fee_pct"`
+	FeeClass                 string      `json:"observed_fee_class"`
 }
 
 type Snapshot struct {

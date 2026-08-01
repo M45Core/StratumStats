@@ -9,16 +9,17 @@ import (
 	"github.com/proofofmike/stratumstats/internal/model"
 )
 
-const MethodologyVersion = "2026-08-01.4"
+const MethodologyVersion = "2026-08-01.7"
 
 type accumulator struct {
-	pool          model.Pool
-	blocks        map[string]bool
-	offsets       []float64
-	tls           bool
-	payoutSamples int
-	directPayouts int
-	feeSamples    []float64
+	pool                 model.Pool
+	blocks               map[string]bool
+	offsets              []float64
+	tls                  bool
+	coinbaseSamples      int
+	workerAddressMatches int
+	feeSamples           []float64
+	timings              map[string]*timingAccumulator
 }
 
 // Compute applies only objective probe measurements. Operator size, fees,
@@ -30,7 +31,14 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 	}
 	for _, o := range observations {
 		a := acc[o.PoolID]
-		if a == nil || !o.Eligible || o.BlockID == "" {
+		if a == nil {
+			continue
+		}
+		if o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != "" {
+			addProtocolObservation(a, o)
+			continue
+		}
+		if !o.Eligible || o.BlockID == "" {
 			continue
 		}
 		a.blocks[o.BlockID] = true
@@ -38,9 +46,9 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 			a.offsets = append(a.offsets, o.OffsetMS)
 		}
 		if o.Arrived && o.CoinbaseAnalyzed {
-			a.payoutSamples++
+			a.coinbaseSamples++
 			if o.WorkerWalletInCoinbase {
-				a.directPayouts++
+				a.workerAddressMatches++
 			}
 			if o.EstimatedPoolFeePct != nil && *o.EstimatedPoolFeePct >= 0 && *o.EstimatedPoolFeePct <= 100 {
 				a.feeSamples = append(a.feeSamples, *o.EstimatedPoolFeePct)
@@ -63,9 +71,9 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		Disclosure: []string{
 			"Reports use automated observations only; no pool pays or applies for placement.",
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
-			"Confidence labels reflect sample count: provisional at 10, moderate at 30, and established at 100 observations.",
+			"Eligible block and protocol-attempt counts are published directly with their measurements.",
 			"The probe uses pseudonymous miner credentials, but a pool can still observe its source IP.",
-			"Observed pool fee is inferred only when the generated worker payout script appears directly in a decoded coinbase; optional donations or splits may be included.",
+			"Observed pool fee is inferred only when a decoded coinbase output matches the generated worker script; optional donations or splits may be included.",
 		},
 	}
 }
@@ -84,18 +92,18 @@ func build(a *accumulator) model.PoolReport {
 		p95Value = percentile(a.offsets, .95)
 		median, p95 = ptr(round(medValue, 1)), ptr(round(p95Value, 1))
 	}
-	directPayoutPct := (*float64)(nil)
-	payoutMode := "unknown"
-	if a.payoutSamples > 0 {
-		value := round(100*float64(a.directPayouts)/float64(a.payoutSamples), 1)
-		directPayoutPct = &value
+	workerAddressObservedPct := (*float64)(nil)
+	workerAddressStatus := "unknown"
+	if a.coinbaseSamples > 0 {
+		value := round(100*float64(a.workerAddressMatches)/float64(a.coinbaseSamples), 1)
+		workerAddressObservedPct = &value
 		switch {
-		case a.directPayouts == a.payoutSamples:
-			payoutMode = "direct"
-		case a.directPayouts == 0:
-			payoutMode = "custodial"
+		case a.workerAddressMatches == a.coinbaseSamples:
+			workerAddressStatus = "always_observed"
+		case a.workerAddressMatches == 0:
+			workerAddressStatus = "not_observed"
 		default:
-			payoutMode = "mixed"
+			workerAddressStatus = "varied"
 		}
 	}
 	poolFeePct := (*float64)(nil)
@@ -117,19 +125,14 @@ func build(a *accumulator) model.PoolReport {
 			feeClass = "positive"
 		}
 	}
-	confidence := "insufficient"
-	if blocks >= 100 {
-		confidence = "established"
-	} else if blocks >= 30 {
-		confidence = "moderate"
-	} else if blocks >= 10 {
-		confidence = "provisional"
-	}
 	return model.PoolReport{
 		PoolID: a.pool.ID, PoolName: a.pool.Name, Category: a.pool.Category, Sources: a.pool.Sources,
-		Confidence: confidence, Blocks: blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95,
+		Blocks: blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95,
 		Availability: round(availability, 1), TLSObserved: a.tls,
-		PayoutSamples: a.payoutSamples, DirectPayoutPct: directPayoutPct, PoolFeePct: poolFeePct, PoolFeeMinPct: poolFeeMinPct, PoolFeeMaxPct: poolFeeMaxPct, FeeClass: feeClass, PayoutMode: payoutMode,
+		ConnectTiming: timingStats(a, model.ProtocolConnect), TLSTiming: timingStats(a, model.ProtocolTLSHandshake),
+		SubscribeTiming: timingStats(a, model.ProtocolSubscribe), AuthorizeTiming: timingStats(a, model.ProtocolAuthorize), PingTiming: timingStats(a, model.ProtocolPing),
+		CoinbaseSamples: a.coinbaseSamples, WorkerAddressObservedPct: workerAddressObservedPct, WorkerAddressStatus: workerAddressStatus,
+		PoolFeePct: poolFeePct, PoolFeeMinPct: poolFeeMinPct, PoolFeeMaxPct: poolFeeMaxPct, FeeClass: feeClass,
 	}
 }
 

@@ -116,7 +116,7 @@ func collect(args []string) error {
 	}
 	log.Printf("probing %d pools from vantage %q; credentials rotate and are not stored", len(cfg.Pools), *vantage)
 	return probe.Collect(ctx, cfg.Pools, *vantage, func(batch []model.Observation) error {
-		log.Printf("writing %d corroborated observations", len(batch))
+		log.Printf("writing %d telemetry records", len(batch))
 		return store.Append(*dataPath, batch)
 	})
 }
@@ -216,7 +216,7 @@ func demoData(pools []model.Pool) []model.Observation {
 			out = append(out, observation)
 		}
 	}
-	return out
+	return appendDemoProtocolData(out, pools, rng, now)
 }
 
 func usage() {

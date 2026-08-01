@@ -55,7 +55,10 @@ mkdir -p "$(dirname "$output_file")"
 "$browser" \
   --headless \
   --disable-gpu \
+  --disable-extensions \
   --no-sandbox \
+  --no-first-run \
+  --user-data-dir="$temporary_dir/chrome-profile" \
   --hide-scrollbars \
   --window-size=1440,1100 \
   --screenshot="$output_file" \

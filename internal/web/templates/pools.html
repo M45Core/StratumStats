@@ -10,7 +10,7 @@
 <body>
 <header>
   <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
-  <nav><a href="/">Reports</a><a href="/methodology">Methodology</a><a href="/api/v1/pools">Registry API</a></nav>
+  <nav><a href="/">Reports</a><a href="/coinbase">Coinbase</a><a href="/methodology">Methodology</a><a href="/api/v1/pools">Registry API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
 </header>
 <main>
   <section class="registry-hero">
@@ -18,7 +18,7 @@
     <h1>Know what each endpoint <em>actually is.</em></h1>
     <p class="lede">Canonical operator names, product types, advertised terms, and current Stratum V1 connection details. Regional aliases are grouped under one pool so they are not mistaken for independent operators.</p>
   </section>
-  <div class="notice registry-notice">Registry facts are researched context, not score inputs. Fees and product terms are operator claims checked on the listed date; measured payout and transport evidence remain separate.</div>
+  <div class="notice registry-notice">Registry facts are researched context, not score inputs. Fees and product terms are operator claims checked on the listed date; measured coinbase and transport evidence remain separate.</div>
   <section class="registry-grid">
     {{range .Pools}}
     <article class="pool-card" id="{{.ID}}">

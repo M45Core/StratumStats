@@ -21,6 +21,15 @@ type Server struct {
 	Demo  bool
 }
 
+type coinbasePage struct {
+	Snapshot       model.Snapshot
+	Demo           bool
+	AlwaysObserved []model.PoolReport
+	NotObserved    []model.PoolReport
+	Varied         []model.PoolReport
+	Unknown        []model.PoolReport
+}
+
 func (s Server) Handler() (http.Handler, error) {
 	t, err := template.New("site").Funcs(template.FuncMap{"metric": func(value *float64) float64 {
 		if value == nil {
@@ -58,6 +67,28 @@ func (s Server) Handler() (http.Handler, error) {
 			Pools []model.Pool
 		}{registryAsOf(s.Pools), s.Pools})
 	})
+	mux.HandleFunc("GET /coinbase", func(w http.ResponseWriter, r *http.Request) {
+		data, err := snapshot()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		page := coinbasePage{Snapshot: data, Demo: s.Demo}
+		for _, pool := range data.Reports {
+			switch pool.WorkerAddressStatus {
+			case "always_observed":
+				page.AlwaysObserved = append(page.AlwaysObserved, pool)
+			case "not_observed":
+				page.NotObserved = append(page.NotObserved, pool)
+			case "varied":
+				page.Varied = append(page.Varied, pool)
+			default:
+				page.Unknown = append(page.Unknown, pool)
+			}
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = t.ExecuteTemplate(w, "coinbase.html", page)
+	})
 	mux.HandleFunc("GET /methodology", func(w http.ResponseWriter, r *http.Request) {
 		data, err := snapshot()
 		if err != nil {
@@ -86,7 +117,7 @@ func (s Server) Handler() (http.Handler, error) {
 		writeJSON(w, data)
 	})
 	mux.HandleFunc("GET /api/v1/methodology", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "metrics": []string{"availability_pct", "median_ms", "p95_ms", "payout_mode", "median_pool_fee_pct", "tls_observed"}, "minimum_blocks": map[string]int{"provisional": 10, "moderate": 30, "established": 100}})
+		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "median_pool_fee_pct", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /static/", http.FileServer(http.FS(assets)))

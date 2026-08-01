@@ -1,4 +1,5 @@
 /stratumstats
+/.bitcoin-node/
 /data/*.jsonl
 !/data/.gitkeep
 *.tmp

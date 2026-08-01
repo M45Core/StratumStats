@@ -6,11 +6,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +18,13 @@ import (
 )
 
 const blockWindow = 15 * time.Second
+
+var (
+	requestTimeout     = 30 * time.Second
+	pingInterval       = 60 * time.Second
+	pingResponseWindow = 10 * time.Second
+	sessionReadTimeout = 90 * time.Second
+)
 
 type event struct {
 	poolID, prevHash    string
@@ -30,6 +37,7 @@ type event struct {
 	workerPayoutSats    uint64
 	estimatedPoolFeePct *float64
 	connected           *bool
+	protocol            *model.Observation
 }
 
 type activeBlock struct {
@@ -43,8 +51,8 @@ type activeBlock struct {
 	payout   map[string]event
 }
 
-// Collect connects to every configured endpoint and emits completed block
-// blocks. It submits no shares and never stores the randomized credentials.
+// Collect connects to every configured endpoint and emits block and protocol
+// observations. It submits no shares and never stores randomized credentials.
 func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func([]model.Observation) error) error {
 	events := make(chan event, 256)
 	var wg sync.WaitGroup
@@ -109,6 +117,14 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 			if !ok {
 				return nil
 			}
+			if e.protocol != nil {
+				record := *e.protocol
+				record.Vantage = vantage
+				if err := emit([]model.Observation{record}); err != nil {
+					return err
+				}
+				continue
+			}
 			if e.connected != nil {
 				connected[e.poolID] = *e.connected
 				continue
@@ -155,17 +171,98 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		return err
 	}
 	dialer := net.Dialer{Timeout: 10 * time.Second}
-	var conn net.Conn
 	address := net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port))
-	if endpoint.TLS {
-		conn, err = tls.DialWithDialer(&dialer, "tcp", address, &tls.Config{ServerName: endpoint.Host, MinVersion: tls.VersionTLS12})
-	} else {
-		conn, err = dialer.DialContext(ctx, "tcp", address)
-	}
+
+	connectStarted := time.Now()
+	rawConn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolConnect, connectStarted, protocolErrorStatus(err), "connect_failed")
 		return err
 	}
-	defer conn.Close()
+	if err := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolConnect, connectStarted, model.ProtocolStatusOK, ""); err != nil {
+		rawConn.Close()
+		return err
+	}
+	defer rawConn.Close()
+
+	var conn net.Conn = rawConn
+	if endpoint.TLS {
+		tlsConn := tls.Client(rawConn, &tls.Config{ServerName: endpoint.Host, MinVersion: tls.VersionTLS12})
+		tlsStarted := time.Now()
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolTLSHandshake, tlsStarted, protocolErrorStatus(err), "tls_handshake_failed")
+			return err
+		}
+		if err := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolTLSHandshake, tlsStarted, model.ProtocolStatusOK, ""); err != nil {
+			return err
+		}
+		conn = tlsConn
+	}
+
+	closeOnCancelDone := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			conn.Close()
+		case <-closeOnCancelDone:
+		}
+	}()
+	defer close(closeOnCancelDone)
+
+	r := bufio.NewReader(conn)
+	w := bufio.NewWriter(conn)
+	subscribeStarted := time.Now()
+	if err := request(w, 1, "mining.subscribe", []string{identity.Agent}); err != nil {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolSubscribe, subscribeStarted, model.ProtocolStatusError, "subscribe_write_failed")
+		return err
+	}
+	subscribeResult, remoteErr, err := awaitResponse(ctx, conn, r, w, identity.Agent, 1, requestTimeout)
+	if err != nil {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolSubscribe, subscribeStarted, protocolErrorStatus(err), "subscribe_response_failed")
+		return fmt.Errorf("subscribe: %w", err)
+	}
+	if remoteErr != nil {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolSubscribe, subscribeStarted, model.ProtocolStatusRejected, "subscribe_rejected")
+		return fmt.Errorf("subscribe rejected: %v", remoteErr)
+	}
+	var subscribe []json.RawMessage
+	var extraNonce1 string
+	var extraNonce2Size int
+	if json.Unmarshal(subscribeResult, &subscribe) != nil || len(subscribe) < 3 {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolSubscribe, subscribeStarted, model.ProtocolStatusError, "subscribe_invalid_response")
+		return fmt.Errorf("subscribe: invalid response")
+	}
+	if json.Unmarshal(subscribe[1], &extraNonce1) != nil || json.Unmarshal(subscribe[2], &extraNonce2Size) != nil || extraNonce1 == "" || extraNonce2Size <= 0 {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolSubscribe, subscribeStarted, model.ProtocolStatusError, "subscribe_invalid_extranonce")
+		return fmt.Errorf("subscribe: invalid extranonce")
+	}
+	if err := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolSubscribe, subscribeStarted, model.ProtocolStatusOK, ""); err != nil {
+		return err
+	}
+
+	authorizeStarted := time.Now()
+	if err := request(w, 2, "mining.authorize", []string{identity.Username, "x"}); err != nil {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, model.ProtocolStatusError, "authorize_write_failed")
+		return err
+	}
+	authorizeResult, remoteErr, err := awaitResponse(ctx, conn, r, w, identity.Agent, 2, requestTimeout)
+	if err != nil {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, protocolErrorStatus(err), "authorize_response_failed")
+		return fmt.Errorf("authorize: %w", err)
+	}
+	if remoteErr != nil {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, model.ProtocolStatusRejected, "authorize_rejected")
+		return fmt.Errorf("authorize rejected: %v", remoteErr)
+	}
+	var authorized bool
+	if json.Unmarshal(authorizeResult, &authorized) != nil || !authorized {
+		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, model.ProtocolStatusRejected, "authorize_rejected")
+		return fmt.Errorf("authorization rejected")
+	}
+	if err := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, model.ProtocolStatusOK, ""); err != nil {
+		return err
+	}
+
 	online := true
 	select {
 	case out <- event{poolID: poolID, connected: &online}:
@@ -180,44 +277,100 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		}
 	}()
 
-	r := bufio.NewReader(conn)
-	w := bufio.NewWriter(conn)
-	if err := request(w, 1, "mining.subscribe", []string{identity.Agent}); err != nil {
-		return err
-	}
-	subscribeResult, err := awaitResponse(ctx, conn, r, 1)
-	if err != nil {
-		return fmt.Errorf("subscribe: %w", err)
-	}
-	var subscribe []json.RawMessage
-	var extraNonce1 string
-	var extraNonce2Size int
-	if json.Unmarshal(subscribeResult, &subscribe) == nil && len(subscribe) >= 3 {
-		_ = json.Unmarshal(subscribe[1], &extraNonce1)
-		_ = json.Unmarshal(subscribe[2], &extraNonce2Size)
-	}
-	if err := request(w, 2, "mining.authorize", []string{identity.Username, "x"}); err != nil {
-		return err
-	}
-	if _, err := awaitResponse(ctx, conn, r, 2); err != nil {
-		return fmt.Errorf("authorize: %w", err)
-	}
-
 	var previous string
 	var fullSent bool
+	pingID := 1000
+	pingPending := false
+	pingDisabled := false
+	pingStarted := time.Time{}
+	pingDeadline := time.Time{}
+	nextPing := time.Now()
+
 	for {
-		if err := conn.SetReadDeadline(time.Now().Add(90 * time.Second)); err != nil {
+		now := time.Now()
+		if !pingDisabled && !pingPending && !nextPing.IsZero() && !now.Before(nextPing) {
+			pingID++
+			pingStarted = now
+			if err := request(w, pingID, model.ProtocolPing, []any{}); err != nil {
+				_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, model.ProtocolStatusError, "ping_write_failed")
+				return err
+			}
+			pingPending = true
+			pingDeadline = now.Add(pingResponseWindow)
+		}
+
+		readDeadline := now.Add(sessionReadTimeout)
+		if pingPending && pingDeadline.Before(readDeadline) {
+			readDeadline = pingDeadline
+		}
+		if !pingDisabled && !pingPending && !nextPing.IsZero() && nextPing.Before(readDeadline) {
+			readDeadline = nextPing
+		}
+		if err := conn.SetReadDeadline(readDeadline); err != nil {
 			return err
 		}
 		line, err := r.ReadBytes('\n')
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			now = time.Now()
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				if pingPending && !now.Before(pingDeadline) {
+					if publishErr := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, model.ProtocolStatusTimeout, "ping_timeout"); publishErr != nil {
+						return publishErr
+					}
+					pingPending, pingDisabled = false, true
+					continue
+				}
+				if !pingDisabled && !pingPending && !nextPing.IsZero() && !now.Before(nextPing) {
+					continue
+				}
+			}
+			if pingPending {
+				_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, model.ProtocolStatusError, "ping_connection_closed")
+			}
 			return err
 		}
+
 		var msg struct {
-			Method string `json:"method"`
-			Params []any  `json:"params"`
+			ID     any             `json:"id"`
+			Method string          `json:"method"`
+			Params []any           `json:"params"`
+			Result json.RawMessage `json:"result"`
+			Error  any             `json:"error"`
 		}
-		if json.Unmarshal(line, &msg) != nil || msg.Method != "mining.notify" || len(msg.Params) < 9 {
+		if json.Unmarshal(line, &msg) != nil {
+			continue
+		}
+		if pingPending && responseID(msg.ID) == pingID {
+			status, category := model.ProtocolStatusOK, ""
+			if msg.Error != nil {
+				status, category = model.ProtocolStatusUnsupported, "ping_unsupported"
+				pingDisabled = true
+			} else {
+				var pong string
+				if json.Unmarshal(msg.Result, &pong) != nil || !strings.EqualFold(pong, "pong") {
+					status, category = model.ProtocolStatusError, "ping_invalid_response"
+					pingDisabled = true
+				}
+			}
+			if err := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, status, category); err != nil {
+				return err
+			}
+			pingPending = false
+			if !pingDisabled {
+				nextPing = time.Now().Add(pingInterval)
+			}
+			continue
+		}
+		if msg.Method == "client.get_version" {
+			if err := response(w, msg.ID, identity.Agent); err != nil {
+				return err
+			}
+			continue
+		}
+		if msg.Method != "mining.notify" || len(msg.Params) < 9 {
 			continue
 		}
 		prev, ok := msg.Params[1].(string)
@@ -264,6 +417,35 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 	}
 }
 
+func publishProtocol(ctx context.Context, out chan<- event, poolID string, endpoint model.Endpoint, method string, started time.Time, status, errorCategory string) error {
+	duration := float64(time.Since(started).Nanoseconds()) / float64(time.Millisecond)
+	record := model.Observation{
+		Version:        model.ObservationVersion,
+		RecordType:     model.RecordTypeProtocol,
+		ObservedAt:     time.Now().UTC(),
+		PoolID:         poolID,
+		Endpoint:       net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port)),
+		ProtocolMethod: method,
+		DurationMS:     &duration,
+		ResponseStatus: status,
+		TLS:            endpoint.TLS,
+		ErrorCategory:  errorCategory,
+	}
+	select {
+	case out <- event{poolID: poolID, protocol: &record}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func protocolErrorStatus(err error) string {
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		return model.ProtocolStatusTimeout
+	}
+	return model.ProtocolStatusError
+}
+
 func request(w *bufio.Writer, id int, method string, params any) error {
 	b, err := json.Marshal(map[string]any{"id": id, "method": method, "params": params})
 	if err != nil {
@@ -275,44 +457,60 @@ func request(w *bufio.Writer, id int, method string, params any) error {
 	return w.Flush()
 }
 
-func awaitResponse(ctx context.Context, conn net.Conn, r *bufio.Reader, id int) (json.RawMessage, error) {
+func response(w *bufio.Writer, id any, result any) error {
+	b, err := json.Marshal(map[string]any{"id": id, "result": result, "error": nil})
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(append(b, '\n')); err != nil {
+		return err
+	}
+	return w.Flush()
+}
+
+func awaitResponse(ctx context.Context, conn net.Conn, r *bufio.Reader, w *bufio.Writer, agent string, id int, timeout time.Duration) (json.RawMessage, any, error) {
+	deadline := time.Now().Add(timeout)
+	if contextDeadline, ok := ctx.Deadline(); ok && contextDeadline.Before(deadline) {
+		deadline = contextDeadline
+	}
 	for {
-		if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
-			return nil, err
+		if err := conn.SetReadDeadline(deadline); err != nil {
+			return nil, nil, err
 		}
 		line, err := r.ReadBytes('\n')
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		var msg struct {
 			ID     any             `json:"id"`
+			Method string          `json:"method"`
 			Result json.RawMessage `json:"result"`
 			Error  any             `json:"error"`
 		}
-		if json.Unmarshal(line, &msg) != nil || msg.ID == nil {
+		if json.Unmarshal(line, &msg) != nil {
 			continue
 		}
-		got := -1
-		switch v := msg.ID.(type) {
-		case float64:
-			got = int(v)
-		case string:
-			got, _ = strconv.Atoi(v)
-		}
-		if got != id {
-			continue
-		}
-		if msg.Error != nil {
-			return nil, fmt.Errorf("remote error: %v", msg.Error)
-		}
-		if id == 2 {
-			var accepted bool
-			if json.Unmarshal(msg.Result, &accepted) == nil && !accepted {
-				return nil, fmt.Errorf("authorization rejected")
+		if msg.Method == "client.get_version" {
+			if err := response(w, msg.ID, agent); err != nil {
+				return nil, nil, err
 			}
+			continue
 		}
-		return msg.Result, nil
+		if responseID(msg.ID) != id {
+			continue
+		}
+		return msg.Result, msg.Error, nil
 	}
 }
 
-var _ io.Reader
+func responseID(value any) int {
+	switch v := value.(type) {
+	case float64:
+		return int(v)
+	case string:
+		id, _ := strconv.Atoi(v)
+		return id
+	default:
+		return -1
+	}
+}

@@ -20,7 +20,7 @@ func TestRepositoryPoolRegistryLoadsAndConsolidates(t *testing.T) {
 			t.Errorf("obsolete or duplicate pool %q remains", removed)
 		}
 	}
-	for _, canonical := range []string{"2miners_btc_solo", "ckpool", "solohash_co_uk"} {
+	for _, canonical := range []string{"2miners_btc_solo", "ckpool", "m45core", "noderunners", "p2pool", "public_pool", "solohash_co_uk"} {
 		if _, ok := pools[canonical]; !ok {
 			t.Errorf("canonical pool %q is missing", canonical)
 		}

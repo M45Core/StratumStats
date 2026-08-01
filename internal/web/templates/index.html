@@ -1,64 +1,93 @@
+{{define "timing-cell"}}
+  {{if .Attempts}}
+    {{if .MedianMS}}
+      {{printf "%.1f ms" (metric .MedianMS)}}
+      <small>P95 {{printf "%.1f ms" (metric .P95MS)}}</small>
+    {{else}}
+      —<small>no successful timings</small>
+    {{end}}
+    <small>{{.Successes}}/{{.Attempts}} ok{{if .Rejected}} · {{.Rejected}} rejected{{end}}{{if .Unsupported}} · {{.Unsupported}} unsupported{{end}}{{if .Timeouts}} · {{.Timeouts}} timeout{{end}}{{if .Errors}} · {{.Errors}} error{{end}}</small>
+  {{else}}
+    —<small>no samples</small>
+  {{end}}
+{{end}}
 {{define "index.html"}}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>StratumStats — observable Bitcoin pool telemetry</title>
-  <meta name="description" content="Independent, reproducible Bitcoin mining pool measurements.">
+  <title>StratumStats — Bitcoin pool telemetry</title>
+  <meta name="description" content="Latency, availability, and protocol response times from Bitcoin Stratum probes.">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header>
   <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
-  <nav><a href="/pools">Pool registry</a><a href="/methodology">Methodology</a><a href="/api/v1/reports">Raw API</a></nav>
+  <nav><a href="/coinbase">Coinbase</a><a href="/pools">Pool registry</a><a href="/methodology">Methodology</a><a href="/api/v1/reports">API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
 </header>
 <main>
   <section class="hero">
     <div>
-      <p class="eyebrow">Independent pool telemetry</p>
-      <h1>Pool facts backed by <em>evidence.</em></h1>
-      <p class="lede">Every figure comes from repeatable Stratum measurements. No composite score, paid placement, operator surveys, or hidden weights.</p>
+      <h1>Bitcoin pool telemetry.</h1>
+      <p class="lede">Latency, availability, and protocol response times from repeatable Stratum probes.</p>
     </div>
-    <div class="principles"><span>Open methodology</span><span>Raw JSONL evidence</span><span>Pseudonymous probes</span></div>
   </section>
-  {{if .Demo}}<div class="notice">Demonstration data — these figures are synthetic and must not be represented as real pool results.</div>{{end}}
+  {{if .Demo}}<div class="notice">Demo data — synthetic measurements shown for interface preview only.</div>{{end}}
+
+  <section class="section-head protocol-head">
+    <div><p class="eyebrow">Session timings</p><h2>Protocol response</h2></div>
+    <p>Successful-operation medians · <code>mining.ping</code> is optional</p>
+  </section>
+  <div class="table-wrap">
+    <table class="protocol-table">
+      <thead><tr><th>Pool</th><th>Connect</th><th>TLS handshake</th><th>Subscribe</th><th>Authorize</th><th>Ping / pong</th></tr></thead>
+      <tbody>
+      {{range $r := .Snapshot.Reports}}
+        <tr>
+          <td><strong><a href="/pools#{{$r.PoolID}}">{{$r.PoolName}}</a></strong></td>
+          <td>{{template "timing-cell" $r.ConnectTiming}}</td>
+          <td>{{template "timing-cell" $r.TLSTiming}}</td>
+          <td>{{template "timing-cell" $r.SubscribeTiming}}</td>
+          <td>{{template "timing-cell" $r.AuthorizeTiming}}</td>
+          <td>{{template "timing-cell" $r.PingTiming}}</td>
+        </tr>
+      {{else}}
+        <tr><td colspan="6" class="empty">No protocol observations yet. Run the collector, or use <code>go run .</code> to preview demo mode.</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+
   <section class="section-head">
     <div><p class="eyebrow">Pool reports</p><h2>Observed pool behavior</h2></div>
     <p>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · Method {{.Snapshot.Methodology}}</p>
   </section>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Pool</th><th>Payout custody</th><th>Pool fee</th><th>Confidence</th><th>Availability</th><th>Median</th><th>P95</th></tr></thead>
+      <thead><tr><th>Pool</th><th>Eligible blocks</th><th>Availability</th><th>Median</th><th>P95</th><th>TLS</th></tr></thead>
       <tbody>
       {{range $r := .Snapshot.Reports}}
         <tr>
-          <td><strong><a href="/pools#{{.PoolID}}">{{.PoolName}}</a></strong><small>{{if $r.Category}}{{$r.Category}} · {{end}}{{$r.Blocks}} eligible blocks</small></td>
-          <td>
-            <span class="custody custody-{{$r.PayoutMode}}">{{if eq $r.PayoutMode "direct"}}Direct coinbase{{else if eq $r.PayoutMode "custodial"}}Trust pool{{else if eq $r.PayoutMode "mixed"}}Mixed{{else}}Unknown{{end}}</span>
-            {{if $r.DirectPayoutPct}}<small>{{printf "%.1f%% direct" (metric $r.DirectPayoutPct)}}</small>{{end}}
-          </td>
-          <td>
-            {{if $r.PoolFeePct}}{{printf "%.3f%%" (metric $r.PoolFeePct)}}
-              <small>{{if eq $r.FeeClass "zero"}}observed zero{{else if eq $r.FeeClass "variable"}}variable · median{{else}}observed · median{{end}}</small>
-            {{else}}—<small>not inferable</small>{{end}}
-          </td>
-          <td><span class="pill pill-{{$r.Confidence}}">{{$r.Confidence}}</span></td>
+          <td><strong><a href="/pools#{{.PoolID}}">{{.PoolName}}</a></strong><small>{{$r.Category}}</small></td>
+          <td>{{$r.Blocks}}</td>
           <td>{{$r.Availability}}%</td>
           <td>{{if $r.MedianMS}}{{printf "%.1f ms" (metric $r.MedianMS)}}{{else}}—{{end}}</td>
           <td>{{if $r.P95MS}}{{printf "%.1f ms" (metric $r.P95MS)}}{{else}}—{{end}}</td>
+          <td>{{if $r.TLSObserved}}observed{{else}}—{{end}}</td>
         </tr>
       {{else}}
-        <tr><td colspan="7" class="empty">No observations yet. Run the collector, or start with <code>demo</code> to preview the site.</td></tr>
+        <tr><td colspan="6" class="empty">No observations yet. Run the collector, or use <code>go run .</code> to preview demo mode.</td></tr>
       {{end}}
       </tbody>
     </table>
   </div>
+
   <section class="cards">
-    <article><p class="eyebrow">Fair by construction</p><h3>Same block. Same clock.</h3><p>Delivery latency is compared only within the same block and vantage point, reducing geographic and clock bias.</p></article>
-    <article><p class="eyebrow">Uncertainty shown</p><h3>Samples stay visible.</h3><p>Confidence comes only from eligible block count. Small datasets remain explicitly provisional instead of being inflated into a ranking.</p></article>
-    <article><p class="eyebrow">Verify us</p><h3>Recompute every figure.</h3><p>The source observations are append-only JSONL. Every aggregate is deterministic and available through the API.</p></article>
+    <article><p class="eyebrow">Comparable timing</p><h3>Same block, same vantage.</h3><p>Latency is calculated within each block and observation location.</p></article>
+    <article><p class="eyebrow">Sample context</p><h3>Counts remain visible.</h3><p>The eligible-block total is published beside every block-delivery measurement.</p></article>
+    <article><p class="eyebrow">Reproducible reports</p><h3>Source data in JSONL.</h3><p>Aggregates are deterministic and available through the API.</p></article>
   </section>
 </main>
-<footer><span>StratumStats</span><span>Measure claims. Publish uncertainty.</span></footer>
+<footer><span>StratumStats</span><span>Bitcoin pool telemetry.</span></footer>
 </body>
 </html>{{end}}

@@ -1,5 +1,5 @@
 package model
 
-// ObservationVersion 3 uses block terminology and adds observed pool-fee evidence.
+// ObservationVersion 4 adds independent protocol response timing records.
 // Readers remain backward compatible with version 1 latency-only records.
-const ObservationVersion = 3
+const ObservationVersion = 4

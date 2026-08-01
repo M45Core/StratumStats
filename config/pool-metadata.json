@@ -141,7 +141,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo-mining service with direct coinbase payout to the finding miner.",
+      "description": "Bitcoin solo-mining service whose documented jobs place the finding miner address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -197,7 +197,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool using FPPS and custodial Binance account balances.",
+      "description": "Account-based shared Bitcoin pool using FPPS with balances tracked in Binance accounts before withdrawal.",
       "products": [
         "FPPS"
       ],
@@ -267,7 +267,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Multi-mode non-custodial service offering solo, shared PPLNS, group-solo, and blockparty products; configured endpoints target the solo lane.",
+      "description": "Wallet-authenticated service offering solo, shared PPLNS, group-solo, and blockparty products; configured endpoints target the solo lane.",
       "products": [
         "SOLO",
         "PPLNS",
@@ -317,7 +317,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool using FPPS; balances remain custodial until payout.",
+      "description": "Account-based shared Bitcoin pool using FPPS; earnings are credited to an account before payout.",
       "products": [
         "FPPS"
       ],
@@ -355,7 +355,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Anonymous Bitcoin solo-mining product with the miner address directly in the coinbase.",
+      "description": "Anonymous Bitcoin solo-mining product whose documented jobs place the miner address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -402,7 +402,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Anonymous not-for-profit Bitcoin solo-mining service with direct coinbase payout and no operator payout wallet.",
+      "description": "Anonymous not-for-profit Bitcoin solo-mining service whose documented jobs place the worker address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -545,7 +545,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "German community Bitcoin solo pool based on ckpool-solo with direct worker payout.",
+      "description": "German community Bitcoin solo pool based on ckpool-solo whose documented jobs place the worker address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -781,7 +781,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "European Bitcoin solo pool with direct coinbase payout and an ancillary store-points program.",
+      "description": "European Bitcoin solo pool whose documented jobs place the finder address in a coinbase output, with an ancillary store-points program.",
       "products": [
         "SOLO"
       ],
@@ -820,7 +820,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Community-run Bitcoin solo pool with direct-to-address payouts.",
+      "description": "Community-run Bitcoin solo pool whose documented jobs place the worker address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -867,7 +867,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Non-custodial shared TIDES pool with optional miner-selected block templates through DATUM.",
+      "description": "Shared TIDES pool with optional miner-selected block templates through DATUM.",
       "products": [
         "TIDES"
       ],
@@ -1022,7 +1022,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo-mining pool with direct finder economics.",
+      "description": "Bitcoin solo-mining pool whose documented jobs place the finder address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -1096,7 +1096,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool supporting PPLNS and FPPS with custodial settlement.",
+      "description": "Account-based shared Bitcoin pool supporting PPLNS and FPPS with earnings credited before payout.",
       "products": [
         "PPLNS",
         "FPPS"
@@ -1131,7 +1131,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Non-custodial Bitcoin solo pool with direct coinbase payout to the finder.",
+      "description": "Bitcoin solo pool whose documented jobs place the finder address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -1169,7 +1169,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Non-custodial multi-coin SHA-256 solo-pool operator; this record covers Bitcoin.",
+      "description": "Wallet-authenticated multi-coin SHA-256 solo-pool operator; this record covers Bitcoin.",
       "products": [
         "SOLO"
       ],
@@ -1300,7 +1300,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Open-source Bitcoin solo-mining pool with direct worker payout.",
+      "description": "Open-source Bitcoin solo-mining pool whose documented jobs place the worker address in a coinbase output.",
       "products": [
         "SOLO"
       ],
@@ -1394,7 +1394,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "European non-custodial Bitcoin solo pool; unrelated to SoloPool.Com.",
+      "description": "European wallet-authenticated Bitcoin solo pool; unrelated to SoloPool.Com.",
       "products": [
         "SOLO"
       ],
@@ -1456,7 +1456,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool offering PPLNS and FPPS with daily custodial settlement.",
+      "description": "Account-based shared Bitcoin pool offering PPLNS and FPPS with daily account settlement.",
       "products": [
         "PPLNS",
         "FPPS"

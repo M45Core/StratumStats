@@ -26,8 +26,8 @@ func TestComputeReportsAvailabilityAndLatency(t *testing.T) {
 		t.Fatal("median latency not reported")
 	}
 
-	if s.Reports[0].Confidence != "moderate" {
-		t.Fatalf("confidence = %q", s.Reports[0].Confidence)
+	if s.Reports[0].Blocks != 40 {
+		t.Fatalf("eligible blocks = %d", s.Reports[0].Blocks)
 	}
 }
 
