@@ -1,0 +1,1706 @@
+{
+  "schema_version": 2,
+  "research_as_of": "2026-08-01",
+  "generated_from": [
+    {
+      "name": "stratum-race",
+      "path": "../stratum-race/config/pools.json"
+    },
+    {
+      "name": "PoolCensus",
+      "path": "../PoolCensus/collector/pools.json"
+    },
+    {
+      "name": "pool-research",
+      "path": "pool-metadata.json"
+    }
+  ],
+  "pools": [
+    {
+      "id": "2miners_btc_solo",
+      "name": "2Miners Bitcoin SOLO",
+      "website": "https://2miners.com/solo-btc-mining-pool",
+      "category": "solo",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "asia-solo-btc.2miners.com",
+          "port": 12323,
+          "tls": true,
+          "region": "Asia",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "asia-solo-btc.2miners.com",
+          "port": 2323,
+          "tls": false,
+          "region": "Asia",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo-btc.2miners.com",
+          "port": 12323,
+          "tls": true,
+          "region": "Europe",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo-btc.2miners.com",
+          "port": 2323,
+          "tls": false,
+          "region": "Europe",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "us-solo-btc.2miners.com",
+          "port": 12323,
+          "tls": true,
+          "region": "United States",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "us-solo-btc.2miners.com",
+          "port": 2323,
+          "tls": false,
+          "region": "United States",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "2Miners",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Bitcoin solo-mining product with regional endpoints; a finder receives the block reward less the advertised pool fee.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "1.5%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "2Miners Bitcoin SOLO",
+          "url": "https://2miners.com/solo-btc-mining-pool"
+        }
+      ]
+    },
+    {
+      "id": "antpool",
+      "name": "ANTPOOL",
+      "website": "https://www.antpool.com/home?language=en",
+      "category": "shared",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "ss.antpool.com",
+          "port": 3333,
+          "tls": false,
+          "label": "official Bitcoin endpoint",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Antpool Technologies Pte. Ltd.",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based shared Bitcoin pool with FPPS and PPLNS reward modes.",
+      "products": [
+        "FPPS",
+        "PPLNS"
+      ],
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "ANTPOOL",
+          "url": "https://www.antpool.com/home?language=en"
+        }
+      ]
+    },
+    {
+      "id": "atlaspool",
+      "name": "AtlasPool",
+      "website": "https://atlaspool.io/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "solo.atlaspool.io",
+          "port": 3333,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo.atlaspool.io",
+          "port": 4333,
+          "tls": true,
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo.atlaspool.io",
+          "port": 4334,
+          "tls": false,
+          "label": "high difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "AtlasPool",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Bitcoin solo-mining service with direct coinbase payout to the finding miner.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "1.5%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "AtlasPool",
+          "url": "https://atlaspool.io/"
+        },
+        {
+          "title": "AtlasPool terms",
+          "url": "https://atlaspool.io/terms-of-service.html"
+        }
+      ]
+    },
+    {
+      "id": "binance_pool",
+      "name": "Binance Pool",
+      "website": "https://pool.binance.com/en",
+      "category": "shared",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "bs.poolbinance.com",
+          "port": 3333,
+          "tls": false,
+          "label": "official Bitcoin endpoint",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Binance",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based shared Bitcoin pool using FPPS and custodial Binance account balances.",
+      "products": [
+        "FPPS"
+      ],
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Binance Pool",
+          "url": "https://pool.binance.com/en"
+        },
+        {
+          "title": "Binance BTC mining guide",
+          "url": "https://www.binance.com/en/support/faq/detail/360041370811"
+        }
+      ]
+    },
+    {
+      "id": "bitcoinmerch",
+      "name": "Bitcoin Merch Lucky Pool",
+      "website": "https://pool.bitcoinmerch.com/",
+      "category": "solo",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "pool.bitcoinmerch.com",
+          "port": 3333,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Bitcoin Merch LLC",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Bitcoin solo-mining pool oriented toward home-mining devices.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "2%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Bitcoin Merch Lucky Pool",
+          "url": "https://pool.bitcoinmerch.com/"
+        }
+      ]
+    },
+    {
+      "id": "blitzpool",
+      "name": "Blitzpool",
+      "website": "https://blitzpool.yourdevice.ch/",
+      "category": "hybrid",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 3333,
+          "tls": false,
+          "label": "SOLO",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 6666,
+          "tls": true,
+          "label": "SOLO TLS",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "yourdevice.ch",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Multi-mode non-custodial service offering solo, shared PPLNS, group-solo, and blockparty products; configured endpoints target the solo lane.",
+      "products": [
+        "SOLO",
+        "PPLNS",
+        "group solo",
+        "blockparty"
+      ],
+      "advertised_fee": "SOLO 0%; PPLNS 1%; group solo 1.5%; blockparty 1.5%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Blitzpool",
+          "url": "https://blitzpool.yourdevice.ch/"
+        },
+        {
+          "title": "Blitzpool mining modes",
+          "url": "https://blitzpool.yourdevice.ch/mining-modes"
+        }
+      ]
+    },
+    {
+      "id": "braiins_pool",
+      "name": "Braiins Pool",
+      "website": "https://braiins.com/pool",
+      "category": "shared",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "stratum.braiins.com",
+          "port": 3333,
+          "tls": false,
+          "label": "Stratum V1",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Braiins Mining Ltd.",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based shared Bitcoin pool using FPPS; balances remain custodial until payout.",
+      "products": [
+        "FPPS"
+      ],
+      "advertised_fee": "2.5% standard; 0% with Braiins OS",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Braiins Pool",
+          "url": "https://braiins.com/pool"
+        },
+        {
+          "title": "Braiins rewards and payouts",
+          "url": "https://academy.braiins.com/braiins-pool/rewards-and-payouts"
+        }
+      ]
+    },
+    {
+      "id": "braiins_solo",
+      "name": "Braiins Solo",
+      "website": "https://solo.braiins.com/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "solo.stratum.braiins.com",
+          "port": 3333,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo.stratum.braiins.com",
+          "port": 443,
+          "tls": false,
+          "label": "plaintext firewall-friendly",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Braiins Mining Ltd.",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Anonymous Bitcoin solo-mining product with the miner address directly in the coinbase.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0.5%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Braiins Solo",
+          "url": "https://solo.braiins.com/"
+        },
+        {
+          "title": "Braiins solo-mining documentation",
+          "url": "https://academy.braiins.com/braiins-pool/solo-mining"
+        }
+      ]
+    },
+    {
+      "id": "ckpool",
+      "name": "Solo CKPool",
+      "website": "https://solo.ckpool.org/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "stratum.ckpool.org",
+          "port": 3333,
+          "tls": false,
+          "label": "global standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "stratum.ckpool.org",
+          "port": 4334,
+          "tls": false,
+          "label": "rental high difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Solo CKPool",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Anonymous not-for-profit Bitcoin solo-mining service with direct coinbase payout and no operator payout wallet.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "2%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Solo CKPool",
+          "url": "https://solo.ckpool.org/"
+        },
+        {
+          "title": "Solo CKPool stats",
+          "url": "https://stats.ckpool.org/"
+        }
+      ]
+    },
+    {
+      "id": "f2pool",
+      "name": "f2pool",
+      "website": "https://www.f2pool.com/",
+      "category": "shared",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "btc.f2pool.com",
+          "port": 1314,
+          "tls": false,
+          "label": "primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.f2pool.com",
+          "port": 3333,
+          "tls": false,
+          "label": "backup",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btcssl.f2pool.com",
+          "port": 1300,
+          "tls": true,
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "f2pool",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based shared Bitcoin pool with selectable FPPS and PPLNS products and merged-mining rewards.",
+      "products": [
+        "FPPS",
+        "PPLNS"
+      ],
+      "advertised_fee": "FPPS 4%; PPLNS 2%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "f2pool",
+          "url": "https://www.f2pool.com/"
+        },
+        {
+          "title": "f2pool Bitcoin mining guide",
+          "url": "https://f2pool.io/mining/guides/how-to-mine-bitcoin/"
+        }
+      ]
+    },
+    {
+      "id": "findmyblock_xyz",
+      "name": "FindMyBlock.xyz",
+      "website": "https://findmyblock.xyz/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research"
+      ],
+      "endpoints": [
+        {
+          "host": "eu.findmyblock.xyz",
+          "port": 3335,
+          "tls": false,
+          "region": "Europe",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "FindMyBlock.xyz",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "France-hosted community Bitcoin solo pool aimed at home miners.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "FindMyBlock.xyz",
+          "url": "https://findmyblock.xyz/"
+        },
+        {
+          "title": "PoolCensus",
+          "url": "https://poolcensus.m45core.com/"
+        }
+      ]
+    },
+    {
+      "id": "gobrrr_me",
+      "name": "Go Brrr Pool",
+      "website": "https://pool.gobrrr.me/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research"
+      ],
+      "endpoints": [
+        {
+          "host": "pool.gobrrr.me",
+          "port": 3333,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Go Brrr",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "German community Bitcoin solo pool based on ckpool-solo with direct worker payout.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Go Brrr Pool",
+          "url": "https://pool.gobrrr.me/"
+        },
+        {
+          "title": "Go Brrr 2026 mining guide",
+          "url": "https://www.gobrrr.me/bitcoin-mining-for-beginners-the-complete-guide-2026/"
+        }
+      ]
+    },
+    {
+      "id": "helios",
+      "name": "HeliosPool",
+      "website": "https://heliospool.com/",
+      "category": "solo",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "btc.heliospool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "North America",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "HeliosPool",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Regional multi-chain solo-pool operator; this record covers its Bitcoin product.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "1%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "HeliosPool",
+          "url": "https://heliospool.com/"
+        },
+        {
+          "title": "HeliosPool FAQ",
+          "url": "https://heliospool.com/faq/"
+        },
+        {
+          "title": "HeliosPool status",
+          "url": "https://status.heliospool.com/"
+        }
+      ]
+    },
+    {
+      "id": "kano_solo_mode",
+      "name": "KanoPool",
+      "website": "https://kano.is/",
+      "category": "hybrid",
+      "sources": [
+        "PoolCensus",
+        "pool-research"
+      ],
+      "endpoints": [
+        {
+          "host": "stratum.kano.is",
+          "port": 3333,
+          "tls": false,
+          "label": "mode selected in account",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "KanoPool",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based pool offering shared three-day PPLNS and selectable solo modes on the same infrastructure.",
+      "products": [
+        "PPLNS",
+        "SOLO"
+      ],
+      "advertised_fee": "0.5%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "KanoPool",
+          "url": "https://kano.is/"
+        },
+        {
+          "title": "KanoPool setup",
+          "url": "https://kano.is/gekko.php"
+        },
+        {
+          "title": "KanoPool announcement",
+          "url": "https://bitcointalk.org/index.php?topic=789369"
+        }
+      ]
+    },
+    {
+      "id": "letsmineit",
+      "name": "LetsMine.it",
+      "website": "https://letsmine.it/",
+      "category": "hybrid",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "us1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "United States",
+          "label": "Bitcoin SOLO",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "LetsMine.it",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Multi-product mining platform offering solo, proportional shared, sell-hashrate, and ticket-mining products; this endpoint is the Bitcoin solo lane.",
+      "products": [
+        "SOLO",
+        "PROP",
+        "PPS",
+        "ticket mining"
+      ],
+      "advertised_fee": "SOLO 1%; PROP 1%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "LetsMine.it",
+          "url": "https://letsmine.it/"
+        },
+        {
+          "title": "LetsMine.it FAQ",
+          "url": "https://letsmine.it/en/posts/tutorial/faq"
+        }
+      ]
+    },
+    {
+      "id": "m45core",
+      "name": "M45Core.com",
+      "website": "https://m45core.com/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "m45core.com",
+          "port": 3333,
+          "tls": false,
+          "region": "United States",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "m45core.com",
+          "port": 4333,
+          "tls": true,
+          "region": "United States",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "tinyminer.m45core.com",
+          "port": 3334,
+          "tls": false,
+          "region": "United States",
+          "label": "TinyMiner low difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "tinyminer.m45core.com",
+          "port": 4334,
+          "tls": true,
+          "region": "United States",
+          "label": "TinyMiner low difficulty TLS",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "M45Core",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Zero-fee Bitcoin solo pool with a separate TinyMiner lane for very low-hashrate devices; the retired EU service is excluded.",
+      "products": [
+        "SOLO",
+        "TinyMiner SOLO"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "M45Core.com",
+          "url": "https://m45core.com/"
+        },
+        {
+          "title": "TinyMiner.M45Core.com",
+          "url": "https://tinyminer.m45core.com/"
+        }
+      ]
+    },
+    {
+      "id": "mineshop",
+      "name": "Mineshop Solo Pool",
+      "website": "https://solo.mineshop.eu/",
+      "category": "solo",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "solo.mineshop.eu",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe",
+          "label": "global standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Mineshop.eu",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "European Bitcoin solo pool with direct coinbase payout and an ancillary store-points program.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Mineshop Solo Pool",
+          "url": "https://solo.mineshop.eu/"
+        },
+        {
+          "title": "Mineshop.eu",
+          "url": "https://mineshop.eu/"
+        }
+      ]
+    },
+    {
+      "id": "noderunners",
+      "name": "Noderunners Mining Pool",
+      "website": "https://noderunners.network/en/pool",
+      "category": "solo",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "pool.noderunners.network",
+          "port": 1336,
+          "tls": true,
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "pool.noderunners.network",
+          "port": 1337,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Noderunners",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Community-run Bitcoin solo pool with direct-to-address payouts.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Noderunners Mining Pool",
+          "url": "https://noderunners.network/en/pool"
+        },
+        {
+          "title": "Noderunners block history",
+          "url": "https://mempool.space/mining/pool/noderunners"
+        }
+      ]
+    },
+    {
+      "id": "ocean",
+      "name": "OCEAN",
+      "website": "https://ocean.xyz/",
+      "category": "shared",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "mine.ocean.xyz",
+          "port": 3334,
+          "tls": false,
+          "label": "default Stratum V1",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "OCEAN",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Non-custodial shared TIDES pool with optional miner-selected block templates through DATUM.",
+      "products": [
+        "TIDES"
+      ],
+      "advertised_fee": "2%; 1% with DATUM or miner-selected templates",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "OCEAN",
+          "url": "https://ocean.xyz/"
+        },
+        {
+          "title": "OCEAN block history",
+          "url": "https://mempool.space/mining/pool/ocean"
+        }
+      ]
+    },
+    {
+      "id": "p2pool",
+      "name": "P2Pool (original Bitcoin network)",
+      "website": "https://github.com/p2pool/p2pool",
+      "category": "decentralized",
+      "sources": [
+        "PoolCensus",
+        "pool-research"
+      ],
+      "endpoints": [],
+      "operator": "P2Pool open-source project",
+      "status": "inactive",
+      "auth_model": "local_node",
+      "probe_status": "no_central_endpoint",
+      "description": "Original decentralized PPLNS-style Bitcoin sharechain; effectively dormant for production Bitcoin and retained as a historical reference.",
+      "products": [
+        "PPLNS sharechain"
+      ],
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Original P2Pool repository",
+          "url": "https://github.com/p2pool/p2pool"
+        },
+        {
+          "title": "Bitcoin Wiki P2Pool",
+          "url": "https://en.bitcoin.it/wiki/P2Pool"
+        },
+        {
+          "title": "Independent P2Pool stewardship note",
+          "url": "https://p2pool.org/"
+        }
+      ]
+    },
+    {
+      "id": "parasite",
+      "name": "Parasite Pool",
+      "website": "https://parasite.space/",
+      "category": "hybrid",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "parasite.wtf",
+          "port": 42069,
+          "tls": false,
+          "label": "official Stratum endpoint",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Parasite Pool",
+      "status": "active",
+      "auth_model": "wallet_or_lightning",
+      "probe_status": "compatible",
+      "description": "Finder-bonus shared-round pool that pays a fixed finder award and distributes the remaining reward among round contributors.",
+      "products": [
+        "finder bonus",
+        "shared round"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Parasite Pool",
+          "url": "https://parasite.space/"
+        },
+        {
+          "title": "Parasite Pool source",
+          "url": "https://github.com/parasitepool/para"
+        }
+      ]
+    },
+    {
+      "id": "public_pool",
+      "name": "Public Pool",
+      "website": "https://web.public-pool.io/",
+      "category": "hybrid",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "public-pool.io",
+          "port": 3333,
+          "tls": false,
+          "label": "SOLO Stratum V1",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "public-pool.io",
+          "port": 4333,
+          "tls": true,
+          "label": "SOLO Stratum V1 TLS",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Public Pool",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Open-source zero-fee service offering separate solo and PPLNS products; configured endpoints target the solo product.",
+      "products": [
+        "SOLO",
+        "PPLNS"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Public Pool dashboard",
+          "url": "https://web.public-pool.io/"
+        },
+        {
+          "title": "Public Pool source",
+          "url": "https://github.com/benjamin-wilson/public-pool"
+        }
+      ]
+    },
+    {
+      "id": "pyblock",
+      "name": "PyBLOCK",
+      "website": "https://pool.pyblock.xyz/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "pool.pyblock.xyz",
+          "port": 4444,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "PyBLOCK",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Bitcoin solo-mining pool with direct finder economics.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0.4%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "PyBLOCK project",
+          "url": "https://curly60e.github.io/pyblock/"
+        },
+        {
+          "title": "PyBLOCK dashboard",
+          "url": "https://pool.pyblock.xyz/"
+        }
+      ]
+    },
+    {
+      "id": "satoshiradio_solo",
+      "name": "Satoshi Radio Mining Pool",
+      "website": "https://pool.satoshiradio.nl/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research"
+      ],
+      "endpoints": [
+        {
+          "host": "pool.satoshiradio.nl",
+          "port": 3333,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Satoshi Radio",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Community Bitcoin solo pool focused on home miners.",
+      "products": [
+        "SOLO"
+      ],
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "Satoshi Radio Mining Pool",
+          "url": "https://pool.satoshiradio.nl/"
+        },
+        {
+          "title": "PoolCensus",
+          "url": "https://poolcensus.m45core.com/"
+        }
+      ]
+    },
+    {
+      "id": "secpool",
+      "name": "SECPOOL",
+      "website": "https://v3.secpool.com/",
+      "category": "shared",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "btc.secpool.com",
+          "port": 3333,
+          "tls": false,
+          "label": "official Bitcoin endpoint",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "SECPOOL",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based shared Bitcoin pool supporting PPLNS and FPPS with custodial settlement.",
+      "products": [
+        "PPLNS",
+        "FPPS"
+      ],
+      "advertised_fee": "PPLNS 0%; FPPS 4% (current displayed rates)",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "SECPOOL",
+          "url": "https://v3.secpool.com/"
+        }
+      ]
+    },
+    {
+      "id": "solo_cat",
+      "name": "solo.cat",
+      "website": "https://solo.cat/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research"
+      ],
+      "endpoints": [
+        {
+          "host": "solo.cat",
+          "port": 3333,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "Solo Cat",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Non-custodial Bitcoin solo pool with direct coinbase payout to the finder.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "solo.cat",
+          "url": "https://solo.cat/"
+        },
+        {
+          "title": "PoolCensus",
+          "url": "https://poolcensus.m45core.com/"
+        }
+      ]
+    },
+    {
+      "id": "solofury",
+      "name": "SoloFury",
+      "website": "https://solofury.com/",
+      "category": "solo",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "label": "primary",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "SoloFury",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Non-custodial multi-coin SHA-256 solo-pool operator; this record covers Bitcoin.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "1%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "SoloFury",
+          "url": "https://solofury.com/"
+        },
+        {
+          "title": "SoloFury API documentation",
+          "url": "https://solofury.com/api-docs/"
+        }
+      ]
+    },
+    {
+      "id": "solohash_co_uk",
+      "name": "SoloHash Bitcoin Solo",
+      "website": "https://solohash.co.uk/pool/bitcoin-solo",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "solo-ca.solohash.co.uk",
+          "port": 3333,
+          "tls": false,
+          "region": "Canada",
+          "label": "low difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo-ca.solohash.co.uk",
+          "port": 3334,
+          "tls": false,
+          "region": "Canada",
+          "label": "high difficulty; payout validation pending",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo-de.solohash.co.uk",
+          "port": 3333,
+          "tls": false,
+          "region": "Germany",
+          "label": "low difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo-de.solohash.co.uk",
+          "port": 3334,
+          "tls": false,
+          "region": "Germany",
+          "label": "high difficulty; payout validation pending",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo.solohash.co.uk",
+          "port": 3333,
+          "tls": false,
+          "region": "United Kingdom",
+          "label": "low difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "solo.solohash.co.uk",
+          "port": 3334,
+          "tls": false,
+          "region": "United Kingdom",
+          "label": "high difficulty; payout validation pending",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "SoloHash",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Multi-region Bitcoin solo product with low- and high-difficulty lanes; regional registry rows are consolidated here.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0.5%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "SoloHash Bitcoin Solo",
+          "url": "https://solohash.co.uk/pool/bitcoin-solo"
+        },
+        {
+          "title": "SoloHash pool API",
+          "url": "https://api.solohash.co.uk/api/v1/pools"
+        },
+        {
+          "title": "SoloHash announcement",
+          "url": "https://bitcointalk.org/index.php?topic=5513459.msg64641476"
+        }
+      ]
+    },
+    {
+      "id": "solomining_de",
+      "name": "SoloMining.de",
+      "website": "https://pool.solomining.de/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "pool.solomining.de",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "pool.solomining.de",
+          "port": 4333,
+          "tls": true,
+          "region": "Europe",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "SoloMining.de",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Open-source Bitcoin solo-mining pool with direct worker payout.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "SoloMining.de",
+          "url": "https://pool.solomining.de/"
+        },
+        {
+          "title": "PoolCensus",
+          "url": "https://poolcensus.m45core.com/"
+        }
+      ]
+    },
+    {
+      "id": "solopool_com",
+      "name": "SoloPool.Com",
+      "website": "https://solopool.com/",
+      "category": "hybrid",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "stratum.solopool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "United States",
+          "label": "mode selected by password",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "SoloPool.Com",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Hybrid solo, proportional shared, and user-split service whose mode is selected through the Stratum password; the collector password selects solo.",
+      "products": [
+        "SOLO",
+        "Prop+",
+        "Solo Split"
+      ],
+      "advertised_fee": "2%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "SoloPool.Com",
+          "url": "https://solopool.com/"
+        },
+        {
+          "title": "SoloPool.Com documentation",
+          "url": "https://solopool.com/docs.html"
+        },
+        {
+          "title": "SoloPool.Com terms",
+          "url": "https://solopool.com/terms.html"
+        }
+      ]
+    },
+    {
+      "id": "solopool_org_eu3",
+      "name": "SoloPool.org Bitcoin Solo",
+      "website": "https://btc.solopool.org/",
+      "category": "solo",
+      "sources": [
+        "PoolCensus",
+        "pool-research"
+      ],
+      "endpoints": [
+        {
+          "host": "eu3.solopool.org",
+          "port": 7005,
+          "tls": false,
+          "region": "Europe",
+          "label": "difficulty tier",
+          "sources": [
+            "PoolCensus",
+            "pool-research"
+          ]
+        },
+        {
+          "host": "eu3.solopool.org",
+          "port": 8005,
+          "tls": false,
+          "region": "Europe",
+          "label": "difficulty tier",
+          "sources": [
+            "PoolCensus",
+            "pool-research"
+          ]
+        },
+        {
+          "host": "eu3.solopool.org",
+          "port": 9005,
+          "tls": false,
+          "region": "Europe",
+          "label": "PoolCensus-validated tier",
+          "sources": [
+            "PoolCensus",
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "SoloPool.org",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "European non-custodial Bitcoin solo pool; unrelated to SoloPool.Com.",
+      "products": [
+        "SOLO"
+      ],
+      "advertised_fee": "1.5%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "SoloPool.org Bitcoin pool",
+          "url": "https://btc.solopool.org/"
+        },
+        {
+          "title": "PoolCensus",
+          "url": "https://poolcensus.m45core.com/"
+        }
+      ]
+    },
+    {
+      "id": "spiderpool",
+      "name": "SpiderPool",
+      "website": "https://www.spiderpool.com/",
+      "category": "shared",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "btc-us.spiderpool.com",
+          "port": 2309,
+          "tls": false,
+          "region": "North America",
+          "label": "primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-us.spiderpool.com",
+          "port": 2310,
+          "tls": true,
+          "region": "North America",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-us.spiderpool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "North America",
+          "label": "backup",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "SpiderPool",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based shared Bitcoin pool offering PPLNS and FPPS with daily custodial settlement.",
+      "products": [
+        "PPLNS",
+        "FPPS"
+      ],
+      "advertised_fee": "PPLNS 1% current displayed rate; FPPS 4%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "SpiderPool",
+          "url": "https://www.spiderpool.com/"
+        },
+        {
+          "title": "SpiderPool Bitcoin mining guide",
+          "url": "https://support.spiderpool.com/bitcoin-mining"
+        }
+      ]
+    },
+    {
+      "id": "viabtc",
+      "name": "ViaBTC",
+      "website": "https://www.viabtc.com/",
+      "category": "hybrid",
+      "sources": [
+        "pool-research",
+        "stratum-race"
+      ],
+      "endpoints": [
+        {
+          "host": "btc-ssl.viabtc.io",
+          "port": 551,
+          "tls": true,
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.viabtc.io",
+          "port": 3333,
+          "tls": false,
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "ViaBTC",
+      "status": "active",
+      "auth_model": "account",
+      "probe_status": "requires_credentials",
+      "description": "Account-based multi-mode Bitcoin pool offering PPS+, PPLNS, and SOLO settlement.",
+      "products": [
+        "PPS+",
+        "PPLNS",
+        "SOLO"
+      ],
+      "advertised_fee": "PPS+ block reward 4% and transaction fees 2%; PPLNS 2%; SOLO 1%",
+      "fee_checked_at": "2026-08-01",
+      "last_verified": "2026-08-01",
+      "research_sources": [
+        {
+          "title": "ViaBTC",
+          "url": "https://www.viabtc.com/"
+        },
+        {
+          "title": "ViaBTC BTC mining guide",
+          "url": "https://support.viabtc.com/hc/en-us/articles/7207401012879-BTC-Mining"
+        },
+        {
+          "title": "ViaBTC reward calculation",
+          "url": "https://support.viabtc.com/hc/en-us/articles/7207397084047-How-are-profits-calculated"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{{define "pools.html"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pool registry — StratumStats</title>
+  <meta name="description" content="Researched names, products, status, terms, and endpoints for Bitcoin mining pools measured by StratumStats.">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
+  <nav><a href="/">Reports</a><a href="/methodology">Methodology</a><a href="/api/v1/pools">Registry API</a></nav>
+</header>
+<main>
+  <section class="registry-hero">
+    <p class="eyebrow">Pool registry · researched {{.AsOf}}</p>
+    <h1>Know what each endpoint <em>actually is.</em></h1>
+    <p class="lede">Canonical operator names, product types, advertised terms, and current Stratum V1 connection details. Regional aliases are grouped under one pool so they are not mistaken for independent operators.</p>
+  </section>
+  <div class="notice registry-notice">Registry facts are researched context, not score inputs. Fees and product terms are operator claims checked on the listed date; measured payout and transport evidence remain separate.</div>
+  <section class="registry-grid">
+    {{range .Pools}}
+    <article class="pool-card" id="{{.ID}}">
+      <div class="pool-card-head">
+        <div>
+          <p class="pool-id">{{.ID}}</p>
+          <h2>{{if .Website}}<a href="{{.Website}}" target="_blank" rel="noreferrer">{{.Name}}</a>{{else}}{{.Name}}{{end}}</h2>
+        </div>
+        <div class="pool-badges">
+          <span class="pool-type pool-type-{{.Category}}">{{.Category}}</span>
+          <span class="pool-status pool-status-{{.Status}}">{{.Status}}</span>
+        </div>
+      </div>
+      <p class="pool-description">{{.Description}}</p>
+      <dl class="pool-facts">
+        <div><dt>Operator</dt><dd>{{if .Operator}}{{.Operator}}{{else}}Not established{{end}}</dd></div>
+        <div><dt>Products</dt><dd>{{range $i, $product := .Products}}{{if $i}} · {{end}}{{$product}}{{else}}Not confirmed{{end}}</dd></div>
+        <div><dt>Advertised fee</dt><dd>{{if .AdvertisedFee}}{{.AdvertisedFee}}<small>checked {{.FeeCheckedAt}}</small>{{else}}Not confirmed{{end}}</dd></div>
+        <div><dt>Collector fit</dt><dd>{{if eq .ProbeStatus "compatible"}}Pseudonymous V1 probe compatible{{else if eq .ProbeStatus "requires_credentials"}}Account credentials required{{else if eq .ProbeStatus "no_central_endpoint"}}No central endpoint{{else}}{{.ProbeStatus}}{{end}}<small>auth: {{.AuthModel}}</small></dd></div>
+      </dl>
+      <div class="pool-subsection">
+        <h3>Stratum V1 endpoints</h3>
+        <ul class="endpoint-list">
+          {{range .Endpoints}}
+          <li><code>{{.Host}}:{{.Port}}</code>{{if .TLS}}<span class="tls">TLS</span>{{end}}{{if .Region}}<small>{{.Region}}</small>{{end}}{{if .Label}}<small>{{.Label}}</small>{{end}}</li>
+          {{else}}
+          <li class="muted">No compatible central V1 endpoint.</li>
+          {{end}}
+        </ul>
+      </div>
+      <div class="pool-subsection sources">
+        <h3>Research sources</h3>
+        <p>{{range $i, $source := .ResearchSources}}{{if $i}} · {{end}}<a href="{{$source.URL}}" target="_blank" rel="noreferrer">{{$source.Title}}</a>{{else}}No web source recorded{{end}}</p>
+      </div>
+      <p class="verified">Last checked {{.LastVerified}}</p>
+    </article>
+    {{end}}
+  </section>
+</main>
+<footer><span>StratumStats</span><span>Operator claims separated from measurements.</span></footer>
+</body>
+</html>{{end}}

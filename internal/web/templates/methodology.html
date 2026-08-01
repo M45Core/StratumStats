@@ -1,0 +1,45 @@
+{{define "methodology.html"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Methodology — StratumStats</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
+  <nav><a href="/">Reports</a><a href="/pools">Pool registry</a><a href="/api/v1/methodology">Method API</a></nav>
+</header>
+<main class="prose">
+  <p class="eyebrow">Method {{.Methodology}}</p>
+  <h1>Measurements that can be challenged.</h1>
+  <p class="lede">StratumStats publishes observed dimensions separately. It does not collapse subjective weights into a composite score or declare one universally best pool.</p>
+
+  <h2>Published measurements</h2>
+  <div class="method-grid">
+    <article><h3>Availability</h3><p>Conservative 95% Wilson lower bound of full-template arrivals over eligible blocks. Disappearing during an observed block counts as a miss.</p></article>
+    <article><h3>Median delivery</h3><p>Median full-template delay relative to the earliest structurally valid template observed for the same block and vantage.</p></article>
+    <article><h3>Tail delivery</h3><p>95th-percentile relative delay, exposing intermittent stalls that a median can hide.</p></article>
+    <article><h3>Transport security</h3><p>Whether a configured TLS endpoint successfully completed a measured Stratum session.</p></article>
+  </div>
+
+  <h2>Why empty-first is not scored</h2>
+  <p>After a new block, Bitcoin Core validates the block, updates chain and mempool state, and assembles a transaction-bearing template. Sending coinbase-only work immediately can prevent miners from wasting time on the stale parent. Empty-first frequency is not inherently bad; only empty-to-full duration and resulting fee opportunity cost are meaningful.</p>
+
+  <h2>Payout custody and pool fee</h2>
+  <p>For every structurally valid job, the probe reconstructs the coinbase with its negotiated extranonces and looks for the exact generated worker payout script. A match is direct coinbase payment. No match means the miner must trust the pool to account for and later pay earnings.</p>
+  <p>For direct payment, the observed pool fee is <code>100 × (all coinbase outputs − worker outputs) / all coinbase outputs</code>. Optional donations or configured splits can be included, so this is the effective fee visible in the work—not a claim about the pool’s advertised policy. A fee cannot be inferred for custodial payouts from Stratum alone.</p>
+
+  <h2>What is deliberately excluded</h2>
+  <p>Pool size, popularity, advertising, sponsorship, subjective reputation, unverified operator claims, and any composite score. Custodial payout correctness still needs a controlled hashrate/payment study.</p>
+
+  <h2>Anonymity and its limit</h2>
+  <p>Each connection uses a newly generated valid-looking Bitcoin address, ordinary worker name, and rotated miner agent. Credentials are never persisted. This reduces special treatment based on a known benchmark account, but it does not conceal the probe’s source IP. Published vantage labels should be coarse regions, never hostnames or IP addresses.</p>
+
+  <h2>Disclosures</h2>
+  <ul>{{range .Disclosure}}<li>{{.}}</li>{{end}}</ul>
+</main>
+<footer><span>StratumStats</span><span>Metrics before conclusions.</span></footer>
+</body>
+</html>{{end}}

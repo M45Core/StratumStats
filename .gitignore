@@ -1,0 +1,5 @@
+/stratumstats
+/data/*.jsonl
+!/data/.gitkeep
+*.tmp
+.DS_Store
