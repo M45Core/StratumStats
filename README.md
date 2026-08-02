@@ -57,10 +57,10 @@ The dashboard checks for new measurements every 10 seconds without reloading
 the page. Changed pool rows briefly flash, and rows are moved or re-sorted when
 their verification state or block-template latency changes.
 
-A proposed low-cost, standalone Fly.io probe for sampled US West, Central, and
-East measurements is specified in
-[`docs/regional-probe-design.md`](docs/regional-probe-design.md). It remains
-separate from the main server and is not yet an active data source.
+A low-cost, standalone Fly.io probe for sampled US West, Central, and East
+measurements is implemented in the separate StratumScout repository and specified
+in [`docs/regional-probe-design.md`](docs/regional-probe-design.md). Its live Fly
+canary has not yet started, so it is not yet an active data source.
 
 Configuration is in `config/pools.json`. The collector never submits shares.
 Current records use observation schema version 6 with retry-safe IDs, source

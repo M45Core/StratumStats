@@ -1,7 +1,6 @@
 # Regional probe design
 
-Status: approved MVP; StratumStats collector side implemented, standalone probe
-measurement engine in progress
+Status: MVP implemented in StratumStats and StratumScout; live Fly canary pending
 
 This specifies a separate, disposable Fly.io application that sends sampled
 regional Stratum measurements to the main StratumStats server. It is not a
@@ -57,9 +56,10 @@ It is a static Go binary built with the standard library in a `scratch`
 image. It does not listen on a port.
 
 ```sh
-stratum-scout \
-  -collector https://stats.example.com \
-  -run-for 5m
+COLLECTOR_URL=https://stats.example.com \
+INGEST_KEY_ID=current \
+INGEST_SECRET=replace-with-32-random-bytes \
+FLY_REGION=lax FLY_MACHINE_ID=local RUN_FOR=5m stratum-scout
 ```
 
 | Environment | Meaning |
@@ -158,7 +158,7 @@ Validation is all-or-nothing.
 The probe batches for five seconds or 100 observations. Network errors and
 `5xx` responses retry with exponential backoff and jitter. `4xx` responses
 are permanent failures. The in-memory queue is capped at 2,000 observations;
-overflow drops the oldest batch and is reported explicitly.
+overflow drops the oldest observations and is reported explicitly.
 
 An acknowledgement may be lost after append. A retry sends the identical
 batch. Reports deduplicate by `observation_id`, retaining the first valid
@@ -265,8 +265,8 @@ A vantage becomes visibly stale after two missed hourly runs.
 
 1. **Complete:** add schema v6, authenticated ingestion, validation, report
    deduplication, serialized append, caching, and contract tests to StratumStats.
-2. Create the standalone repository and test against an `httptest` collector
-   and local fake Stratum servers.
+2. **Complete:** create the standalone repository, finite executable, scratch image,
+   bounded uploader, `httptest` collector contract, and local fake Stratum tests.
 3. Run `lax` manually for 48 hours with uploads excluded from public reports.
 4. Verify offsets, retries, termination, data volume, and cost.
 5. Enable `dfw` and `iad`, then expose the vantage API and UI selector.
