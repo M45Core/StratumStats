@@ -1,6 +1,7 @@
 # Regional probe design
 
-Status: proposed MVP
+Status: approved MVP; StratumStats collector side implemented, standalone probe
+measurement engine in progress
 
 This specifies a separate, disposable Fly.io application that sends sampled
 regional Stratum measurements to the main StratumStats server. It is not a
@@ -121,6 +122,7 @@ The version 1 upload envelope is:
   "region": "lax",
   "vantage": "us-west",
   "machine_id": "5683...",
+  "started_at": "2026-08-01T17:55:00Z",
   "sent_at": "2026-08-01T18:00:05Z",
   "observations": []
 }
@@ -216,8 +218,9 @@ vantages return `400 Bad Request`.
 successful run, last observation, configuration revision, sample counts, and
 incomplete or dropped-record status.
 
-The dashboard adds an `All US regions / West / Central / East` selector and a
-last-seen indicator. It filters latency, availability, and protocol timing.
+The dashboard adds an `All data / US combined / West / Central / East`
+selector and a last-seen indicator. It filters latency, availability, and
+protocol timing while preserving the existing unfiltered view.
 Coinbase-based pool safety remains global so a pool does not move between
 Normal and Unsafe merely because one region lacks evidence.
 
@@ -239,8 +242,11 @@ not depend on synchronized starts.
 
 At currently listed rates, three Machines running five minutes each hour cost
 about $0.50-$0.65 per month in compute, before small network and stopped-rootfs
-charges. Configure a budget alert: failure to exit would turn a sampled Machine
-into a continuously billed Machine.
+charges. Fly does not currently provide a native hard spending cap or billing
+alerts. The practical ceiling is therefore architectural: exactly three fixed
+Machines, no autoscaler, volumes, paid IPs, or managed services. If all three
+failed to exit and ran continuously for a month, expected compute would remain
+roughly $6-$8, plus small rootfs and bounded network charges.
 
 The process enforces a hard deadline even when sessions or uploads are stuck.
 It never sleeps until the next hour while the Machine remains billable.
@@ -257,8 +263,8 @@ A vantage becomes visibly stale after two missed hourly runs.
 
 ## Rollout
 
-1. Add schema v6, authenticated ingestion, validation, report deduplication,
-   serialized append, caching, and contract tests to StratumStats.
+1. **Complete:** add schema v6, authenticated ingestion, validation, report
+   deduplication, serialized append, caching, and contract tests to StratumStats.
 2. Create the standalone repository and test against an `httptest` collector
    and local fake Stratum servers.
 3. Run `lax` manually for 48 hours with uploads excluded from public reports.
@@ -275,4 +281,3 @@ A vantage becomes visibly stale after two missed hourly runs.
 - Regional offsets never use collector receipt time or another region's clock.
 - The UI shows sample counts, scheduled mode, last-seen, and stale state.
 - Removing the Fly app leaves the main server functional with local data.
-

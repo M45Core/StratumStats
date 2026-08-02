@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -16,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/proofofmike/stratumstats/internal/ingest"
 	"github.com/proofofmike/stratumstats/internal/model"
 	"github.com/proofofmike/stratumstats/internal/probe"
 	"github.com/proofofmike/stratumstats/internal/store"
@@ -66,7 +69,24 @@ func serve(args []string, demo bool) error {
 		}
 		return store.Load(*dataPath)
 	}
-	app, err := (webapp.Server{Pools: cfg.Pools, Load: loader, Demo: demo}).Handler()
+	var ingestHandler http.Handler
+	keyID, secret := os.Getenv("STRATUMSTATS_INGEST_KEY_ID"), os.Getenv("STRATUMSTATS_INGEST_SECRET")
+	if (keyID == "") != (secret == "") {
+		return fmt.Errorf("STRATUMSTATS_INGEST_KEY_ID and STRATUMSTATS_INGEST_SECRET must be set together")
+	}
+	if secret != "" && len(secret) < 32 {
+		return fmt.Errorf("STRATUMSTATS_INGEST_SECRET must contain at least 32 bytes")
+	}
+	if !demo && keyID != "" {
+		appender := &store.Appender{Path: *dataPath}
+		ingestHandler = ingest.Receiver{
+			Pools:  cfg.Pools,
+			Keys:   map[string][]byte{keyID: []byte(secret)},
+			Append: appender.Append,
+		}
+		log.Printf("authenticated regional-probe ingestion enabled")
+	}
+	app, err := (webapp.Server{Pools: cfg.Pools, Load: loader, Demo: demo, Ingest: ingestHandler}).Handler()
 	if err != nil {
 		return err
 	}
@@ -115,10 +135,30 @@ func collect(args []string) error {
 		defer cancel()
 	}
 	log.Printf("probing %d pools from vantage %q; credentials rotate and are not stored", len(cfg.Pools), *vantage)
+	runID, err := randomRunID()
+	if err != nil {
+		return err
+	}
+	var sequence uint64
+	appender := &store.Appender{Path: *dataPath}
 	return probe.Collect(ctx, cfg.Pools, *vantage, func(batch []model.Observation) error {
+		for index := range batch {
+			sequence++
+			batch[index].Source = "local"
+			batch[index].RunID = runID
+			batch[index].ObservationID = fmt.Sprintf("%s/%d", runID, sequence)
+		}
 		log.Printf("writing %d telemetry records", len(batch))
-		return store.Append(*dataPath, batch)
+		return appender.Append(batch)
 	})
+}
+
+func randomRunID() (string, error) {
+	var value [16]byte
+	if _, err := cryptorand.Read(value[:]); err != nil {
+		return "", fmt.Errorf("generate collector run id: %w", err)
+	}
+	return hex.EncodeToString(value[:]), nil
 }
 
 func loadConfig(path string) (model.Config, error) {

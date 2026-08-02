@@ -63,7 +63,8 @@ East measurements is specified in
 separate from the main server and is not yet an active data source.
 
 Configuration is in `config/pools.json`. The collector never submits shares.
-Current records use observation schema version 5 with `block_id` terminology.
+Current records use observation schema version 6 with retry-safe IDs, source
+provenance, and `block_id` terminology.
 
 Compiling a reusable binary is optional:
 
@@ -166,7 +167,7 @@ deterministic alphabetical ordering.
 
 ## Protocol response timings
 
-Protocol operations are stored as independent version 5 JSONL records rather
+Protocol operations are stored as independent version 6 JSONL records rather
 than repeated on every block observation. Reports publish successful-operation
 median and P95 durations plus outcome counts for:
 
@@ -213,7 +214,7 @@ effective percentage. No fee is inferred from a job where the worker address is
 absent. Payment correctness cannot be inferred from Stratum alone; it needs a
 controlled hashrate/payment study.
 
-Current version 5 JSONL retains `coinbase_analyzed`,
+Current version 6 JSONL retains `coinbase_analyzed`,
 `worker_wallet_in_coinbase`, `coinbase_total_sats`, `worker_payout_sats`, and
 `estimated_pool_fee_pct`. Reports expose `coinbase_samples`,
 `worker_address_observed_pct`, `worker_address_status`, the latest and previous
@@ -270,10 +271,16 @@ endpoint sets, and deduplicates normalized host/port/TLS tuples.
 ## HTTP API
 
 - `GET /api/v1/reports` — current pool reports and disclosures
+- `GET /api/v1/reports?vantage=us-west` — one scheduled regional view
+- `GET /api/v1/vantages` — regional sample counts and collector health
+- `GET /api/v1/probe-config` — minimal compatible endpoint configuration
 - `GET /api/v1/pools` — researched pool identity, type, status, terms, endpoints, and sources
 - `GET /api/v1/methodology` — published metric names and methodology version
 - `GET /healthz` — liveness
 
-There is intentionally no public ingestion endpoint yet. This avoids exposing
-an unauthenticated data-poisoning surface before signed collector reports and
-anti-Sybil rules are designed.
+`POST /api/v1/ingest` is registered only when both
+`STRATUMSTATS_INGEST_KEY_ID` and `STRATUMSTATS_INGEST_SECRET` are set for a
+non-demo server. The secret must contain at least 32 bytes. Requests use the
+versioned, gzip-compressed HMAC-SHA256 contract documented in
+[`docs/regional-probe-design.md`](docs/regional-probe-design.md); unauthenticated,
+stale, malformed, and partially invalid batches are rejected before append.

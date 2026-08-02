@@ -41,6 +41,17 @@
   </section>
   {{if .Demo}}<div class="notice dashboard-notice compact-notice">Demo data — synthetic measurements shown for interface preview only.</div>{{end}}
 
+  {{if not .Demo}}<section class="vantage-bar" aria-label="Regional measurement vantage">
+    <div class="vantage-selector">
+      <a href="/" {{if eq .SelectedVantage ""}}aria-current="page"{{end}}>All data</a>
+      <a href="/?vantage=us-all" {{if eq .SelectedVantage "us-all"}}aria-current="page"{{end}}>US combined</a>
+      <a href="/?vantage=us-west" {{if eq .SelectedVantage "us-west"}}aria-current="page"{{end}}>West</a>
+      <a href="/?vantage=us-central" {{if eq .SelectedVantage "us-central"}}aria-current="page"{{end}}>Central</a>
+      <a href="/?vantage=us-east" {{if eq .SelectedVantage "us-east"}}aria-current="page"{{end}}>East</a>
+    </div>
+    <p><strong>{{.SelectedLabel}}</strong>{{with .VantageStatus}} · scheduled samples{{if .LastObservationAt}} · last seen {{.LastObservationAt.Format "02 Jan 15:04 UTC"}}{{end}}{{if .Stale}} · <span class="vantage-stale">stale</span>{{end}}{{else}} · combined measurements{{end}}</p>
+  </section>{{end}}
+
   <section class="summary-stats compact-summary" aria-label="Measurement summary" data-live-summary>
     <article><span>Pools monitored</span><strong>{{.PoolCount}}</strong></article>
     <article><span>Bitcoin blocks observed</span><strong>{{.BlocksObserved}}</strong></article>
@@ -58,7 +69,7 @@
     <div id="unsafe-pools-list">{{template "pool-list" .UnsafePools}}</div>
   </section>
 
-  <p class="dashboard-footnote" data-live-footnote>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · Method {{.Snapshot.Methodology}} · Median bars use a fixed 0–4+ second scale. Availability is observed deliveries ÷ eligible block samples. * Fee uses matched outputs only.</p>
+  <p class="dashboard-footnote" data-live-footnote>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · {{.SelectedLabel}} · Method {{.Snapshot.Methodology}} · Median bars use a fixed 0–4+ second scale. Availability is observed deliveries ÷ eligible block samples{{if .SelectedVantage}} during scheduled connected windows{{end}}. * Fee uses matched outputs only.</p>
   <p class="visually-hidden" role="status" aria-live="polite" data-live-status></p>
 </main>
 <footer><span>StratumStats</span><span>Raw measurements, kept separate.</span></footer>

@@ -22,14 +22,24 @@ type dashboardPage struct {
 	BlocksObserved     int
 	PoolsWithBlockData int
 	UnsafeCount        int
+	SelectedVantage    string
+	SelectedLabel      string
+	VantageStatus      *vantageStatus
 }
 
-func buildDashboardPage(snapshot model.Snapshot, demo bool) dashboardPage {
+func buildDashboardPage(snapshot model.Snapshot, demo bool, selectedVantage string, status *vantageStatus) dashboardPage {
+	selectedLabel := "All measurements"
+	if label := vantageLabels[selectedVantage]; label != "" {
+		selectedLabel = label
+	}
 	page := dashboardPage{
-		Snapshot:       snapshot,
-		Demo:           demo,
-		PoolCount:      len(snapshot.Reports),
-		BlocksObserved: snapshot.BlocksObserved,
+		Snapshot:        snapshot,
+		Demo:            demo,
+		PoolCount:       len(snapshot.Reports),
+		BlocksObserved:  snapshot.BlocksObserved,
+		SelectedVantage: selectedVantage,
+		SelectedLabel:   selectedLabel,
+		VantageStatus:   status,
 	}
 	for _, report := range snapshot.Reports {
 		if report.MedianMS != nil {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/proofofmike/stratumstats/internal/ingest"
 	"github.com/proofofmike/stratumstats/internal/model"
 	"github.com/proofofmike/stratumstats/internal/report"
 )
@@ -16,9 +17,10 @@ import (
 var assets embed.FS
 
 type Server struct {
-	Pools []model.Pool
-	Load  func() ([]model.Observation, error)
-	Demo  bool
+	Pools  []model.Pool
+	Load   func() ([]model.Observation, error)
+	Demo   bool
+	Ingest http.Handler
 }
 
 func (s Server) Handler() (http.Handler, error) {
@@ -32,21 +34,30 @@ func (s Server) Handler() (http.Handler, error) {
 		return nil, err
 	}
 	mux := http.NewServeMux()
-	snapshot := func() (model.Snapshot, error) {
-		obs, err := s.Load()
-		if err != nil {
-			return model.Snapshot{}, err
-		}
-		return report.Compute(s.Pools, obs, time.Now()), nil
+	cache := &snapshotCache{pools: s.Pools, load: s.Load}
+	snapshot := func(vantage string) (model.Snapshot, error) {
+		return cache.snapshot(vantage, time.Now().UTC())
 	}
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		data, err := snapshot()
+		vantage := r.URL.Query().Get("vantage")
+		if !validVantage(vantage) {
+			http.Error(w, "unknown vantage", http.StatusBadRequest)
+			return
+		}
+		now := time.Now().UTC()
+		data, err := cache.snapshot(vantage, now)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		observations, err := cache.records(now)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		statuses := buildVantageStatuses(observations, now)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = t.ExecuteTemplate(w, "index.html", buildDashboardPage(data, s.Demo))
+		_ = t.ExecuteTemplate(w, "index.html", buildDashboardPage(data, s.Demo, vantage, selectedVantageStatus(statuses, vantage)))
 	})
 	mux.HandleFunc("GET /pools", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -59,7 +70,7 @@ func (s Server) Handler() (http.Handler, error) {
 		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	})
 	mux.HandleFunc("GET /methodology", func(w http.ResponseWriter, r *http.Request) {
-		data, err := snapshot()
+		data, err := snapshot("")
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -77,16 +88,46 @@ func (s Server) Handler() (http.Handler, error) {
 			},
 		})
 	})
+	probeConfig, err := ingest.BuildProbeConfig(s.Pools)
+	if err != nil {
+		return nil, err
+	}
+	mux.HandleFunc("GET /api/v1/probe-config", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, probeConfig)
+	})
+	if s.Ingest != nil {
+		mux.HandleFunc("POST /api/v1/ingest", func(w http.ResponseWriter, r *http.Request) {
+			tracked := &statusResponseWriter{ResponseWriter: w}
+			s.Ingest.ServeHTTP(tracked, r)
+			if tracked.status == http.StatusAccepted {
+				cache.invalidate()
+			}
+		})
+	}
 	mux.HandleFunc("GET /api/v1/reports", func(w http.ResponseWriter, r *http.Request) {
-		data, err := snapshot()
+		vantage := r.URL.Query().Get("vantage")
+		if !validVantage(vantage) {
+			http.Error(w, "unknown vantage", http.StatusBadRequest)
+			return
+		}
+		data, err := snapshot(vantage)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		writeJSON(w, data)
 	})
+	mux.HandleFunc("GET /api/v1/vantages", func(w http.ResponseWriter, r *http.Request) {
+		now := time.Now().UTC()
+		observations, err := cache.records(now)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		writeJSON(w, buildVantageStatuses(observations, now))
+	})
 	mux.HandleFunc("GET /api/v1/methodology", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "latest_pool_fee_pct", "previous_pool_fee_pct", "pool_fee_changed", "pool_fee_changes", "pool_fee_samples", "pool_fee_last_changed_at", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
+		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "measurement_modes": []string{"continuous", "scheduled"}, "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "latest_pool_fee_pct", "previous_pool_fee_pct", "pool_fee_changed", "pool_fee_changes", "pool_fee_samples", "pool_fee_last_changed_at", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /static/", http.FileServer(http.FS(assets)))

@@ -2,7 +2,7 @@ package model
 
 import "encoding/json"
 
-// UnmarshalJSON keeps version 1-3 JSONL readable after later schema additions.
+// UnmarshalJSON keeps version 1-5 JSONL readable after later schema additions.
 // Version 3 replaced contest-oriented names with block/report terminology.
 func (o *Observation) UnmarshalJSON(data []byte) error {
 	type observationAlias Observation

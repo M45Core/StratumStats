@@ -2,6 +2,7 @@ package model
 
 const (
 	RecordTypeProtocol = "protocol"
+	RecordTypeProbeRun = "probe_run"
 
 	ProtocolConnect      = "tcp.connect"
 	ProtocolTLSHandshake = "tls.handshake"

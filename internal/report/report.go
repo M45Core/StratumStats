@@ -9,7 +9,7 @@ import (
 	"github.com/proofofmike/stratumstats/internal/model"
 )
 
-const MethodologyVersion = "2026-08-01.13"
+const MethodologyVersion = "2026-08-01.14"
 
 type feeSample struct {
 	at    time.Time
@@ -34,6 +34,7 @@ type accumulator struct {
 // Compute applies only objective probe measurements. Operator size, fees,
 // sponsorships, and subjective reputation are deliberately excluded.
 func Compute(pools []model.Pool, observations []model.Observation, now time.Time) model.Snapshot {
+	observations = uniqueObservations(observations)
 	acc := make(map[string]*accumulator, len(pools))
 	observedBlocks := make(map[string]bool)
 	eligiblePoolSamples := make(map[string]bool)
@@ -113,6 +114,61 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 			"Observed pool fee is inferred only when a decoded coinbase output matches the generated worker script; optional donations or splits may be included.",
 		},
 	}
+}
+
+// ComputeVantage filters telemetry to one coarse vantage while retaining
+// global coinbase evidence for pool safety classification and fee history.
+func ComputeVantage(pools []model.Pool, observations []model.Observation, vantage string, now time.Time) model.Snapshot {
+	return ComputeVantages(pools, observations, map[string]bool{vantage: true}, now)
+}
+
+// ComputeVantages filters telemetry to a set of coarse vantages while keeping
+// the same global evidence behavior as a single-vantage report.
+func ComputeVantages(pools []model.Pool, observations []model.Observation, vantages map[string]bool, now time.Time) model.Snapshot {
+	filtered := make([]model.Observation, 0, len(observations))
+	for _, observation := range observations {
+		if vantages[observation.Vantage] {
+			filtered = append(filtered, observation)
+		}
+	}
+	regional := Compute(pools, filtered, now)
+	global := Compute(pools, observations, now)
+	globalReports := make(map[string]model.PoolReport, len(global.Reports))
+	for _, poolReport := range global.Reports {
+		globalReports[poolReport.PoolID] = poolReport
+	}
+	for index := range regional.Reports {
+		evidence := globalReports[regional.Reports[index].PoolID]
+		regional.Reports[index].CoinbaseSamples = evidence.CoinbaseSamples
+		regional.Reports[index].WorkerAddressObservedPct = evidence.WorkerAddressObservedPct
+		regional.Reports[index].WorkerAddressStatus = evidence.WorkerAddressStatus
+		regional.Reports[index].LatestPoolFeePct = evidence.LatestPoolFeePct
+		regional.Reports[index].PreviousPoolFeePct = evidence.PreviousPoolFeePct
+		regional.Reports[index].PoolFeeChanged = evidence.PoolFeeChanged
+		regional.Reports[index].PoolFeeChanges = evidence.PoolFeeChanges
+		regional.Reports[index].PoolFeeSamples = evidence.PoolFeeSamples
+		regional.Reports[index].PoolFeeLastChangedAt = evidence.PoolFeeLastChangedAt
+	}
+	regional.Disclosure = append(regional.Disclosure,
+		"Regional views contain scheduled samples only; availability is not continuous uptime.",
+		"Pool safety and fee evidence remain global when latency and protocol metrics are filtered by vantage.",
+	)
+	return regional
+}
+
+func uniqueObservations(observations []model.Observation) []model.Observation {
+	seen := make(map[string]bool)
+	unique := make([]model.Observation, 0, len(observations))
+	for _, observation := range observations {
+		if observation.ObservationID != "" {
+			if seen[observation.ObservationID] {
+				continue
+			}
+			seen[observation.ObservationID] = true
+		}
+		unique = append(unique, observation)
+	}
+	return unique
 }
 
 func build(a *accumulator) model.PoolReport {

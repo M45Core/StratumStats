@@ -59,7 +59,7 @@
     if (refreshing || document.hidden) return;
     refreshing = true;
     try {
-      const response = await fetch(window.location.pathname, {
+      const response = await fetch(window.location.pathname + window.location.search, {
         cache: "no-store",
         headers: { "X-StratumStats-Refresh": "1" },
       });

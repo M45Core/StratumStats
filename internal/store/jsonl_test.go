@@ -29,3 +29,28 @@ func TestLoadMissingFile(t *testing.T) {
 		t.Fatalf("got=%v err=%v", got, err)
 	}
 }
+
+func TestAppenderSerializesConcurrentBatches(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "observations.jsonl")
+	appender := &Appender{Path: path}
+	const batches = 20
+	errs := make(chan error, batches)
+	for i := 0; i < batches; i++ {
+		i := i
+		go func() {
+			errs <- appender.Append([]model.Observation{{Version: model.ObservationVersion, ObservationID: string(rune('a' + i)), PoolID: "pool"}})
+		}()
+	}
+	for i := 0; i < batches; i++ {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != batches {
+		t.Fatalf("records=%d, want %d", len(got), batches)
+	}
+}

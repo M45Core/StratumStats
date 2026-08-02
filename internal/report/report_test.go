@@ -68,6 +68,33 @@ func TestComputeDeduplicatesArrivalsByVantageAndBlock(t *testing.T) {
 	}
 }
 
+func TestComputeDeduplicatesRetriedObservationIDs(t *testing.T) {
+	pools := []model.Pool{{ID: "pool", Name: "Pool"}}
+	duration := 12.0
+	record := model.Observation{Version: model.ObservationVersion, ObservationID: "run/1", RecordType: model.RecordTypeProtocol, PoolID: "pool", ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration}
+	snapshot := Compute(pools, []model.Observation{record, record}, time.Now())
+	if got := snapshot.Reports[0].ConnectTiming.Attempts; got != 1 {
+		t.Fatalf("attempts=%d, want 1", got)
+	}
+}
+
+func TestComputeVantageFiltersTimingButRetainsGlobalCoinbaseEvidence(t *testing.T) {
+	fee := 1.25
+	pools := []model.Pool{{ID: "pool", Name: "Pool"}}
+	observations := []model.Observation{
+		{PoolID: "pool", Vantage: "us-west", BlockID: "west", ObservedAt: time.Unix(1, 0), Eligible: true, Arrived: true, OffsetMS: 10},
+		{PoolID: "pool", Vantage: "us-east", BlockID: "east", ObservedAt: time.Unix(2, 0), Eligible: true, Arrived: true, OffsetMS: 90, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
+	}
+	snapshot := ComputeVantage(pools, observations, "us-west", time.Now())
+	got := snapshot.Reports[0]
+	if got.Blocks != 1 || got.MedianMS == nil || *got.MedianMS != 10 {
+		t.Fatalf("regional report=%+v", got)
+	}
+	if got.WorkerAddressStatus != "always_observed" || got.LatestPoolFeePct == nil || *got.LatestPoolFeePct != fee {
+		t.Fatalf("global evidence not retained: %+v", got)
+	}
+}
+
 func TestComputeIgnoresReopenedWindowsForSameBlock(t *testing.T) {
 	pools := []model.Pool{{ID: "first", Name: "First"}, {ID: "late", Name: "Late"}}
 	started := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)

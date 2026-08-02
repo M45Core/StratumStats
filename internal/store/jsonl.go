@@ -2,10 +2,13 @@ package store
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/proofofmike/stratumstats/internal/model"
 )
@@ -39,16 +42,38 @@ func Append(path string, observations []model.Observation) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	e := json.NewEncoder(f)
+	var encoded bytes.Buffer
+	e := json.NewEncoder(&encoded)
 	for _, o := range observations {
 		if err := e.Encode(o); err != nil {
 			return err
 		}
 	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	written, err := f.Write(encoded.Bytes())
+	if err != nil {
+		return err
+	}
+	if written != encoded.Len() {
+		return io.ErrShortWrite
+	}
 	return f.Sync()
+}
+
+// Appender serializes batches bound for one JSONL file. Encoding completes
+// before the append starts, so validation/encoding failures cannot leave a
+// partial batch in the file.
+type Appender struct {
+	Path string
+	mu   sync.Mutex
+}
+
+func (a *Appender) Append(observations []model.Observation) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return Append(a.Path, observations)
 }

@@ -61,7 +61,7 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	if script.Code != 200 {
 		t.Fatalf("dashboard updater status=%d", script.Code)
 	}
-	for _, want := range []string{"fetch(window.location.pathname", "data-pool-id", "row-updated"} {
+	for _, want := range []string{"fetch(window.location.pathname + window.location.search", "data-pool-id", "row-updated"} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("dashboard updater missing %q", want)
 		}
