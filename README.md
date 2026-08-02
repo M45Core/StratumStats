@@ -61,6 +61,8 @@ A low-cost, standalone Fly.io probe for sampled US West, Central, and East
 measurements is implemented in the separate StratumScout repository and specified
 in [`docs/regional-probe-design.md`](docs/regional-probe-design.md). Its live Fly
 canary has not yet started, so it is not yet an active data source.
+Deployment gates, canary checks, promotion, and rollback are tracked in the
+[`regional probe rollout runbook`](docs/regional-probe-rollout.md).
 
 Configuration is in `config/pools.json`. The collector never submits shares.
 Current records use observation schema version 6 with retry-safe IDs, source

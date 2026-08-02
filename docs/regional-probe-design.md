@@ -263,6 +263,9 @@ A vantage becomes visibly stale after two missed hourly runs.
 
 ## Rollout
 
+The detailed operational gates and completion record are maintained in
+[`regional-probe-rollout.md`](regional-probe-rollout.md).
+
 1. **Complete:** add schema v6, authenticated ingestion, validation, report
    deduplication, serialized append, caching, and contract tests to StratumStats.
 2. **Complete:** create the standalone repository, finite executable, scratch image,
