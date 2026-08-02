@@ -23,7 +23,9 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	body := w.Body.String()
 	for _, want := range []string{
 		"Bitcoin pool telemetry.",
-		"Eligible blocks",
+		"Block template latency",
+		"Normal pools",
+		"Unsafe pools",
 		"Demo data — synthetic measurements shown for interface preview only.",
 		"https://github.com/proofofmike/stratumstats",
 	} {
@@ -39,6 +41,10 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 		"Direct coinbase",
 		"Payout custody",
 		"Confidence",
+		"Leaderboard",
+		"Current Leader",
+		"Wins",
+		"Races",
 	} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("homepage still contains old copy %q", unwanted)

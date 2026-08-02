@@ -49,7 +49,8 @@ type Config struct {
 }
 
 // Observation is the immutable evidence used to produce reports. OffsetMS is
-// relative to the first full template seen by the same vantage for a block.
+// relative to the first structurally valid block template seen by the same
+// vantage for a block.
 type Observation struct {
 	Version                int       `json:"version"`
 	RecordType             string    `json:"record_type,omitempty"`

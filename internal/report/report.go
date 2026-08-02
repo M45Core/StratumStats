@@ -9,7 +9,7 @@ import (
 	"github.com/proofofmike/stratumstats/internal/model"
 )
 
-const MethodologyVersion = "2026-08-01.7"
+const MethodologyVersion = "2026-08-01.8"
 
 type accumulator struct {
 	pool                 model.Pool

@@ -9,7 +9,7 @@ import (
 	"github.com/proofofmike/stratumstats/internal/model"
 )
 
-func TestCoinbaseObservationsAreSeparateAndNeutral(t *testing.T) {
+func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
 	fee := 0.75
 	pools := []model.Pool{
 		{ID: "present", Name: "Present Pool"},
@@ -26,33 +26,40 @@ func TestCoinbaseObservationsAreSeparateAndNeutral(t *testing.T) {
 	}
 
 	page := httptest.NewRecorder()
-	h.ServeHTTP(page, httptest.NewRequest("GET", "/coinbase", nil))
+	h.ServeHTTP(page, httptest.NewRequest("GET", "/", nil))
 	body := page.Body.String()
 	for _, want := range []string{
-		"Coinbase observations.",
-		"Observed in every sample",
-		"Not observed in sampled outputs",
-		"No decoded coinbase samples",
+		"Normal pools",
+		"Unsafe pools",
+		"Worker address observed",
+		"Worker address absent",
+		"Not measured",
 		"Present Pool",
 		"Absent Pool",
 		"Unknown Pool",
-		"100.0%",
+		"1/1 decoded jobs",
+		"Pool fee",
 		"0.750%",
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("coinbase page missing %q", want)
+			t.Errorf("dashboard missing %q", want)
 		}
 	}
 	for _, unwanted := range []string{"Trust pool", "Direct coinbase", "Payout custody"} {
 		if strings.Contains(body, unwanted) {
-			t.Errorf("coinbase page contains old label %q", unwanted)
+			t.Errorf("dashboard contains old label %q", unwanted)
 		}
 	}
+	normalAt, unsafeAt := strings.Index(body, "<h2>Normal pools</h2>"), strings.Index(body, "<h2>Unsafe pools</h2>")
+	presentAt, unknownAt, absentAt := strings.Index(body, "Present Pool"), strings.Index(body, "Unknown Pool"), strings.Index(body, "Absent Pool")
+	if normalAt < 0 || unsafeAt < 0 || !(normalAt < presentAt && presentAt < unknownAt && unknownAt < unsafeAt && unsafeAt < absentAt) {
+		t.Fatalf("pools were not grouped alphabetically into normal then unsafe sections")
+	}
 
-	home := httptest.NewRecorder()
-	h.ServeHTTP(home, httptest.NewRequest("GET", "/", nil))
-	if strings.Contains(home.Body.String(), "0.750%") || strings.Contains(home.Body.String(), "Payout custody") {
-		t.Fatal("coinbase evidence leaked back into the main telemetry table")
+	legacy := httptest.NewRecorder()
+	h.ServeHTTP(legacy, httptest.NewRequest("GET", "/coinbase", nil))
+	if legacy.Code != 301 || legacy.Header().Get("Location") != "/" {
+		t.Fatalf("legacy coinbase route = %d %q, want 301 to /", legacy.Code, legacy.Header().Get("Location"))
 	}
 
 	api := httptest.NewRecorder()

@@ -21,15 +21,6 @@ type Server struct {
 	Demo  bool
 }
 
-type coinbasePage struct {
-	Snapshot       model.Snapshot
-	Demo           bool
-	AlwaysObserved []model.PoolReport
-	NotObserved    []model.PoolReport
-	Varied         []model.PoolReport
-	Unknown        []model.PoolReport
-}
-
 func (s Server) Handler() (http.Handler, error) {
 	t, err := template.New("site").Funcs(template.FuncMap{"metric": func(value *float64) float64 {
 		if value == nil {
@@ -55,10 +46,7 @@ func (s Server) Handler() (http.Handler, error) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = t.ExecuteTemplate(w, "index.html", struct {
-			Snapshot model.Snapshot
-			Demo     bool
-		}{data, s.Demo})
+		_ = t.ExecuteTemplate(w, "index.html", buildDashboardPage(data, s.Demo))
 	})
 	mux.HandleFunc("GET /pools", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -68,26 +56,7 @@ func (s Server) Handler() (http.Handler, error) {
 		}{registryAsOf(s.Pools), s.Pools})
 	})
 	mux.HandleFunc("GET /coinbase", func(w http.ResponseWriter, r *http.Request) {
-		data, err := snapshot()
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		page := coinbasePage{Snapshot: data, Demo: s.Demo}
-		for _, pool := range data.Reports {
-			switch pool.WorkerAddressStatus {
-			case "always_observed":
-				page.AlwaysObserved = append(page.AlwaysObserved, pool)
-			case "not_observed":
-				page.NotObserved = append(page.NotObserved, pool)
-			case "varied":
-				page.Varied = append(page.Varied, pool)
-			default:
-				page.Unknown = append(page.Unknown, pool)
-			}
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = t.ExecuteTemplate(w, "coinbase.html", page)
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	})
 	mux.HandleFunc("GET /methodology", func(w http.ResponseWriter, r *http.Request) {
 		data, err := snapshot()

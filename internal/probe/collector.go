@@ -27,17 +27,17 @@ var (
 )
 
 type event struct {
-	poolID, prevHash    string
-	at                  time.Time
-	full, tls           bool
-	verified            bool
-	coinbaseAnalyzed    bool
-	workerWalletSeen    bool
-	coinbaseTotalSats   uint64
-	workerPayoutSats    uint64
-	estimatedPoolFeePct *float64
-	connected           *bool
-	protocol            *model.Observation
+	poolID, prevHash     string
+	at                   time.Time
+	hasTransactions, tls bool
+	verified             bool
+	coinbaseAnalyzed     bool
+	workerWalletSeen     bool
+	coinbaseTotalSats    uint64
+	workerPayoutSats     uint64
+	estimatedPoolFeePct  *float64
+	connected            *bool
+	protocol             *model.Observation
 }
 
 type activeBlock struct {
@@ -140,18 +140,7 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 				r.eligible[e.poolID] = true
 				blocks[e.prevHash] = r
 			}
-			if !e.full {
-				r.empty[e.poolID] = true
-				continue
-			}
-			if !e.verified {
-				r.invalid[e.poolID] = true
-				continue
-			}
-			if old, exists := r.arrivals[e.poolID]; !exists || e.at.Before(old) {
-				r.arrivals[e.poolID], r.tls[e.poolID] = e.at, e.tls
-				r.payout[e.poolID] = e
-			}
+			recordBlockEvent(r, e)
 		case now := <-ticker.C:
 			for id, r := range blocks {
 				if now.Sub(r.started) >= blockWindow {
@@ -278,7 +267,7 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 	}()
 
 	var previous string
-	var fullSent bool
+	var transactionJobSent bool
 	pingID := 1000
 	pingPending := false
 	pingDisabled := false
@@ -393,9 +382,9 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 			if !clean {
 				continue
 			}
-			previous, fullSent = prev, false
+			previous, transactionJobSent = prev, false
 		}
-		if len(branches) > 0 && fullSent {
+		if len(branches) > 0 && transactionJobSent {
 			continue
 		}
 		job := Job{PrevHash: prev, MerkleBranches: branchStrings, ExtraNonce1: extraNonce1, ExtraNonce2Size: extraNonce2Size, WorkerScript: identity.PayoutScript}
@@ -406,14 +395,31 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		job.NTime, _ = msg.Params[7].(string)
 		verification := VerifyJob(job)
 		if len(branches) > 0 {
-			fullSent = true
+			transactionJobSent = true
 		}
-		e := event{poolID: poolID, prevHash: prev, at: time.Now(), full: len(branches) > 0, tls: endpoint.TLS, verified: verification.Valid, coinbaseAnalyzed: verification.CoinbaseAnalyzed, workerWalletSeen: verification.WorkerWalletSeen, coinbaseTotalSats: verification.CoinbaseTotalSats, workerPayoutSats: verification.WorkerPayoutSats, estimatedPoolFeePct: verification.EstimatedPoolFeePct}
+		e := event{poolID: poolID, prevHash: prev, at: time.Now(), hasTransactions: len(branches) > 0, tls: endpoint.TLS, verified: verification.Valid, coinbaseAnalyzed: verification.CoinbaseAnalyzed, workerWalletSeen: verification.WorkerWalletSeen, coinbaseTotalSats: verification.CoinbaseTotalSats, workerPayoutSats: verification.WorkerPayoutSats, estimatedPoolFeePct: verification.EstimatedPoolFeePct}
 		select {
 		case out <- e:
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+}
+
+// recordBlockEvent keeps the earliest structurally valid template for a pool.
+// A coinbase-only template is useful work and counts immediately; the presence
+// of transaction branches is retained only as raw empty-first evidence.
+func recordBlockEvent(block *activeBlock, e event) {
+	if !e.hasTransactions {
+		block.empty[e.poolID] = true
+	}
+	if !e.verified {
+		block.invalid[e.poolID] = true
+		return
+	}
+	if old, exists := block.arrivals[e.poolID]; !exists || e.at.Before(old) {
+		block.arrivals[e.poolID], block.tls[e.poolID] = e.at, e.tls
+		block.payout[e.poolID] = e
 	}
 }
 

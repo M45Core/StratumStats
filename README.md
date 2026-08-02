@@ -3,8 +3,8 @@
 StratumStats is a Go service for measuring observable Bitcoin mining-pool
 behavior. It records Stratum observations as append-only JSONL and publishes
 latency, availability, protocol response times, TLS, and sample counts.
-Coinbase output observations and pool-fee estimates are kept in a separate
-view.
+Coinbase output observations and pool-fee estimates are shown beside those
+measurements on the same dashboard.
 
 Reports keep these dimensions separate and do not calculate an overall score
 or ranking.
@@ -22,8 +22,8 @@ _Regenerate this synthetic dashboard screenshot with `./scripts/screenshot.sh`._
 - **Measurements over claims.** Reports use automated observations, never paid
   placement, popularity, sponsorship, or operator questionnaires.
 - **Metrics stay separate.** Availability, median latency, tail latency,
-  protocol response, TLS, and sample counts remain independent facts. Coinbase
-  output evidence has its own page.
+  protocol response, TLS, sample counts, and coinbase evidence remain
+  independent facts even though they share one dashboard.
 - **Same block, same vantage.** Delivery delay is compared only for the same
   block observed from the same location, reducing geography and clock bias.
 - **Sample size stays visible.** Eligible block and protocol-attempt counts are
@@ -54,7 +54,7 @@ go run . serve
 ```
 
 Configuration is in `config/pools.json`. The collector never submits shares.
-Current records use observation schema version 4 with `block_id` terminology.
+Current records use observation schema version 5 with `block_id` terminology.
 
 Compiling a reusable binary is optional:
 
@@ -139,17 +139,18 @@ The deterministic aggregation is implemented in `internal/report/report.go`.
 |---|---|
 | Eligible blocks | Blocks for which the pool was connected at observation start |
 | Availability | 95% Wilson lower bound of valid arrivals over eligible blocks |
-| Median latency | Median delay behind the earliest valid template for the same block and vantage |
-| P95 latency | 95th-percentile relative delay, exposing intermittent stalls |
+| Median block-template latency | Median delay behind the earliest structurally valid template for the same block and vantage |
+| P95 block-template latency | 95th-percentile relative delay, exposing intermittent stalls |
 | TLS | Whether a configured TLS Stratum endpoint completed a measured session |
 
-Reports are sorted alphabetically by pool name, not by performance.
-Coinbase output evidence is deliberately omitted from this table and published
-separately at `/coinbase`.
+Reports are sorted alphabetically by pool name, not by performance. The
+dashboard keeps all measurements in each pool row and has only two sections:
+Normal pools and Unsafe pools. A pool moves to Unsafe when the generated worker
+address is absent from at least one sampled coinbase.
 
 ## Protocol response timings
 
-Protocol operations are stored as independent version 4 JSONL records rather
+Protocol operations are stored as independent version 5 JSONL records rather
 than repeated on every block observation. Reports publish successful-operation
 median and P95 durations plus outcome counts for:
 
@@ -167,26 +168,19 @@ endpoint, coarse vantage, duration, response status, and error category.
 ## Empty templates
 
 Empty-first frequency is retained only as raw evidence and is not displayed or
-used as a judgment. After a new block, Bitcoin Core must validate the block,
-update chain and mempool state, and assemble a transaction-bearing template.
-Sending coinbase-only work immediately can prevent miners from wasting time on
-the stale parent.
-
-The meaningful future measurement is empty-to-full duration and its estimated
-transaction-fee opportunity cost—not whether an empty template appeared at all.
-Bitcoin Core's `getblocktemplate` long poll wakes immediately for a new best
-block, while transaction-only changes are checked less frequently.
+used as a judgment. After a new block, Bitcoin Core must validate the block and
+rebuild transaction state. A structurally valid coinbase-only template still
+lets miners stop working on the stale parent immediately, so it counts as the
+first block-template arrival without waiting for transaction branches.
 
 ## Coinbase output observations
 
 The probe reconstructs each structurally valid coinbase using its negotiated
-extranonces and checks for the exact generated worker address script. The
-dedicated `/coinbase` page groups pools by the literal observed result:
-
-- **Observed in every sample**
-- **Not observed in sampled outputs**
-- **Changed across samples**
-- **No decoded coinbase samples**
+extranonces and checks for the exact generated worker address script. The main
+dashboard keeps this evidence with the pool's other measurements. Pools with a
+missing worker address in at least one decoded sample appear in the Unsafe
+pools section; all others appear in Normal pools. A pool with no decoded
+coinbase sample is explicitly marked not measured, not certified safe.
 
 These are output-presence observations, not pool types or judgments about
 payment correctness. A pool can account for earnings outside the coinbase
@@ -203,7 +197,7 @@ effective percentage. No fee is inferred from a job where the worker address is
 absent. Payment correctness cannot be inferred from Stratum alone; it needs a
 controlled hashrate/payment study.
 
-Current version 4 JSONL retains `coinbase_analyzed`,
+Current version 5 JSONL retains `coinbase_analyzed`,
 `worker_wallet_in_coinbase`, `coinbase_total_sats`, `worker_payout_sats`, and
 `estimated_pool_fee_pct`. Reports expose `coinbase_samples`,
 `worker_address_observed_pct`, `worker_address_status`,
@@ -254,9 +248,6 @@ Regenerate the combined registry with:
 The merge combines `stratum-race`, `PoolCensus`, and the research layer, applies
 canonical aliases, excludes stale unsupported imports, replaces researched
 endpoint sets, and deduplicates normalized host/port/TLS tuples.
-
-The web interface publishes the separately grouped coinbase observations at
-`GET /coinbase`.
 
 ## HTTP API
 

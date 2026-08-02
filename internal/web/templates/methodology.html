@@ -9,7 +9,7 @@
 <body>
 <header>
   <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
-  <nav><a href="/">Reports</a><a href="/coinbase">Coinbase</a><a href="/pools">Pool registry</a><a href="/api/v1/methodology">Method API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
+  <nav><a href="/">Reports</a><a href="/pools">Pool registry</a><a href="/api/v1/methodology">Method API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
 </header>
 <main class="prose">
   <p class="eyebrow">Method {{.Methodology}}</p>
@@ -18,8 +18,8 @@
 
   <h2>Published measurements</h2>
   <div class="method-grid">
-    <article><h3>Availability</h3><p>Conservative 95% Wilson lower bound of full-template arrivals over eligible blocks. Disappearing during an observed block counts as a miss.</p></article>
-    <article><h3>Median delivery</h3><p>Median full-template delay relative to the earliest structurally valid template observed for the same block and vantage.</p></article>
+    <article><h3>Availability</h3><p>Conservative 95% Wilson lower bound of valid block-template arrivals over eligible blocks. Disappearing during an observed block counts as a miss.</p></article>
+    <article><h3>Median delivery</h3><p>Median first-valid-template delay relative to the earliest structurally valid template observed for the same block and vantage.</p></article>
     <article><h3>Tail delivery</h3><p>95th-percentile relative delay, exposing intermittent stalls that a median can hide.</p></article>
     <article><h3>Transport security</h3><p>Whether a configured TLS endpoint successfully completed a measured Stratum session.</p></article>
   </div>
@@ -28,11 +28,11 @@
   <p>Connection setup is recorded as separate JSONL evidence: TCP connect (including name resolution), TLS handshake when used, <code>mining.subscribe</code>, and <code>mining.authorize</code>. Durations run from the local request start through the matching response and are aggregated independently from block-delivery latency.</p>
   <p><code>mining.ping</code> is an optional Stratum V1 extension. A valid <code>pong</code> is timed and may be sampled again during a long session. Unsupported responses and timeouts remain visible, but they do not reduce availability or count as failed block delivery.</p>
 
-  <h2>Why empty-first is not scored</h2>
-  <p>After a new block, Bitcoin Core validates the block, updates chain and mempool state, and assembles a transaction-bearing template. Sending coinbase-only work immediately can prevent miners from wasting time on the stale parent. Empty-first frequency is not inherently bad; only empty-to-full duration and resulting fee opportunity cost are meaningful.</p>
+  <h2>Coinbase-only first templates</h2>
+  <p>After a new block, Bitcoin Core validates the block and rebuilds transaction state. A structurally valid coinbase-only template lets miners stop working on the stale parent immediately, so it counts as block-template delivery without waiting for transaction branches. Empty-first remains raw evidence and does not alter this benchmark.</p>
 
   <h2>Coinbase output observations</h2>
-  <p>For every structurally valid job, the probe reconstructs the coinbase with its negotiated extranonces and checks whether an output matches the generated worker address script. The separate <a href="/coinbase">Coinbase observations</a> page reports only present, absent, varied, or no-data results with sample counts. Absence alone does not establish whether a pool will pay correctly by another mechanism.</p>
+  <p>For every structurally valid job, the probe reconstructs the coinbase with its negotiated extranonces and checks whether an output matches the generated worker address script. The main dashboard keeps every measurement together, but moves a pool into the Unsafe pools section when that address is absent from at least one decoded sample. Pools with no decoded samples remain in Normal pools and are explicitly marked not measured.</p>
   <p>When the worker output is present, the observed pool fee is <code>100 × (all coinbase outputs − worker outputs) / all coinbase outputs</code>. Optional donations or configured splits can be included, so this is the effective percentage visible in that job—not a claim about advertised policy. No fee is inferred from jobs where the worker output is absent.</p>
 
   <h2>What is deliberately excluded</h2>

@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/proofofmike/stratumstats/internal/model"
 )
@@ -14,11 +15,10 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	h, err := (Server{
 		Pools: []model.Pool{{ID: "test", Name: "Test Pool"}},
 		Load: func() ([]model.Observation, error) {
-			return []model.Observation{{
-				Version: model.ObservationVersion, RecordType: model.RecordTypeProtocol,
-				PoolID: "test", ProtocolMethod: model.ProtocolSubscribe,
-				ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration,
-			}}, nil
+			return []model.Observation{
+				{Version: model.ObservationVersion, ObservedAt: time.Now(), Vantage: "test", BlockID: "block", PoolID: "test", Eligible: true, Arrived: true, OffsetMS: 42.5},
+				{Version: model.ObservationVersion, RecordType: model.RecordTypeProtocol, PoolID: "test", ProtocolMethod: model.ProtocolSubscribe, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration},
+			}, nil
 		},
 	}).Handler()
 	if err != nil {
@@ -27,10 +27,14 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	h.ServeHTTP(home, httptest.NewRequest("GET", "/", nil))
-	for _, want := range []string{"Protocol response", "12.5 ms", "Ping / pong", "mining.ping"} {
-		if !strings.Contains(home.Body.String(), want) {
+	body := home.Body.String()
+	for _, want := range []string{"Block template latency", "42.5", "12.5", "Ping / pong", "mining.ping"} {
+		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
 		}
+	}
+	if strings.Index(body, "42.5") > strings.Index(body, "12.5") {
+		t.Fatal("block-template benchmark does not precede supporting protocol timing")
 	}
 
 	methodology := httptest.NewRecorder()

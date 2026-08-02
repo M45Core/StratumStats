@@ -1,15 +1,29 @@
-{{define "timing-cell"}}
-  {{if .Attempts}}
-    {{if .MedianMS}}
-      {{printf "%.1f ms" (metric .MedianMS)}}
-      <small>P95 {{printf "%.1f ms" (metric .P95MS)}}</small>
-    {{else}}
-      —<small>no successful timings</small>
-    {{end}}
-    <small>{{.Successes}}/{{.Attempts}} ok{{if .Rejected}} · {{.Rejected}} rejected{{end}}{{if .Unsupported}} · {{.Unsupported}} unsupported{{end}}{{if .Timeouts}} · {{.Timeouts}} timeout{{end}}{{if .Errors}} · {{.Errors}} error{{end}}</small>
+{{define "timing-compact"}}{{if .Attempts}}{{if .MedianMS}}<strong>{{printf "%.1f ms" (metric .MedianMS)}}</strong><small>P95 {{printf "%.1f" (metric .P95MS)}} · {{.Successes}}/{{.Attempts}} ok</small>{{else}}<strong>—</strong><small>0/{{.Attempts}} ok{{if .Unsupported}} · {{.Unsupported}} unsupported{{end}}{{if .Timeouts}} · {{.Timeouts}} timeout{{end}}{{if .Errors}} · {{.Errors}} error{{end}}{{if .Rejected}} · {{.Rejected}} rejected{{end}}</small>{{end}}{{else}}<strong>—</strong><small>no samples</small>{{end}}{{end}}
+{{define "pool-list"}}
+<div class="measurement-list">
+  <div class="measurement-head">
+    <span>Pool</span><span>Block template latency median</span><span>P95</span><span>Availability</span><span>Connection</span><span>Stratum setup</span><span>Ping / pong</span><span>Coinbase</span><span>Pool fee</span>
+  </div>
+  {{range $r := .}}
+  <article class="measurement-row">
+    <div class="measurement-pool"><strong><a href="/pools#{{$r.PoolID}}">{{$r.PoolName}}</a></strong><small>{{$r.Category}}{{if $r.TLSObserved}} · TLS{{end}}</small></div>
+    <div class="template-median">
+      {{if $r.MedianMS}}<strong>{{printf "%.1f ms" (metric $r.MedianMS)}}</strong><div class="median-bar-track" aria-hidden="true"><span class="median-bar {{$r.LatencyClass}}"></span></div>{{else}}<strong>—</strong><div class="median-bar-track" aria-hidden="true"></div>{{end}}
+    </div>
+    <div class="p95-value">{{if $r.P95MS}}<strong>{{printf "%.1f ms" (metric $r.P95MS)}}</strong>{{else}}<strong>—</strong>{{end}}</div>
+    <div class="availability-compact"><strong>{{printf "%.1f%%" $r.Availability}}</strong><progress max="100" value="{{$r.Availability}}">{{$r.Availability}}%</progress><small>{{$r.Arrivals}}/{{$r.Blocks}} templates</small></div>
+    <div class="stacked-stat"><span>TCP {{template "timing-compact" $r.ConnectTiming}}</span><span>TLS {{template "timing-compact" $r.TLSTiming}}</span></div>
+    <div class="stacked-stat"><span>Sub {{template "timing-compact" $r.SubscribeTiming}}</span><span>Auth {{template "timing-compact" $r.AuthorizeTiming}}</span></div>
+    <div class="compact-stat">{{template "timing-compact" $r.PingTiming}}</div>
+    <div class="coinbase-compact {{if $r.UnsafeReason}}coinbase-unsafe{{else if eq $r.WorkerAddressStatus "always_observed"}}coinbase-observed{{end}}">
+      {{if eq $r.WorkerAddressStatus "always_observed"}}<strong>Worker address observed</strong><small>{{$r.CoinbaseSamples}}/{{$r.CoinbaseSamples}} decoded jobs</small>{{else if eq $r.WorkerAddressStatus "varied"}}<strong>Worker address varied</strong><small>{{printf "%.1f%%" (metric $r.WorkerAddressObservedPct)}} · {{$r.CoinbaseSamples}} jobs</small>{{else if eq $r.WorkerAddressStatus "not_observed"}}<strong>Worker address absent</strong><small>0/{{$r.CoinbaseSamples}} decoded jobs</small>{{else}}<strong>Not measured</strong><small>0 decoded jobs</small>{{end}}
+    </div>
+    <div class="fee-compact">{{if $r.PoolFeePct}}<strong>{{printf "%.3f%%" (metric $r.PoolFeePct)}}</strong><small>observed median{{if $r.UnsafeReason}}*</small>{{else}}</small>{{end}}{{else}}<strong>—</strong><small>{{if $r.UnsafeReason}}cannot infer{{else}}not measured{{end}}</small>{{end}}</div>
+  </article>
   {{else}}
-    —<small>no samples</small>
+  <div class="empty">No pools in this section.</div>
   {{end}}
+</div>
 {{end}}
 {{define "index.html"}}<!doctype html>
 <html lang="en">
@@ -17,77 +31,39 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>StratumStats — Bitcoin pool telemetry</title>
-  <meta name="description" content="Latency, availability, and protocol response times from Bitcoin Stratum probes.">
+  <meta name="description" content="Detailed block-template latency and Stratum measurements for Bitcoin mining pools.">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header>
   <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
-  <nav><a href="/coinbase">Coinbase</a><a href="/pools">Pool registry</a><a href="/methodology">Methodology</a><a href="/api/v1/reports">API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
+  <nav><a href="/pools">Pool registry</a><a href="/methodology">Methodology</a><a href="/api/v1/reports">API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
 </header>
 <main>
-  <section class="hero">
-    <div>
-      <h1>Bitcoin pool telemetry.</h1>
-      <p class="lede">Latency, availability, and protocol response times from repeatable Stratum probes.</p>
-    </div>
+  <section class="hero dashboard-hero compact-hero">
+    <div><h1>Bitcoin pool telemetry.</h1><p class="lede">Block-template delivery first, with supporting Stratum and coinbase measurements on the same line.</p></div>
   </section>
-  {{if .Demo}}<div class="notice">Demo data — synthetic measurements shown for interface preview only.</div>{{end}}
+  {{if .Demo}}<div class="notice dashboard-notice compact-notice">Demo data — synthetic measurements shown for interface preview only.</div>{{end}}
 
-  <section class="section-head protocol-head">
-    <div><p class="eyebrow">Session timings</p><h2>Protocol response</h2></div>
-    <p>Successful-operation medians · <code>mining.ping</code> is optional</p>
+  <section class="summary-stats compact-summary" aria-label="Measurement summary">
+    <article><span>Pools monitored</span><strong>{{.PoolCount}}</strong></article>
+    <article><span>Blocks tracked</span><strong>{{.BlockCount}}</strong></article>
+    <article><span>Template observations</span><strong>{{.TemplateObservations}}</strong></article>
+    <article class="summary-unsafe"><span>Unsafe pools</span><strong>{{.UnsafeCount}}</strong></article>
   </section>
-  <div class="table-wrap">
-    <table class="protocol-table">
-      <thead><tr><th>Pool</th><th>Connect</th><th>TLS handshake</th><th>Subscribe</th><th>Authorize</th><th>Ping / pong</th></tr></thead>
-      <tbody>
-      {{range $r := .Snapshot.Reports}}
-        <tr>
-          <td><strong><a href="/pools#{{$r.PoolID}}">{{$r.PoolName}}</a></strong></td>
-          <td>{{template "timing-cell" $r.ConnectTiming}}</td>
-          <td>{{template "timing-cell" $r.TLSTiming}}</td>
-          <td>{{template "timing-cell" $r.SubscribeTiming}}</td>
-          <td>{{template "timing-cell" $r.AuthorizeTiming}}</td>
-          <td>{{template "timing-cell" $r.PingTiming}}</td>
-        </tr>
-      {{else}}
-        <tr><td colspan="6" class="empty">No protocol observations yet. Run the collector, or use <code>go run .</code> to preview demo mode.</td></tr>
-      {{end}}
-      </tbody>
-    </table>
-  </div>
 
-  <section class="section-head">
-    <div><p class="eyebrow">Pool reports</p><h2>Observed pool behavior</h2></div>
-    <p>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · Method {{.Snapshot.Methodology}}</p>
+  <section class="pool-section compact-section">
+    <div class="section-head list-section-head"><div><p class="eyebrow">Block template measurements</p><h2>Normal pools</h2></div><p>Alphabetical · bars compare median delivery on the same fixed scale</p></div>
+    {{template "pool-list" .NormalPools}}
   </section>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Pool</th><th>Eligible blocks</th><th>Availability</th><th>Median</th><th>P95</th><th>TLS</th></tr></thead>
-      <tbody>
-      {{range $r := .Snapshot.Reports}}
-        <tr>
-          <td><strong><a href="/pools#{{.PoolID}}">{{.PoolName}}</a></strong><small>{{$r.Category}}</small></td>
-          <td>{{$r.Blocks}}</td>
-          <td>{{$r.Availability}}%</td>
-          <td>{{if $r.MedianMS}}{{printf "%.1f ms" (metric $r.MedianMS)}}{{else}}—{{end}}</td>
-          <td>{{if $r.P95MS}}{{printf "%.1f ms" (metric $r.P95MS)}}{{else}}—{{end}}</td>
-          <td>{{if $r.TLSObserved}}observed{{else}}—{{end}}</td>
-        </tr>
-      {{else}}
-        <tr><td colspan="6" class="empty">No observations yet. Run the collector, or use <code>go run .</code> to preview demo mode.</td></tr>
-      {{end}}
-      </tbody>
-    </table>
-  </div>
 
-  <section class="cards">
-    <article><p class="eyebrow">Comparable timing</p><h3>Same block, same vantage.</h3><p>Latency is calculated within each block and observation location.</p></article>
-    <article><p class="eyebrow">Sample context</p><h3>Counts remain visible.</h3><p>The eligible-block total is published beside every block-delivery measurement.</p></article>
-    <article><p class="eyebrow">Reproducible reports</p><h3>Source data in JSONL.</h3><p>Aggregates are deterministic and available through the API.</p></article>
+  <section class="pool-section compact-section unsafe-section">
+    <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Worker address missing in sampled coinbase</p><h2>Unsafe pools</h2></div><p>Same measurements, separated only by observed coinbase output</p></div>
+    {{template "pool-list" .UnsafePools}}
   </section>
+
+  <p class="dashboard-footnote">Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · Method {{.Snapshot.Methodology}} · Median bars use a fixed 0–4+ second scale. Availability is the 95% Wilson lower bound. <code>mining.ping</code> is optional. * Fee uses matched outputs only.</p>
 </main>
-<footer><span>StratumStats</span><span>Bitcoin pool telemetry.</span></footer>
+<footer><span>StratumStats</span><span>Raw measurements, kept separate.</span></footer>
 </body>
 </html>{{end}}
