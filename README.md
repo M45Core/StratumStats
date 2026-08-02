@@ -53,6 +53,10 @@ go run . collect -vantage us-west
 go run . serve
 ```
 
+The dashboard checks for new measurements every 10 seconds without reloading
+the page. Changed pool rows briefly flash, and rows are moved or re-sorted when
+their verification state or block-template latency changes.
+
 Configuration is in `config/pools.json`. The collector never submits shares.
 Current records use observation schema version 5 with `block_id` terminology.
 
@@ -137,16 +141,23 @@ The deterministic aggregation is implemented in `internal/report/report.go`.
 
 | Field | Meaning |
 |---|---|
-| Eligible blocks | Blocks for which the pool was connected at observation start |
-| Availability | 95% Wilson lower bound of valid arrivals over eligible blocks |
+| Bitcoin blocks observed | Distinct Bitcoin block identifiers in the dataset; one block counts once regardless of how many pools report it |
+| Eligible samples | Unique vantage-and-block pairs for which the pool was connected at observation start |
+| Availability | Observed valid arrivals divided by eligible vantage-and-block samples |
 | Median block-template latency | Median delay behind the earliest structurally valid template for the same block and vantage |
 | P95 block-template latency | 95th-percentile relative delay, exposing intermittent stalls |
 | TLS | Whether a configured TLS Stratum endpoint completed a measured session |
 
-Reports are sorted alphabetically by pool name, not by performance. The
-dashboard keeps all measurements in each pool row and has only two sections:
-Normal pools and Unsafe pools. A pool moves to Unsafe when the generated worker
-address is absent from at least one sampled coinbase.
+For each block and vantage, reports use only the earliest collector window.
+Late jobs cannot reopen a finalized block or create additional zero-latency
+baselines.
+
+The dashboard sorts each section by median block-template latency, with pools
+that lack a latency sample last. It keeps all numeric measurements in each pool
+row and has only two sections: Normal pools and Unsafe pools. Normal requires
+sampled coinbases to consistently contain the generated worker address; absent,
+varied, and not-yet-verified entries remain in Unsafe. JSON API reports retain
+deterministic alphabetical ordering.
 
 ## Protocol response timings
 
@@ -177,10 +188,10 @@ first block-template arrival without waiting for transaction branches.
 
 The probe reconstructs each structurally valid coinbase using its negotiated
 extranonces and checks for the exact generated worker address script. The main
-dashboard keeps this evidence with the pool's other measurements. Pools with a
-missing worker address in at least one decoded sample appear in the Unsafe
-pools section; all others appear in Normal pools. A pool with no decoded
-coinbase sample is explicitly marked not measured, not certified safe.
+dashboard uses this evidence to determine list placement without spending a
+separate column on it. Normal requires the worker address in every decoded
+sample. Missing, varied, and no-data entries appear in Unsafe until positive
+evidence is available.
 
 These are output-presence observations, not pool types or judgments about
 payment correctness. A pool can account for earnings outside the coinbase
@@ -200,9 +211,11 @@ controlled hashrate/payment study.
 Current version 5 JSONL retains `coinbase_analyzed`,
 `worker_wallet_in_coinbase`, `coinbase_total_sats`, `worker_payout_sats`, and
 `estimated_pool_fee_pct`. Reports expose `coinbase_samples`,
-`worker_address_observed_pct`, `worker_address_status`,
-`median_pool_fee_pct`, the observed fee range, and `observed_fee_class`
-(`zero`, `positive`, `variable`, or `unknown`).
+`worker_address_observed_pct`, `worker_address_status`, the latest and previous
+observed pool-fee percentages, sample and change counts, and the time of the
+latest change. Consecutive samples are compared at the displayed 0.01%
+precision; the dashboard explicitly shows stable or previous → current instead
+of hiding changes in a median.
 
 ## Job verification
 

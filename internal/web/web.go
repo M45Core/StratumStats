@@ -86,7 +86,7 @@ func (s Server) Handler() (http.Handler, error) {
 		writeJSON(w, data)
 	})
 	mux.HandleFunc("GET /api/v1/methodology", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "median_pool_fee_pct", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
+		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "latest_pool_fee_pct", "previous_pool_fee_pct", "pool_fee_changed", "pool_fee_changes", "pool_fee_samples", "pool_fee_last_changed_at", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /static/", http.FileServer(http.FS(assets)))

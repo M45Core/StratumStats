@@ -26,8 +26,11 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 		"Block template latency",
 		"Normal pools",
 		"Unsafe pools",
+		"Bitcoin blocks observed",
+		"Pools with block data",
 		"Demo data — synthetic measurements shown for interface preview only.",
 		"https://github.com/proofofmike/stratumstats",
+		"/static/dashboard.js",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
@@ -45,9 +48,25 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 		"Current Leader",
 		"Wins",
 		"Races",
+		"Template observations",
+		"Wilson",
 	} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("homepage still contains old copy %q", unwanted)
 		}
+	}
+
+	script := httptest.NewRecorder()
+	h.ServeHTTP(script, httptest.NewRequest("GET", "/static/dashboard.js", nil))
+	if script.Code != 200 {
+		t.Fatalf("dashboard updater status=%d", script.Code)
+	}
+	for _, want := range []string{"fetch(window.location.pathname", "data-pool-id", "row-updated"} {
+		if !strings.Contains(script.Body.String(), want) {
+			t.Errorf("dashboard updater missing %q", want)
+		}
+	}
+	if strings.Contains(script.Body.String(), "location.reload") {
+		t.Fatal("dashboard updater performs a full page reload")
 	}
 }

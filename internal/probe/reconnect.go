@@ -2,6 +2,8 @@ package probe
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -17,6 +19,9 @@ func watch(ctx context.Context, poolID string, endpoint model.Endpoint, out chan
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		if !shouldRetry(err) {
+			return fmt.Errorf("not retrying after permanent rejection: %w", err)
+		}
 		log.Printf("probe %s %s:%d disconnected: %v; retrying in %s", poolID, endpoint.Host, endpoint.Port, err, backoff)
 		timer := time.NewTimer(backoff)
 		select {
@@ -30,4 +35,8 @@ func watch(ctx context.Context, poolID string, endpoint model.Endpoint, out chan
 			backoff = time.Minute
 		}
 	}
+}
+
+func shouldRetry(err error) bool {
+	return !errors.Is(err, errPoolRejected)
 }

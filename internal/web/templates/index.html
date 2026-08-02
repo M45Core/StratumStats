@@ -2,23 +2,19 @@
 {{define "pool-list"}}
 <div class="measurement-list">
   <div class="measurement-head">
-    <span>Pool</span><span>Block template latency median</span><span>P95</span><span>Availability</span><span>Connection</span><span>Stratum setup</span><span>Ping / pong</span><span>Coinbase</span><span>Pool fee</span>
+    <span>Pool</span><span>Block template latency median</span><span>P95</span><span>Availability</span><span>Connection</span><span>Stratum setup</span><span>Pool fee / changes</span>
   </div>
   {{range $r := .}}
-  <article class="measurement-row">
+  <article class="measurement-row" data-pool-id="{{$r.PoolID}}">
     <div class="measurement-pool"><strong><a href="/pools#{{$r.PoolID}}">{{$r.PoolName}}</a></strong><small>{{$r.Category}}{{if $r.TLSObserved}} · TLS{{end}}</small></div>
     <div class="template-median">
       {{if $r.MedianMS}}<strong>{{printf "%.1f ms" (metric $r.MedianMS)}}</strong><div class="median-bar-track" aria-hidden="true"><span class="median-bar {{$r.LatencyClass}}"></span></div>{{else}}<strong>—</strong><div class="median-bar-track" aria-hidden="true"></div>{{end}}
     </div>
     <div class="p95-value">{{if $r.P95MS}}<strong>{{printf "%.1f ms" (metric $r.P95MS)}}</strong>{{else}}<strong>—</strong>{{end}}</div>
-    <div class="availability-compact"><strong>{{printf "%.1f%%" $r.Availability}}</strong><progress max="100" value="{{$r.Availability}}">{{$r.Availability}}%</progress><small>{{$r.Arrivals}}/{{$r.Blocks}} templates</small></div>
+    <div class="availability-compact"><strong>{{printf "%.1f%%" $r.Availability}}</strong><progress max="100" value="{{$r.Availability}}">{{$r.Availability}}%</progress><small>{{$r.Arrivals}}/{{$r.Blocks}} eligible samples</small></div>
     <div class="stacked-stat"><span>TCP {{template "timing-compact" $r.ConnectTiming}}</span><span>TLS {{template "timing-compact" $r.TLSTiming}}</span></div>
     <div class="stacked-stat"><span>Sub {{template "timing-compact" $r.SubscribeTiming}}</span><span>Auth {{template "timing-compact" $r.AuthorizeTiming}}</span></div>
-    <div class="compact-stat">{{template "timing-compact" $r.PingTiming}}</div>
-    <div class="coinbase-compact {{if $r.UnsafeReason}}coinbase-unsafe{{else if eq $r.WorkerAddressStatus "always_observed"}}coinbase-observed{{end}}">
-      {{if eq $r.WorkerAddressStatus "always_observed"}}<strong>Worker address observed</strong><small>{{$r.CoinbaseSamples}}/{{$r.CoinbaseSamples}} decoded jobs</small>{{else if eq $r.WorkerAddressStatus "varied"}}<strong>Worker address varied</strong><small>{{printf "%.1f%%" (metric $r.WorkerAddressObservedPct)}} · {{$r.CoinbaseSamples}} jobs</small>{{else if eq $r.WorkerAddressStatus "not_observed"}}<strong>Worker address absent</strong><small>0/{{$r.CoinbaseSamples}} decoded jobs</small>{{else}}<strong>Not measured</strong><small>0 decoded jobs</small>{{end}}
-    </div>
-    <div class="fee-compact">{{if $r.PoolFeePct}}<strong>{{printf "%.3f%%" (metric $r.PoolFeePct)}}</strong><small>observed median{{if $r.UnsafeReason}}*</small>{{else}}</small>{{end}}{{else}}<strong>—</strong><small>{{if $r.UnsafeReason}}cannot infer{{else}}not measured{{end}}</small>{{end}}</div>
+	<div class="fee-compact">{{if $r.LatestPoolFeePct}}<strong>{{printf "%.2f%%" (metric $r.LatestPoolFeePct)}}</strong>{{if $r.PoolFeeChanged}}<small class="fee-changed">changed {{printf "%.2f" (metric $r.PreviousPoolFeePct)}} → {{printf "%.2f%%" (metric $r.LatestPoolFeePct)}}</small><small>{{$r.PoolFeeChanges}} change(s) · {{$r.PoolFeeSamples}} samples{{if $r.UnsafeReason}}*{{end}}</small>{{else if gt $r.PoolFeeSamples 1}}<small>stable · {{$r.PoolFeeSamples}} samples</small>{{else}}<small>1 sample · no history</small>{{end}}{{else}}<strong>—</strong><small>{{if $r.UnsafeReason}}cannot infer{{else}}not measured{{end}}</small>{{end}}</div>
   </article>
   {{else}}
   <div class="empty">No pools in this section.</div>
@@ -45,25 +41,27 @@
   </section>
   {{if .Demo}}<div class="notice dashboard-notice compact-notice">Demo data — synthetic measurements shown for interface preview only.</div>{{end}}
 
-  <section class="summary-stats compact-summary" aria-label="Measurement summary">
+  <section class="summary-stats compact-summary" aria-label="Measurement summary" data-live-summary>
     <article><span>Pools monitored</span><strong>{{.PoolCount}}</strong></article>
-    <article><span>Blocks tracked</span><strong>{{.BlockCount}}</strong></article>
-    <article><span>Template observations</span><strong>{{.TemplateObservations}}</strong></article>
+    <article><span>Bitcoin blocks observed</span><strong>{{.BlocksObserved}}</strong></article>
+    <article><span>Pools with block data</span><strong>{{.PoolsWithBlockData}}</strong></article>
     <article class="summary-unsafe"><span>Unsafe pools</span><strong>{{.UnsafeCount}}</strong></article>
   </section>
 
-  <section class="pool-section compact-section">
-    <div class="section-head list-section-head"><div><p class="eyebrow">Block template measurements</p><h2>Normal pools</h2></div><p>Alphabetical · bars compare median delivery on the same fixed scale</p></div>
-    {{template "pool-list" .NormalPools}}
+  <section class="pool-section compact-section" data-pool-section="normal">
+    <div class="section-head list-section-head"><div><p class="eyebrow">Block template measurements</p><h2>Normal pools</h2></div><p>Verified worker output · fastest median first</p></div>
+    <div id="normal-pools-list">{{template "pool-list" .NormalPools}}</div>
   </section>
 
-  <section class="pool-section compact-section unsafe-section">
-    <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Worker address missing in sampled coinbase</p><h2>Unsafe pools</h2></div><p>Same measurements, separated only by observed coinbase output</p></div>
-    {{template "pool-list" .UnsafePools}}
+  <section class="pool-section compact-section unsafe-section" data-pool-section="unsafe">
+    <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Worker output absent or unverified</p><h2>Unsafe pools</h2></div><p>Same measurements · fastest median first · no-data entries last</p></div>
+    <div id="unsafe-pools-list">{{template "pool-list" .UnsafePools}}</div>
   </section>
 
-  <p class="dashboard-footnote">Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · Method {{.Snapshot.Methodology}} · Median bars use a fixed 0–4+ second scale. Availability is the 95% Wilson lower bound. <code>mining.ping</code> is optional. * Fee uses matched outputs only.</p>
+  <p class="dashboard-footnote" data-live-footnote>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · Method {{.Snapshot.Methodology}} · Median bars use a fixed 0–4+ second scale. Availability is observed deliveries ÷ eligible block samples. * Fee uses matched outputs only.</p>
+  <p class="visually-hidden" role="status" aria-live="polite" data-live-status></p>
 </main>
 <footer><span>StratumStats</span><span>Raw measurements, kept separate.</span></footer>
+<script defer src="/static/dashboard.js"></script>
 </body>
 </html>{{end}}

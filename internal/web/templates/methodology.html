@@ -18,7 +18,7 @@
 
   <h2>Published measurements</h2>
   <div class="method-grid">
-    <article><h3>Availability</h3><p>Conservative 95% Wilson lower bound of valid block-template arrivals over eligible blocks. Disappearing during an observed block counts as a miss.</p></article>
+    <article><h3>Availability</h3><p>Observed valid block-template arrivals divided by unique eligible vantage-and-block samples. The numerator and denominator are shown beside the percentage. Each distinct Bitcoin block counts once per vantage; repeated or later reopened windows cannot increase the count.</p></article>
     <article><h3>Median delivery</h3><p>Median first-valid-template delay relative to the earliest structurally valid template observed for the same block and vantage.</p></article>
     <article><h3>Tail delivery</h3><p>95th-percentile relative delay, exposing intermittent stalls that a median can hide.</p></article>
     <article><h3>Transport security</h3><p>Whether a configured TLS endpoint successfully completed a measured Stratum session.</p></article>
@@ -32,8 +32,9 @@
   <p>After a new block, Bitcoin Core validates the block and rebuilds transaction state. A structurally valid coinbase-only template lets miners stop working on the stale parent immediately, so it counts as block-template delivery without waiting for transaction branches. Empty-first remains raw evidence and does not alter this benchmark.</p>
 
   <h2>Coinbase output observations</h2>
-  <p>For every structurally valid job, the probe reconstructs the coinbase with its negotiated extranonces and checks whether an output matches the generated worker address script. The main dashboard keeps every measurement together, but moves a pool into the Unsafe pools section when that address is absent from at least one decoded sample. Pools with no decoded samples remain in Normal pools and are explicitly marked not measured.</p>
+  <p>For every structurally valid job, the probe reconstructs the coinbase with its negotiated extranonces and checks whether an output matches the generated worker address script. Normal-list placement requires that address in every decoded sample. Missing, varied, and no-data entries remain in Unsafe until positive evidence is available; the compact list does not spend a separate column repeating that status.</p>
   <p>When the worker output is present, the observed pool fee is <code>100 × (all coinbase outputs − worker outputs) / all coinbase outputs</code>. Optional donations or configured splits can be included, so this is the effective percentage visible in that job—not a claim about advertised policy. No fee is inferred from jobs where the worker output is absent.</p>
+  <p>Fee history follows the PoolCensus change approach: consecutive observations are compared at the displayed 0.01% precision so smaller fluctuations do not create noisy changes. The list shows the latest value and either stable with its sample count or the previous → current value with a change count. It never reports a median fee.</p>
 
   <h2>What is deliberately excluded</h2>
   <p>Pool size, popularity, advertising, sponsorship, subjective reputation, unverified operator claims, and any composite score. Payment correctness outside the observed coinbase outputs still needs a controlled hashrate/payment study.</p>

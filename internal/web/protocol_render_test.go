@@ -28,10 +28,13 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	home := httptest.NewRecorder()
 	h.ServeHTTP(home, httptest.NewRequest("GET", "/", nil))
 	body := home.Body.String()
-	for _, want := range []string{"Block template latency", "42.5", "12.5", "Ping / pong", "mining.ping"} {
+	for _, want := range []string{"Block template latency", "42.5", "12.5"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
 		}
+	}
+	if strings.Contains(body, "Ping / pong") {
+		t.Fatal("optional ping/pong still occupies a dashboard column")
 	}
 	if strings.Index(body, "42.5") > strings.Index(body, "12.5") {
 		t.Fatal("block-template benchmark does not precede supporting protocol timing")

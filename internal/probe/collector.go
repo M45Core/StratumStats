@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -20,6 +21,7 @@ import (
 const blockWindow = 15 * time.Second
 
 var (
+	errPoolRejected    = errors.New("pool rejected probe")
 	requestTimeout     = 30 * time.Second
 	pingInterval       = 60 * time.Second
 	pingResponseWindow = 10 * time.Second
@@ -28,6 +30,7 @@ var (
 
 type event struct {
 	poolID, prevHash     string
+	connectionID         string
 	at                   time.Time
 	hasTransactions, tls bool
 	verified             bool
@@ -70,8 +73,9 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 	}
 	go func() { wg.Wait(); close(events) }()
 
-	connected := map[string]bool{}
+	connected := map[string]map[string]bool{}
 	blocks := map[string]*activeBlock{}
+	completedBlocks := map[string]bool{}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	finish := func(r *activeBlock) error {
@@ -126,19 +130,12 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 				continue
 			}
 			if e.connected != nil {
-				connected[e.poolID] = *e.connected
+				recordConnectionState(connected, e)
 				continue
 			}
-			r := blocks[e.prevHash]
+			r := activeBlockForEvent(blocks, completedBlocks, connected, e)
 			if r == nil {
-				r = &activeBlock{id: e.prevHash, started: e.at, eligible: map[string]bool{}, arrivals: map[string]time.Time{}, empty: map[string]bool{}, tls: map[string]bool{}, invalid: map[string]bool{}, payout: map[string]event{}}
-				for id, online := range connected {
-					if online {
-						r.eligible[id] = true
-					}
-				}
-				r.eligible[e.poolID] = true
-				blocks[e.prevHash] = r
+				continue
 			}
 			recordBlockEvent(r, e)
 		case now := <-ticker.C:
@@ -147,10 +144,50 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 					if err := finish(r); err != nil {
 						return err
 					}
+					completedBlocks[id] = true
 					delete(blocks, id)
 				}
 			}
 		}
+	}
+}
+
+// activeBlockForEvent prevents late jobs from reopening a measurement window
+// after that Bitcoin block has already been finalized.
+func activeBlockForEvent(blocks map[string]*activeBlock, completed map[string]bool, connected map[string]map[string]bool, e event) *activeBlock {
+	if completed[e.prevHash] {
+		return nil
+	}
+	if block := blocks[e.prevHash]; block != nil {
+		return block
+	}
+	block := &activeBlock{id: e.prevHash, started: e.at, eligible: map[string]bool{}, arrivals: map[string]time.Time{}, empty: map[string]bool{}, tls: map[string]bool{}, invalid: map[string]bool{}, payout: map[string]event{}}
+	for id, endpoints := range connected {
+		if len(endpoints) > 0 {
+			block.eligible[id] = true
+		}
+	}
+	block.eligible[e.poolID] = true
+	blocks[e.prevHash] = block
+	return block
+}
+
+func recordConnectionState(connected map[string]map[string]bool, e event) {
+	if e.connected == nil || e.connectionID == "" {
+		return
+	}
+	endpoints := connected[e.poolID]
+	if *e.connected {
+		if endpoints == nil {
+			endpoints = map[string]bool{}
+			connected[e.poolID] = endpoints
+		}
+		endpoints[e.connectionID] = true
+		return
+	}
+	delete(endpoints, e.connectionID)
+	if len(endpoints) == 0 {
+		delete(connected, e.poolID)
 	}
 }
 
@@ -212,7 +249,7 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 	}
 	if remoteErr != nil {
 		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolSubscribe, subscribeStarted, model.ProtocolStatusRejected, "subscribe_rejected")
-		return fmt.Errorf("subscribe rejected: %v", remoteErr)
+		return fmt.Errorf("%w: subscribe: %v", errPoolRejected, remoteErr)
 	}
 	var subscribe []json.RawMessage
 	var extraNonce1 string
@@ -241,33 +278,33 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 	}
 	if remoteErr != nil {
 		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, model.ProtocolStatusRejected, "authorize_rejected")
-		return fmt.Errorf("authorize rejected: %v", remoteErr)
+		return fmt.Errorf("%w: authorization: %v", errPoolRejected, remoteErr)
 	}
 	var authorized bool
 	if json.Unmarshal(authorizeResult, &authorized) != nil || !authorized {
 		_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, model.ProtocolStatusRejected, "authorize_rejected")
-		return fmt.Errorf("authorization rejected")
+		return fmt.Errorf("%w: authorization rejected", errPoolRejected)
 	}
 	if err := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolAuthorize, authorizeStarted, model.ProtocolStatusOK, ""); err != nil {
 		return err
 	}
 
 	online := true
+	connectionID := address + "/tls=" + strconv.FormatBool(endpoint.TLS)
 	select {
-	case out <- event{poolID: poolID, connected: &online}:
+	case out <- event{poolID: poolID, connectionID: connectionID, connected: &online}:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 	defer func() {
 		offline := false
 		select {
-		case out <- event{poolID: poolID, connected: &offline}:
+		case out <- event{poolID: poolID, connectionID: connectionID, connected: &offline}:
 		case <-ctx.Done():
 		}
 	}()
 
-	var previous string
-	var transactionJobSent bool
+	var window notifyWindow
 	pingID := 1000
 	pingPending := false
 	pingDisabled := false
@@ -374,17 +411,7 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 				branchStrings = append(branchStrings, value)
 			}
 		}
-		if previous == "" {
-			previous = prev
-			continue
-		}
-		if prev != previous {
-			if !clean {
-				continue
-			}
-			previous, transactionJobSent = prev, false
-		}
-		if len(branches) > 0 && transactionJobSent {
+		if !window.accept(prev, clean, len(branches) > 0) {
 			continue
 		}
 		job := Job{PrevHash: prev, MerkleBranches: branchStrings, ExtraNonce1: extraNonce1, ExtraNonce2Size: extraNonce2Size, WorkerScript: identity.PayoutScript}
@@ -394,9 +421,6 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		job.Bits, _ = msg.Params[6].(string)
 		job.NTime, _ = msg.Params[7].(string)
 		verification := VerifyJob(job)
-		if len(branches) > 0 {
-			transactionJobSent = true
-		}
 		e := event{poolID: poolID, prevHash: prev, at: time.Now(), hasTransactions: len(branches) > 0, tls: endpoint.TLS, verified: verification.Valid, coinbaseAnalyzed: verification.CoinbaseAnalyzed, workerWalletSeen: verification.WorkerWalletSeen, coinbaseTotalSats: verification.CoinbaseTotalSats, workerPayoutSats: verification.WorkerPayoutSats, estimatedPoolFeePct: verification.EstimatedPoolFeePct}
 		select {
 		case out <- e:
@@ -404,6 +428,38 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 			return ctx.Err()
 		}
 	}
+}
+
+type notifyWindow struct {
+	previous           string
+	active             bool
+	transactionJobSent bool
+}
+
+// accept rejects the initial current-block job and every update for it. A
+// measurement window opens only after this connection observes a clean
+// previous-hash transition, so startup timing cannot masquerade as block
+// propagation latency.
+func (window *notifyWindow) accept(previousHash string, clean, hasTransactions bool) bool {
+	if window.previous == "" {
+		window.previous = previousHash
+		return false
+	}
+	if previousHash != window.previous {
+		if !clean {
+			return false
+		}
+		window.previous = previousHash
+		window.active = true
+		window.transactionJobSent = false
+	}
+	if !window.active || (hasTransactions && window.transactionJobSent) {
+		return false
+	}
+	if hasTransactions {
+		window.transactionJobSent = true
+	}
+	return true
 }
 
 // recordBlockEvent keeps the earliest structurally valid template for a pool.

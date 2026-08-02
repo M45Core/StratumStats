@@ -95,15 +95,20 @@ type PoolReport struct {
 	CoinbaseSamples          int         `json:"coinbase_samples"`
 	WorkerAddressObservedPct *float64    `json:"worker_address_observed_pct"`
 	WorkerAddressStatus      string      `json:"worker_address_status"`
-	PoolFeePct               *float64    `json:"median_pool_fee_pct"`
-	PoolFeeMinPct            *float64    `json:"min_pool_fee_pct"`
-	PoolFeeMaxPct            *float64    `json:"max_pool_fee_pct"`
-	FeeClass                 string      `json:"observed_fee_class"`
+	LatestPoolFeePct         *float64    `json:"latest_pool_fee_pct"`
+	PreviousPoolFeePct       *float64    `json:"previous_pool_fee_pct,omitempty"`
+	PoolFeeChanged           bool        `json:"pool_fee_changed"`
+	PoolFeeChanges           int         `json:"pool_fee_changes"`
+	PoolFeeSamples           int         `json:"pool_fee_samples"`
+	PoolFeeLastChangedAt     *time.Time  `json:"pool_fee_last_changed_at,omitempty"`
 }
 
 type Snapshot struct {
-	GeneratedAt time.Time    `json:"generated_at"`
-	Methodology string       `json:"methodology_version"`
-	Reports     []PoolReport `json:"reports"`
-	Disclosure  []string     `json:"disclosure"`
+	GeneratedAt         time.Time    `json:"generated_at"`
+	Methodology         string       `json:"methodology_version"`
+	BlocksObserved      int          `json:"blocks_observed"`
+	EligiblePoolSamples int          `json:"eligible_pool_samples"`
+	TemplateDeliveries  int          `json:"template_deliveries"`
+	Reports             []PoolReport `json:"reports"`
+	Disclosure          []string     `json:"disclosure"`
 }
