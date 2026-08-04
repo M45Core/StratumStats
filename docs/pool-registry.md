@@ -1,8 +1,10 @@
 # Pool registry research
 
-Research date: 2026-08-01
+Research date: 2026-08-04
 
 StratumStats keeps researched operator context separate from measured telemetry. Names, product categories, operating status, endpoints, and advertised fees come from current web research and connection checks. They do not affect reports.
+
+This audit covers 36 distinct pool or product records, 137 Stratum V1 endpoints, and 21 endpoints advertised as TLS. Every active record was checked against a first-party page, first-party help material, operator source code, or a current operator announcement where available. Missing fee text is intentional: the registry does not guess when current terms cannot be established.
 
 The machine-readable source of truth is [pool-metadata.json](../config/pool-metadata.json). It records the exact source links and check dates for every pool. [pools.json](../config/pools.json) is generated from that metadata plus the local StratumRace and PoolCensus registries.
 
@@ -50,8 +52,12 @@ Collector fit is separate. Account-based pools may publish jobs but still reject
 | NodeRunners type unsure | Corrected to solo |
 | Parasite and ViaBTC | Corrected from a single-mode label to hybrid |
 | Public Pool and Blitzpool | Split solo and PPLNS into separate product records with their own endpoints |
-| LetsMine.it and SoloPool.Com | Named and typed for the solo mode actually selected by the collector |
+| LetsMine.it | Split SOLO and PROP because ports 3332 and 3432 select independently measurable products |
+| SoloPool.Com | Kept one SOLO record because the collector password selects SOLO; PROP and Solo Split share the same endpoints and would be mislabeled by duplicate rows |
 | Original Bitcoin P2Pool | Retained as an inactive decentralized historical reference with no central endpoint |
+| f2pool TLS | Replaced the stale `btcssl.f2pool.com` host with the current documented `btcssl-asia.f2pool.com` lanes |
+| Braiins Pool and SpiderPool fees | Corrected current standard PPLNS/FPPS fee text from first-party fee schedules |
+| Regional coverage | Added current documented lanes for Helios, KanoPool, LetsMine.it, Mineshop, SECPOOL, SoloFury, SoloPool.Com, SoloPool.org, SpiderPool, and ViaBTC |
 
 ## Current registry
 
@@ -66,7 +72,7 @@ Advertised fees are snapshots, not promises. A blank fee means the review did no
 | [Bitcoin Merch Lucky Pool](https://pool.bitcoinmerch.com/) | solo | active | 2% | Home-miner-oriented solo service |
 | [Blitzpool — Solo](https://blitzpool.yourdevice.ch/mining-modes/solo) | solo | active | 0% | Dedicated solo endpoints |
 | [Blitzpool — PPLNS](https://blitzpool.yourdevice.ch/mining-modes/pplns) | shared | active | 1% | Dedicated PPLNS endpoints |
-| [Braiins Pool](https://braiins.com/pool) | shared | active | 2.5% standard; 0% with Braiins OS | Account-based FPPS |
+| [Braiins Pool](https://braiins.com/pool) | shared | active | 2% standard; 0% with Braiins OS | Account-based FPPS |
 | [Braiins Solo](https://solo.braiins.com/) | solo | active | 0.5% | Anonymous solo product; finder-address output documented |
 | [Solo CKPool](https://solo.ckpool.org/) | solo | active | 2% | Current global host replaces duplicate aliases |
 | [f2pool](https://www.f2pool.com/) | shared | active | FPPS 4%; PPLNS 2% | Account-based shared products |
@@ -74,7 +80,8 @@ Advertised fees are snapshots, not promises. A blank fee means the review did no
 | [Go Brrr Pool](https://pool.gobrrr.me/) | solo | active | 0% | Community pool; worker-address output documented |
 | [HeliosPool](https://heliospool.com/) | solo | active | 1% | Regional multi-chain operator; Bitcoin record |
 | [KanoPool](https://kano.is/) | hybrid | active | 0.5% | Account selects PPLNS or solo |
-| [LetsMine.it — Bitcoin Solo](https://letsmine.it/) | solo | active | 1% | Configured endpoint is the Bitcoin solo lane |
+| [LetsMine.it — Bitcoin Solo](https://letsmine.it/coin/btc) | solo | active | 1% | Six regions on dedicated SOLO port 3332 |
+| [LetsMine.it — Bitcoin PROP](https://letsmine.it/pool/BTCPOOL) | shared | active | 1% | Six regions on dedicated proportional port 3432 |
 | [M45Core.com](https://m45core.com/) | solo | active | 0% | Main and corrected TinyMiner lanes; EU removed |
 | [Mineshop Solo Pool](https://solo.mineshop.eu/) | solo | active | 0% | Finder address documented in coinbase output |
 | [Noderunners Mining Pool](https://noderunners.network/en/pool) | solo | active | 0% | Community pool with TCP and TLS |
@@ -87,13 +94,33 @@ Advertised fees are snapshots, not promises. A blank fee means the review did no
 | [Satoshi Radio Mining Pool](https://pool.satoshiradio.nl/) | solo | active | not confirmed | Community home-miner pool |
 | [SECPOOL](https://v3.secpool.com/) | shared | active | PPLNS 0% displayed; FPPS 4% | Account-based; displayed PPLNS rate may be promotional |
 | [solo.cat](https://solo.cat/) | solo | active | 0% | Finder address documented in coinbase output |
-| [SoloFury](https://solofury.com/) | solo | active | 1% | Multi-coin operator; Bitcoin record |
+| [SoloFury](https://solofury.com/btc/) | solo | active | 1% | Nine Bitcoin regions; primary 6060 lanes measured, 6061 and 6062 remain documented failovers |
 | [SoloHash Bitcoin Solo](https://solohash.co.uk/pool/bitcoin-solo) | solo | active | 0.5% | Three regions and two difficulty lanes |
 | [SoloMining.de](https://pool.solomining.de/) | solo | active | 0% | Open-source TCP and TLS service |
 | [SoloPool.Com — Solo](https://solopool.com/) | solo | active | 2% | Collector password selects the solo product |
-| [SoloPool.org Bitcoin Solo](https://btc.solopool.org/) | solo | active | 1.5% | Separate operator from SoloPool.Com |
-| [SpiderPool](https://www.spiderpool.com/) | shared | active | PPLNS 1% displayed; FPPS 4% | Account-based; PPLNS rate may be promotional |
+| [SoloPool.org Bitcoin Solo](https://btc.solopool.org/) | solo | active | 1.5% | Europe and US with low, medium, and high difficulty; separate operator from SoloPool.Com |
+| [SpiderPool](https://www.spiderpool.com/) | shared | active | PPLNS 2%; FPPS 4% | Account-based; four regions with plaintext and TLS lanes |
 | [ViaBTC](https://www.viabtc.com/) | hybrid | active | 1% to 4% by mode | Account-based PPS+, PPLNS, and SOLO |
+
+## Live Stratum reachability audit
+
+A bounded 20-second run of the native collector attempted all 137 configured endpoints from the same US Mountain vantage. It established TCP connections to 135 endpoints and completed a structurally valid `mining.subscribe` exchange with 131. Of those, 112 accepted the randomized anonymous authorization and 19 explicitly rejected it, which is expected for records marked `requires_credentials`. Original P2Pool has no central endpoint and was therefore the only registry record without protocol attempts.
+
+Two endpoints did not establish TCP during that window: `de1.letsmine.it:3432` refused the connection, while `btc-af.spiderpool.com:2309` timed out even though the TLS lane on port 2310 was reachable. Both remain listed because they are in current first-party connection material and a single-vantage short failure is not enough to claim retirement. A separate citation pass received an HTTP response from 80 of 81 unique registry URLs; only the PyBLOCK dashboard timed out, while its Stratum endpoint still completed subscribe and authorization successfully. The collector submitted no shares, did not retain its randomized authorization credential, and emitted no wallet address in the temporary evidence.
+
+## TLS certificate audit
+
+A direct hostname-verifying TLS handshake was run against all 21 configured TLS endpoints on 2026-08-04. The probe required TLS 1.2 or newer, the endpoint hostname as SNI, a certificate valid for that hostname and time, and a chain trusted by the system CA store. Seventeen endpoints passed.
+
+Four documented lanes did not complete a valid authenticated handshake:
+
+- `btcssl-asia.f2pool.com:1300` and `:1301` returned a TLS internal-error alert before presenting any certificate, despite both remaining in f2pool current connection documentation.
+- `pool.bitcoinmerch.com:4333` presented a self-signed certificate whose common name is `127.0.0.1`, not the configured hostname.
+- `btc-ssl.powhashing.com:3333` resolved to three IPv4 backends: one served a valid Amazon-issued `powhashing.com` certificate, while two served Cloudflare Origin Certificates without publicly trusted chains. Certificate validity therefore depended on which backend answered.
+
+These endpoints remain configured because the operators currently advertise them and because hiding them would hide a material security failure. A follow-up run with the native collector reached 18 TLS endpoints successfully at least once, while also recording certificate failures from the inconsistent ViaBTC European backends. The collector performs normal certificate validation, records `tls_certificate_invalid` where applicable, and the dashboard renders any such result as a red certificate error. The status is measured telemetry rather than a permanent registry label, so it can recover automatically after an operator fixes the service.
+
+The `parasite.wtf` marketing alias also had a hostname-mismatched web certificate during the audit. The registry uses the valid canonical `parasite.space` website, and the listed Parasite Pool Stratum endpoint is plaintext, so this is not represented as a mining-TLS result.
 
 ## Measurement caveats exposed by the research
 

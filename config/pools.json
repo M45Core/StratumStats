@@ -96,12 +96,16 @@
         "SOLO"
       ],
       "advertised_fee": "1.5%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "2Miners Bitcoin SOLO",
           "url": "https://2miners.com/solo-btc-mining-pool"
+        },
+        {
+          "title": "2Miners Bitcoin SOLO help",
+          "url": "https://solo-btc.2miners.com/help"
         }
       ]
     },
@@ -117,9 +121,27 @@
       "endpoints": [
         {
           "host": "ss.antpool.com",
+          "port": 25,
+          "tls": false,
+          "label": "plaintext firewall-friendly",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "ss.antpool.com",
           "port": 3333,
           "tls": false,
           "label": "official Bitcoin endpoint",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "ss.antpool.com",
+          "port": 443,
+          "tls": false,
+          "label": "plaintext firewall-friendly",
           "sources": [
             "pool-research"
           ]
@@ -134,11 +156,15 @@
         "FPPS",
         "PPLNS"
       ],
-      "last_verified": "2026-08-01",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "ANTPOOL",
           "url": "https://www.antpool.com/home?language=en"
+        },
+        {
+          "title": "ANTPOOL BTC mining tutorial",
+          "url": "https://antpoolsupport-hc.zendesk.com/hc/en-us/articles/5984340865177-BTC-BCH-Mining-Tutorial"
         }
       ]
     },
@@ -190,8 +216,8 @@
         "SOLO"
       ],
       "advertised_fee": "1.5%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "AtlasPool",
@@ -200,6 +226,10 @@
         {
           "title": "AtlasPool terms",
           "url": "https://atlaspool.io/terms-of-service.html"
+        },
+        {
+          "title": "AtlasPool connection guide",
+          "url": "https://atlaspool.io/connect-now.html"
         }
       ]
     },
@@ -221,6 +251,24 @@
           "sources": [
             "pool-research"
           ]
+        },
+        {
+          "host": "btc.poolbinance.com",
+          "port": 1800,
+          "tls": false,
+          "label": "official Bitcoin endpoint",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "sha256.poolbinance.com",
+          "port": 443,
+          "tls": false,
+          "label": "official Bitcoin endpoint",
+          "sources": [
+            "pool-research"
+          ]
         }
       ],
       "operator": "Binance",
@@ -231,7 +279,7 @@
       "products": [
         "FPPS"
       ],
-      "last_verified": "2026-08-01",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Binance Pool",
@@ -261,6 +309,15 @@
           "sources": [
             "pool-research"
           ]
+        },
+        {
+          "host": "pool.bitcoinmerch.com",
+          "port": 4333,
+          "tls": true,
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
         }
       ],
       "operator": "Bitcoin Merch LLC",
@@ -272,8 +329,8 @@
         "SOLO"
       ],
       "advertised_fee": "2%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Bitcoin Merch Lucky Pool",
@@ -302,6 +359,15 @@
         },
         {
           "host": "blitzpool.yourdevice.ch",
+          "port": 3339,
+          "tls": false,
+          "label": "SOLO high difficulty; Blockparty when address-configured",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "blitzpool.yourdevice.ch",
           "port": 6666,
           "tls": true,
           "label": "SOLO TLS",
@@ -314,7 +380,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Zero-fee solo product on dedicated Stratum endpoints; measured separately from Blitzpool PPLNS.",
+      "description": "Zero-fee solo product measured separately from Blitzpool PPLNS. Group-Solo and Blockparty are address-selected services on overlapping ports and are documented but not mislabeled as independently measured rows.",
       "products": [
         "SOLO"
       ],
@@ -329,6 +395,10 @@
         {
           "title": "Blitzpool mining modes",
           "url": "https://blitzpool.yourdevice.ch/mining-modes"
+        },
+        {
+          "title": "Blitzpool solo mode",
+          "url": "https://blitzpool.yourdevice.ch/mining-modes/solo"
         }
       ]
     },
@@ -404,6 +474,15 @@
           "sources": [
             "pool-research"
           ]
+        },
+        {
+          "host": "stratum.braiins.com",
+          "port": 443,
+          "tls": false,
+          "label": "plaintext backup",
+          "sources": [
+            "pool-research"
+          ]
         }
       ],
       "operator": "Braiins Mining Ltd.",
@@ -414,9 +493,9 @@
       "products": [
         "FPPS"
       ],
-      "advertised_fee": "2.5% standard; 0% with Braiins OS",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "advertised_fee": "2% standard; 0% with Braiins OS",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Braiins Pool",
@@ -425,6 +504,14 @@
         {
           "title": "Braiins rewards and payouts",
           "url": "https://academy.braiins.com/braiins-pool/rewards-and-payouts"
+        },
+        {
+          "title": "Braiins OS fee FAQ",
+          "url": "https://braiins.com/os-firmware/download"
+        },
+        {
+          "title": "Braiins Pool quick start",
+          "url": "https://academy.braiins.com/braiins-pool/quick-start"
         }
       ]
     },
@@ -439,6 +526,15 @@
         "stratum-race"
       ],
       "endpoints": [
+        {
+          "host": "solo.stratum.braiins.com",
+          "port": 25,
+          "tls": false,
+          "label": "plaintext firewall-friendly",
+          "sources": [
+            "pool-research"
+          ]
+        },
         {
           "host": "solo.stratum.braiins.com",
           "port": 3333,
@@ -467,8 +563,8 @@
         "SOLO"
       ],
       "advertised_fee": "0.5%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Braiins Solo",
@@ -519,8 +615,8 @@
         "SOLO"
       ],
       "advertised_fee": "2%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Solo CKPool",
@@ -543,10 +639,69 @@
       ],
       "endpoints": [
         {
+          "host": "btc-africa.f2pool.com",
+          "port": 1314,
+          "tls": false,
+          "region": "Africa",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-asia.f2pool.com",
+          "port": 1314,
+          "tls": false,
+          "region": "Asia",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-euro.f2pool.com",
+          "port": 1314,
+          "tls": false,
+          "region": "Europe",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-latin.f2pool.com",
+          "port": 1314,
+          "tls": false,
+          "region": "Latin America",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-na.f2pool.com",
+          "port": 1314,
+          "tls": false,
+          "region": "North America",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
           "host": "btc.f2pool.com",
           "port": 1314,
           "tls": false,
           "label": "primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.f2pool.com",
+          "port": 25,
+          "tls": false,
+          "label": "backup",
           "sources": [
             "pool-research"
           ]
@@ -561,10 +716,20 @@
           ]
         },
         {
-          "host": "btcssl.f2pool.com",
+          "host": "btcssl-asia.f2pool.com",
           "port": 1300,
           "tls": true,
           "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btcssl-asia.f2pool.com",
+          "port": 1301,
+          "tls": true,
+          "region": "Asia",
+          "label": "TLS backup",
           "sources": [
             "pool-research"
           ]
@@ -580,8 +745,8 @@
         "PPLNS"
       ],
       "advertised_fee": "FPPS 4%; PPLNS 2%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "f2pool",
@@ -590,6 +755,10 @@
         {
           "title": "f2pool Bitcoin mining guide",
           "url": "https://f2pool.io/mining/guides/how-to-mine-bitcoin/"
+        },
+        {
+          "title": "f2pool Stratum server list",
+          "url": "https://f2pool.io/mining/support/"
         }
       ]
     },
@@ -623,12 +792,16 @@
         "SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "FindMyBlock.xyz",
           "url": "https://findmyblock.xyz/"
+        },
+        {
+          "title": "FindMyBlock operator announcement",
+          "url": "https://bitcointalk.org/index.php?topic=5550167.0"
         },
         {
           "title": "PoolCensus",
@@ -665,8 +838,8 @@
         "SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Go Brrr Pool",
@@ -689,11 +862,61 @@
       ],
       "endpoints": [
         {
+          "host": "btc.heliospool.asia",
+          "port": 3333,
+          "tls": false,
+          "region": "Asia Pacific",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.heliospool.asia",
+          "port": 4444,
+          "tls": false,
+          "region": "Asia Pacific",
+          "label": "rental high difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
           "host": "btc.heliospool.com",
           "port": 3333,
           "tls": false,
           "region": "North America",
           "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.heliospool.com",
+          "port": 4444,
+          "tls": false,
+          "region": "North America",
+          "label": "rental high difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.heliospool.eu",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe",
+          "label": "standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.heliospool.eu",
+          "port": 4444,
+          "tls": false,
+          "region": "Europe",
+          "label": "rental high difficulty",
           "sources": [
             "pool-research"
           ]
@@ -708,8 +931,8 @@
         "SOLO"
       ],
       "advertised_fee": "1%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "HeliosPool",
@@ -736,6 +959,86 @@
       ],
       "endpoints": [
         {
+          "host": "al.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "Atlanta",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "de.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "Germany",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "jp.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "Japan",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "la.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "Los Angeles",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "nl.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "Netherlands",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "nya.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "New York",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "px.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "Phoenix",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "se.kano.is",
+          "port": 3333,
+          "tls": false,
+          "region": "Seattle",
+          "label": "regional",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
           "host": "stratum.kano.is",
           "port": 3333,
           "tls": false,
@@ -755,16 +1058,20 @@
         "SOLO"
       ],
       "advertised_fee": "0.5%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "KanoPool",
           "url": "https://kano.is/"
         },
         {
-          "title": "KanoPool setup",
-          "url": "https://kano.is/gekko.php"
+          "title": "KanoPool connection help",
+          "url": "https://kano.is/index.php?k=support"
+        },
+        {
+          "title": "KanoPool payouts and fee",
+          "url": "https://kano.is/index.php?k=payout"
         },
         {
           "title": "KanoPool announcement",
@@ -783,6 +1090,56 @@
       ],
       "endpoints": [
         {
+          "host": "de1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "Germany",
+          "label": "Bitcoin SOLO",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "fr1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "France",
+          "label": "Bitcoin SOLO",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "gb1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "United Kingdom",
+          "label": "Bitcoin SOLO",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "pl1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "Poland",
+          "label": "Bitcoin SOLO",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "sg1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "Singapore",
+          "label": "Bitcoin SOLO",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
           "host": "us1.letsmine.it",
           "port": 3332,
           "tls": false,
@@ -797,13 +1154,13 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo product on the configured US endpoint; the operators other products are not measured by this entry.",
+      "description": "Registration-free Bitcoin solo product on dedicated port 3332 across six regions. LetsMine also operates a separately measurable PROP product on port 3432.",
       "products": [
         "SOLO"
       ],
       "advertised_fee": "1%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "LetsMine.it",
@@ -812,6 +1169,102 @@
         {
           "title": "LetsMine.it FAQ",
           "url": "https://letsmine.it/en/posts/tutorial/faq"
+        },
+        {
+          "title": "LetsMine.it Bitcoin products and setup",
+          "url": "https://letsmine.it/coin/btc"
+        }
+      ]
+    },
+    {
+      "id": "letsmineit_prop",
+      "name": "LetsMine.it — Bitcoin PROP",
+      "website": "https://letsmine.it/pool/BTCPOOL",
+      "category": "shared",
+      "sources": [
+        "pool-research"
+      ],
+      "endpoints": [
+        {
+          "host": "de1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "Germany",
+          "label": "Bitcoin PROP",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "fr1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "France",
+          "label": "Bitcoin PROP",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "gb1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "United Kingdom",
+          "label": "Bitcoin PROP",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "pl1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "Poland",
+          "label": "Bitcoin PROP",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "sg1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "Singapore",
+          "label": "Bitcoin PROP",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "us1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "United States",
+          "label": "Bitcoin PROP",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ],
+      "operator": "LetsMine.it",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Registration-free proportional Bitcoin pool on dedicated port 3432 across six regions; rewards are split by contributed work when the PROP round finds a block.",
+      "products": [
+        "PROP"
+      ],
+      "advertised_fee": "1%",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
+      "research_sources": [
+        {
+          "title": "LetsMine.it Bitcoin products and setup",
+          "url": "https://letsmine.it/coin/btc"
+        },
+        {
+          "title": "LetsMine.it Bitcoin PROP pool",
+          "url": "https://letsmine.it/pool/BTCPOOL"
         }
       ]
     },
@@ -877,8 +1330,8 @@
         "TinyMiner SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "M45Core.com",
@@ -909,6 +1362,36 @@
           "sources": [
             "pool-research"
           ]
+        },
+        {
+          "host": "solo.mineshop.eu",
+          "port": 3335,
+          "tls": false,
+          "region": "Europe",
+          "label": "rental high difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "stratum-de.solo.mineshop.eu",
+          "port": 3333,
+          "tls": false,
+          "region": "Germany",
+          "label": "regional standard",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "stratum-de.solo.mineshop.eu",
+          "port": 3335,
+          "tls": false,
+          "region": "Germany",
+          "label": "rental high difficulty",
+          "sources": [
+            "pool-research"
+          ]
         }
       ],
       "operator": "Mineshop.eu",
@@ -920,8 +1403,8 @@
         "SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Mineshop Solo Pool",
@@ -971,8 +1454,8 @@
         "SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Noderunners Mining Pool",
@@ -1013,8 +1496,8 @@
         "TIDES"
       ],
       "advertised_fee": "2%; 1% with DATUM or miner-selected templates",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "OCEAN",
@@ -1044,7 +1527,7 @@
       "products": [
         "PPLNS sharechain"
       ],
-      "last_verified": "2026-08-01",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Original P2Pool repository",
@@ -1090,8 +1573,8 @@
         "shared round"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Parasite Pool",
@@ -1235,8 +1718,8 @@
         "SOLO"
       ],
       "advertised_fee": "0.4%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "PyBLOCK project",
@@ -1276,7 +1759,7 @@
       "products": [
         "SOLO"
       ],
-      "last_verified": "2026-08-01",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Satoshi Radio Mining Pool",
@@ -1300,9 +1783,47 @@
       "endpoints": [
         {
           "host": "btc.secpool.com",
+          "port": 25,
+          "tls": false,
+          "label": "global backup",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.secpool.com",
           "port": 3333,
           "tls": false,
-          "label": "official Bitcoin endpoint",
+          "label": "global primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.secpool.com",
+          "port": 443,
+          "tls": false,
+          "label": "global backup",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "ru.secpool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "Russia",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "ru2.secpool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "Russia",
+          "label": "regional backup",
           "sources": [
             "pool-research"
           ]
@@ -1318,8 +1839,8 @@
         "FPPS"
       ],
       "advertised_fee": "PPLNS 0%; FPPS 4% (current displayed rates)",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "SECPOOL",
@@ -1356,12 +1877,16 @@
         "SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "solo.cat",
           "url": "https://solo.cat/"
+        },
+        {
+          "title": "solo.cat documentation",
+          "url": "https://solo.cat/doc.html"
         },
         {
           "title": "PoolCensus",
@@ -1380,10 +1905,91 @@
       ],
       "endpoints": [
         {
+          "host": "afr-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Johannesburg, South Africa",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "asia-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Singapore",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
           "host": "btc.solofury.com",
           "port": 6060,
           "tls": false,
-          "label": "primary",
+          "region": "Atlanta, US",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "eu-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Frankfurt, Germany",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "jp-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Tokyo, Japan",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "lat-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Sao Paulo, Brazil",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "me-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Tel Aviv, Israel",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "pnw-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Seattle, US",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "uk-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "London, United Kingdom",
+          "label": "regional primary",
           "sources": [
             "pool-research"
           ]
@@ -1398,12 +2004,16 @@
         "SOLO"
       ],
       "advertised_fee": "1%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "SoloFury",
           "url": "https://solofury.com/"
+        },
+        {
+          "title": "SoloFury Bitcoin pool",
+          "url": "https://solofury.com/btc/"
         },
         {
           "title": "SoloFury API documentation",
@@ -1492,8 +2102,8 @@
         "SOLO"
       ],
       "advertised_fee": "0.5%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "SoloHash Bitcoin Solo",
@@ -1550,8 +2160,8 @@
         "SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "SoloMining.de",
@@ -1574,11 +2184,41 @@
       ],
       "endpoints": [
         {
+          "host": "eu.solopool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe",
+          "label": "standard difficulty; mode selected by password",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "eu.solopool.com",
+          "port": 4444,
+          "tls": false,
+          "region": "Europe",
+          "label": "high difficulty; mode selected by password",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
           "host": "stratum.solopool.com",
           "port": 3333,
           "tls": false,
           "region": "United States",
-          "label": "mode selected by password",
+          "label": "standard difficulty; mode selected by password",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "stratum.solopool.com",
+          "port": 4444,
+          "tls": false,
+          "region": "United States",
+          "label": "high difficulty; mode selected by password",
           "sources": [
             "pool-research"
           ]
@@ -1593,8 +2233,8 @@
         "SOLO"
       ],
       "advertised_fee": "2%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "SoloPool.Com",
@@ -1625,7 +2265,7 @@
           "port": 7005,
           "tls": false,
           "region": "Europe",
-          "label": "difficulty tier",
+          "label": "medium difficulty",
           "sources": [
             "PoolCensus",
             "pool-research"
@@ -1636,7 +2276,7 @@
           "port": 8005,
           "tls": false,
           "region": "Europe",
-          "label": "difficulty tier",
+          "label": "low difficulty",
           "sources": [
             "PoolCensus",
             "pool-research"
@@ -1647,9 +2287,39 @@
           "port": 9005,
           "tls": false,
           "region": "Europe",
-          "label": "PoolCensus-validated tier",
+          "label": "high difficulty",
           "sources": [
             "PoolCensus",
+            "pool-research"
+          ]
+        },
+        {
+          "host": "us1.solopool.org",
+          "port": 7005,
+          "tls": false,
+          "region": "United States",
+          "label": "medium difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "us1.solopool.org",
+          "port": 8005,
+          "tls": false,
+          "region": "United States",
+          "label": "low difficulty",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "us1.solopool.org",
+          "port": 9005,
+          "tls": false,
+          "region": "United States",
+          "label": "high difficulty",
+          "sources": [
             "pool-research"
           ]
         }
@@ -1658,17 +2328,21 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "European wallet-authenticated Bitcoin solo pool; unrelated to SoloPool.Com.",
+      "description": "Multi-region wallet-authenticated Bitcoin solo pool with low-, medium-, and high-difficulty lanes; unrelated to SoloPool.Com.",
       "products": [
         "SOLO"
       ],
       "advertised_fee": "1.5%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "SoloPool.org Bitcoin pool",
           "url": "https://btc.solopool.org/"
+        },
+        {
+          "title": "SoloPool.org connection help",
+          "url": "https://btc.solopool.org/help"
         },
         {
           "title": "PoolCensus",
@@ -1686,6 +2360,66 @@
         "stratum-race"
       ],
       "endpoints": [
+        {
+          "host": "btc-af.spiderpool.com",
+          "port": 2309,
+          "tls": false,
+          "region": "Africa",
+          "label": "primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-af.spiderpool.com",
+          "port": 2310,
+          "tls": true,
+          "region": "Africa",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-as.spiderpool.com",
+          "port": 2309,
+          "tls": false,
+          "region": "Asia",
+          "label": "primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-as.spiderpool.com",
+          "port": 2310,
+          "tls": true,
+          "region": "Asia",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-eu.spiderpool.com",
+          "port": 2309,
+          "tls": false,
+          "region": "Europe",
+          "label": "primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc-eu.spiderpool.com",
+          "port": 2310,
+          "tls": true,
+          "region": "Europe",
+          "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
         {
           "host": "btc-us.spiderpool.com",
           "port": 2309,
@@ -1705,16 +2439,6 @@
           "sources": [
             "pool-research"
           ]
-        },
-        {
-          "host": "btc-us.spiderpool.com",
-          "port": 3333,
-          "tls": false,
-          "region": "North America",
-          "label": "backup",
-          "sources": [
-            "pool-research"
-          ]
         }
       ],
       "operator": "SpiderPool",
@@ -1726,9 +2450,9 @@
         "PPLNS",
         "FPPS"
       ],
-      "advertised_fee": "PPLNS 1% current displayed rate; FPPS 4%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "advertised_fee": "PPLNS 2%; FPPS 4%",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "SpiderPool",
@@ -1737,6 +2461,10 @@
         {
           "title": "SpiderPool Bitcoin mining guide",
           "url": "https://support.spiderpool.com/bitcoin-mining"
+        },
+        {
+          "title": "SpiderPool fees",
+          "url": "https://support.spiderpool.com/fees"
         }
       ]
     },
@@ -1751,10 +2479,58 @@
       ],
       "endpoints": [
         {
+          "host": "btc-ssl.powhashing.com",
+          "port": 3333,
+          "tls": true,
+          "region": "Europe",
+          "label": "regional TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
           "host": "btc-ssl.viabtc.io",
           "port": 551,
           "tls": true,
-          "label": "TLS",
+          "label": "global TLS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.powhashing.com",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe",
+          "label": "regional primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.powhashing.com",
+          "port": 443,
+          "tls": false,
+          "region": "Europe",
+          "label": "regional backup",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.viabtc.cc",
+          "port": 3333,
+          "tls": false,
+          "label": "global alternate",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.viabtc.cc",
+          "port": 443,
+          "tls": false,
+          "label": "global alternate backup",
           "sources": [
             "pool-research"
           ]
@@ -1763,7 +2539,34 @@
           "host": "btc.viabtc.io",
           "port": 3333,
           "tls": false,
-          "label": "standard",
+          "label": "global primary",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.viabtc.io",
+          "port": 443,
+          "tls": false,
+          "label": "global backup",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.viabtc.top",
+          "port": 3333,
+          "tls": false,
+          "label": "global alternate",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "btc.viabtc.top",
+          "port": 443,
+          "tls": false,
+          "label": "global alternate backup",
           "sources": [
             "pool-research"
           ]
@@ -1780,8 +2583,8 @@
         "SOLO"
       ],
       "advertised_fee": "PPS+ block reward 4% and transaction fees 2%; PPLNS 2%; SOLO 1%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "ViaBTC",
@@ -1794,6 +2597,10 @@
         {
           "title": "ViaBTC reward calculation",
           "url": "https://support.viabtc.com/hc/en-us/articles/7207397084047-How-are-profits-calculated"
+        },
+        {
+          "title": "ViaBTC mining endpoints",
+          "url": "https://support.viabtc.com/hc/en-us/articles/14367481714191-Mining-Pools-Information"
         }
       ]
     }

@@ -265,7 +265,7 @@ verification layer.
 ## Pool registry
 
 The generated `config/pools.json` is enriched by the manually researched
-`config/pool-metadata.json`. The current registry contains 35 distinct pool or
+`config/pool-metadata.json`. The current registry contains 36 distinct pool or
 product records after regional and duplicate aliases are consolidated.
 
 Context kept separate from telemetry includes:
