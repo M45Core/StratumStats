@@ -29,18 +29,22 @@ var (
 )
 
 type event struct {
-	poolID, prevHash     string
-	connectionID         string
-	at                   time.Time
-	hasTransactions, tls bool
-	verified             bool
-	coinbaseAnalyzed     bool
-	workerWalletSeen     bool
-	coinbaseTotalSats    uint64
-	workerPayoutSats     uint64
-	estimatedPoolFeePct  *float64
-	connected            *bool
-	protocol             *model.Observation
+	poolID, prevHash         string
+	connectionID             string
+	at                       time.Time
+	hasTransactions, tls     bool
+	verified                 bool
+	coinbaseAnalyzed         bool
+	workerWalletSeen         bool
+	coinbaseTotalSats        uint64
+	workerPayoutSats         uint64
+	coinbaseOutputs          []model.CoinbaseOutput
+	coinbaseOutputCount      int
+	coinbaseOutputsTruncated bool
+	coinbaseOmittedSats      uint64
+	estimatedPoolFeePct      *float64
+	connected                *bool
+	protocol                 *model.Observation
 }
 
 type activeBlock struct {
@@ -102,6 +106,10 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 			o.WorkerWalletInCoinbase = payout.workerWalletSeen
 			o.CoinbaseTotalSats = payout.coinbaseTotalSats
 			o.WorkerPayoutSats = payout.workerPayoutSats
+			o.CoinbaseOutputs = payout.coinbaseOutputs
+			o.CoinbaseOutputCount = payout.coinbaseOutputCount
+			o.CoinbaseOutputsTruncated = payout.coinbaseOutputsTruncated
+			o.CoinbaseOmittedSats = payout.coinbaseOmittedSats
 			o.EstimatedPoolFeePct = payout.estimatedPoolFeePct
 			if r.invalid[id] {
 				o.ErrorCategory = "invalid_job"
@@ -216,7 +224,7 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		tlsConn := tls.Client(rawConn, &tls.Config{ServerName: endpoint.Host, MinVersion: tls.VersionTLS12})
 		tlsStarted := time.Now()
 		if err := tlsConn.HandshakeContext(ctx); err != nil {
-			_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolTLSHandshake, tlsStarted, protocolErrorStatus(err), "tls_handshake_failed")
+			_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolTLSHandshake, tlsStarted, protocolErrorStatus(err), tlsErrorCategory(err))
 			return err
 		}
 		if err := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolTLSHandshake, tlsStarted, model.ProtocolStatusOK, ""); err != nil {
@@ -421,7 +429,7 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		job.Bits, _ = msg.Params[6].(string)
 		job.NTime, _ = msg.Params[7].(string)
 		verification := VerifyJob(job)
-		e := event{poolID: poolID, prevHash: prev, at: time.Now(), hasTransactions: len(branches) > 0, tls: endpoint.TLS, verified: verification.Valid, coinbaseAnalyzed: verification.CoinbaseAnalyzed, workerWalletSeen: verification.WorkerWalletSeen, coinbaseTotalSats: verification.CoinbaseTotalSats, workerPayoutSats: verification.WorkerPayoutSats, estimatedPoolFeePct: verification.EstimatedPoolFeePct}
+		e := event{poolID: poolID, prevHash: prev, at: time.Now(), hasTransactions: len(branches) > 0, tls: endpoint.TLS, verified: verification.Valid, coinbaseAnalyzed: verification.CoinbaseAnalyzed, workerWalletSeen: verification.WorkerWalletSeen, coinbaseTotalSats: verification.CoinbaseTotalSats, workerPayoutSats: verification.WorkerPayoutSats, coinbaseOutputs: verification.CoinbaseOutputs, coinbaseOutputCount: verification.CoinbaseOutputCount, coinbaseOutputsTruncated: verification.CoinbaseOutputsTruncated, coinbaseOmittedSats: verification.CoinbaseOmittedSats, estimatedPoolFeePct: verification.EstimatedPoolFeePct}
 		select {
 		case out <- e:
 		case <-ctx.Done():
@@ -506,6 +514,14 @@ func protocolErrorStatus(err error) string {
 		return model.ProtocolStatusTimeout
 	}
 	return model.ProtocolStatusError
+}
+
+func tlsErrorCategory(err error) string {
+	var verificationError *tls.CertificateVerificationError
+	if errors.As(err, &verificationError) {
+		return model.ProtocolErrorTLSCertificateInvalid
+	}
+	return "tls_handshake_failed"
 }
 
 func request(w *bufio.Writer, id int, method string, params any) error {

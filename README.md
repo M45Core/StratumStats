@@ -3,8 +3,10 @@
 StratumStats is a Go service for measuring observable Bitcoin mining-pool
 behavior. It records Stratum observations as append-only JSONL and publishes
 latency, availability, protocol response times, TLS, and sample counts.
-Coinbase output observations and pool-fee estimates are shown beside those
-measurements on the same dashboard.
+Coinbase output observations and solo pool-fee estimates are shown beside those
+measurements on the same dashboard. Non-solo rows show explicitly labeled
+advertised fee terms from the pool registry because their miner fees are not
+observable in the block coinbase.
 
 Reports keep these dimensions separate and do not calculate an overall score
 or ranking.
@@ -65,8 +67,8 @@ Deployment gates, canary checks, promotion, and rollback are tracked in the
 [`regional probe rollout runbook`](docs/regional-probe-rollout.md).
 
 Configuration is in `config/pools.json`. The collector never submits shares.
-Current records use observation schema version 6 with retry-safe IDs, source
-provenance, and `block_id` terminology.
+Current records use observation schema version 8 with retry-safe IDs, source
+provenance, bounded non-worker coinbase evidence, and `block_id` terminology.
 
 Compiling a reusable binary is optional:
 
@@ -152,29 +154,38 @@ The deterministic aggregation is implemented in `internal/report/report.go`.
 | Bitcoin blocks observed | Distinct Bitcoin block identifiers in the dataset; one block counts once regardless of how many pools report it |
 | Eligible samples | Unique vantage-and-block pairs for which the pool was connected at observation start |
 | Availability | Observed valid arrivals divided by eligible vantage-and-block samples |
-| Median block-template latency | Median delay behind the earliest structurally valid template for the same block and vantage |
-| P95 block-template latency | 95th-percentile relative delay, exposing intermittent stalls |
-| TLS | Whether a configured TLS Stratum endpoint completed a measured session |
+| Median block-template latency | Median delay behind the earliest structurally valid template for the same block and vantage, using the rolling 24-hour window |
+| P95 block-template latency | 95th-percentile relative delay from the same rolling 24-hour window, exposing intermittent stalls |
+| Estimated mining loss | Median relative latency ÷ 600,000 ms × 100; an incremental stale-work proxy, not measured revenue loss |
+| Latest payout destinations | Retained positive-value non-worker coinbase outputs with address or script type, satoshi value, and total-value percentage |
+| Recent metric history | Up to the last 12 canonical template-latency samples within the rolling 24-hour window plus worker-matched fee samples for solo pools; non-solo panels show advertised product terms |
+| TLS | Whether a configured TLS Stratum endpoint completed a measured session with a certificate valid for its hostname, validity period, and the probe system trust store; certificate failures are explicit errors |
 
 For each block and vantage, reports use only the earliest collector window.
+Block-template median, P95, estimated mining loss, recent latency history, and
+protocol timing statistics use observations from the rolling 24 hours before
+report generation. Report JSON includes `latency_window_hours: 24` so API
+consumers can apply the same interpretation. Availability and payout verification remain cumulative.
 Late jobs cannot reopen a finalized block or create additional zero-latency
 baselines.
 
-The dashboard sorts each section by median block-template latency, with pools
-that lack a latency sample last. It keeps all numeric measurements in each pool
-row and has only two sections: Normal pools and Unsafe pools. Normal requires
-sampled coinbases to consistently contain the generated worker address; absent,
-varied, and not-yet-verified entries remain in Unsafe. JSON API reports retain
-deterministic alphabetical ordering.
+The dashboard sorts each section by median block-template latency. Solo pools
+use three sections: Free solo pools, Non-free solo pools, and Unsafe solo pools. Free requires
+sampled coinbases to consistently contain the generated worker address and the
+latest observed effective pool fee to be 0.00%. Non-free has the same worker-output
+requirement but a nonzero or not-yet-measured fee. Absent, varied, and
+not-yet-verified worker output entries remain in Unsafe. Any non-solo product record whose researched product list includes PPLNS appears in Pools offering PPLNS, whether PPLNS is dedicated or one of several payout modes. Remaining non-solo pools appear in Other non-solo pools. JSON API reports retain deterministic
+alphabetical ordering. Pools without an observed block-template latency sample
+are omitted from every dashboard section. Each displayed section can be sorted in either direction by any column; missing values remain last. Every pool row has an expandable Payout & history panel. Solo panels include destination percentages and recent latency line graph and timestamped observed-fee changes. Non-solo panels label decoded block coinbase destinations separately from later miner payouts and show advertised fee terms instead of an inapplicable measured-fee state.
 
 ## Protocol response timings
 
-Protocol operations are stored as independent version 6 JSONL records rather
+Protocol operations are stored as independent version 8 JSONL records rather
 than repeated on every block observation. Reports publish successful-operation
 median and P95 durations plus outcome counts for:
 
 - TCP connect, including local name resolution;
-- TLS handshake on TLS endpoints;
+- TLS 1.2+ handshake with hostname, validity-period, chain, and system-trust-store certificate verification on TLS endpoints;
 - `mining.subscribe`;
 - `mining.authorize`; and
 - `mining.ping` / `pong`.
@@ -183,6 +194,9 @@ median and P95 durations plus outcome counts for:
 timeouts are reported as compatibility facts, not availability failures. A
 supported session may be sampled again every 60 seconds. Raw records retain the
 endpoint, coarse vantage, duration, response status, and error category.
+Certificate verification is never bypassed. A failed check is retained as
+`tls_certificate_invalid`, counted in `certificate_errors`, and rendered as a
+red TLS error even if another TLS endpoint for the pool succeeds.
 
 ## Empty templates
 
@@ -205,7 +219,7 @@ These are output-presence observations, not pool types or judgments about
 payment correctness. A pool can account for earnings outside the coinbase
 transaction.
 
-When a worker output is present, the observed pool fee is:
+For a solo job where the worker output is present, the observed effective fee is:
 
 ```text
 100 × (all coinbase outputs − worker outputs) / all coinbase outputs
@@ -213,15 +227,21 @@ When a worker output is present, the observed pool fee is:
 
 Optional donations and configured payout splits can be included in this
 effective percentage. No fee is inferred from a job where the worker address is
-absent. Payment correctness cannot be inferred from Stratum alone; it needs a
-controlled hashrate/payment study.
+absent. This calculation does not measure PPLNS, FPPS, or other shared-pool fees because those pools account for shares and pay miners separately from the block coinbase. Their dashboard rows instead show operator-advertised terms from the registry, with a check date when available; an absent sourced term is labeled advertised fee not confirmed. Payment correctness cannot be inferred from Stratum alone; it needs a controlled hashrate/payment study.
 
-Current version 6 JSONL retains `coinbase_analyzed`,
-`worker_wallet_in_coinbase`, `coinbase_total_sats`, `worker_payout_sats`, and
-`estimated_pool_fee_pct`. Reports expose `coinbase_samples`,
-`worker_address_observed_pct`, `worker_address_status`, the latest and previous
-observed pool-fee percentages, sample and change counts, and the time of the
-latest change. Consecutive samples are compared at the displayed 0.01%
+Current version 8 JSONL retains `coinbase_analyzed`,
+`worker_wallet_in_coinbase`, `coinbase_total_sats`, `worker_payout_sats`,
+`estimated_pool_fee_pct`, and up to 64 coalesced positive-value non-worker
+coinbase destinations. The matched worker destination is reduced to aggregate
+verification and payout values inside the probe; its address and script are
+removed before telemetry serialization or storage. Oversized non-worker output
+scripts retain a marked 80-byte prefix; smaller destinations beyond the cap are
+represented by an omitted-value total. Decoded standard mainnet non-worker
+addresses link to their mempool.space address pages; script-only destinations
+remain plain text. Reports expose the latest destination values and percentages,
+recent template-latency and
+fee series, worker-address status, fee samples and change counts, and the latest
+change time. Consecutive fee samples are compared at the displayed 0.01%
 precision; the dashboard explicitly shows stable or previous → current instead
 of hiding changes in a median.
 
@@ -245,7 +265,7 @@ verification layer.
 ## Pool registry
 
 The generated `config/pools.json` is enriched by the manually researched
-`config/pool-metadata.json`. The current registry contains 33 distinct pool or
+`config/pool-metadata.json`. The current registry contains 35 distinct pool or
 product records after regional and duplicate aliases are consolidated.
 
 Context kept separate from telemetry includes:
@@ -254,6 +274,7 @@ Context kept separate from telemetry includes:
 - `solo`, `shared`, `hybrid`, or `decentralized` type;
 - researched operating status and collector compatibility;
 - advertised products and fee text with a check date;
+- separate records when one operator exposes independently selectable measured products;
 - endpoint regions/roles and direct research-source links.
 
 The complete research method, decisions, and per-pool summary are in

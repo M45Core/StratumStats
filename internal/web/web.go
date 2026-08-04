@@ -24,12 +24,19 @@ type Server struct {
 }
 
 func (s Server) Handler() (http.Handler, error) {
-	t, err := template.New("site").Funcs(template.FuncMap{"metric": func(value *float64) float64 {
-		if value == nil {
-			return 0
-		}
-		return *value
-	}}).ParseFS(assets, "templates/*.html")
+	t, err := template.New("site").Funcs(template.FuncMap{
+		"metric": func(value *float64) float64 {
+			if value == nil {
+				return 0
+			}
+			return *value
+		},
+		"btc":         formatBTC,
+		"payoutPct":   formatPayoutPercentage,
+		"payoutShare": payoutShare,
+		"shortScript": shortScript,
+		"historyTime": formatHistoryTime,
+	}).ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +64,7 @@ func (s Server) Handler() (http.Handler, error) {
 		}
 		statuses := buildVantageStatuses(observations, now)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = t.ExecuteTemplate(w, "index.html", buildDashboardPage(data, s.Demo, vantage, selectedVantageStatus(statuses, vantage)))
+		_ = t.ExecuteTemplate(w, "index.html", buildDashboardPage(data, s.Pools, s.Demo, vantage, selectedVantageStatus(statuses, vantage)))
 	})
 	mux.HandleFunc("GET /pools", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -127,11 +134,47 @@ func (s Server) Handler() (http.Handler, error) {
 		writeJSON(w, buildVantageStatuses(observations, now))
 	})
 	mux.HandleFunc("GET /api/v1/methodology", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "measurement_modes": []string{"continuous", "scheduled"}, "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "latest_pool_fee_pct", "previous_pool_fee_pct", "pool_fee_changed", "pool_fee_changes", "pool_fee_samples", "pool_fee_last_changed_at", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
+		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": "none", "latency_window_hours": int(report.LatencyWindow / time.Hour), "measurement_modes": []string{"continuous", "scheduled"}, "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "estimated_mining_loss_pct", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "latest_pool_fee_pct", "previous_pool_fee_pct", "pool_fee_changed", "pool_fee_changes", "pool_fee_samples", "pool_fee_last_changed_at", "latest_coinbase_observed_at", "latest_coinbase_total_sats", "latest_coinbase_output_count", "latest_payout_destinations", "latest_payout_destinations_truncated", "latest_payout_omitted_sats", "template_latency_history", "pool_fee_history", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /static/", http.FileServer(http.FS(assets)))
 	return securityHeaders(mux), nil
+}
+
+func formatBTC(sats uint64) string {
+	return fmt.Sprintf("%d.%08d BTC", sats/100_000_000, sats%100_000_000)
+}
+
+func formatPayoutPercentage(value float64) string {
+	switch {
+	case value > 0 && value < 0.0001:
+		return "<0.0001%"
+	case value > 0 && value < 0.01:
+		return fmt.Sprintf("%.4f%%", value)
+	default:
+		return fmt.Sprintf("%.2f%%", value)
+	}
+}
+
+func payoutShare(value, total uint64) float64 {
+	if total == 0 {
+		return 0
+	}
+	return 100 * float64(value) / float64(total)
+}
+
+func shortScript(script string) string {
+	if len(script) <= 36 {
+		return script
+	}
+	return script[:20] + "…" + script[len(script)-12:]
+}
+
+func formatHistoryTime(value time.Time) string {
+	if value.IsZero() {
+		return "time unavailable"
+	}
+	return value.UTC().Format("02 Jan 15:04")
 }
 
 func registryAsOf(pools []model.Pool) string {

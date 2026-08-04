@@ -20,6 +20,9 @@ func TestVerifyJob(t *testing.T) {
 	if !v.CoinbaseAnalyzed || !v.WorkerWalletSeen || v.EstimatedPoolFeePct == nil || *v.EstimatedPoolFeePct != 0 {
 		t.Fatalf("payout verification=%+v", v)
 	}
+	if v.CoinbaseOutputCount != 1 || len(v.CoinbaseOutputs) != 0 {
+		t.Fatalf("retained payout output=%+v", v.CoinbaseOutputs)
+	}
 	j.Bits = "zz"
 	if VerifyJob(j).Valid {
 		t.Fatal("invalid bits accepted")

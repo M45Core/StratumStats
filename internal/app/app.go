@@ -248,10 +248,27 @@ func demoData(pools []model.Pool) []model.Observation {
 			if pool.Category == "solo" && arrived {
 				fee := float64((p % 4)) * 0.5
 				total := uint64(312_500_000)
+				poolShare := uint64(float64(total) * fee / 100)
 				observation.WorkerWalletInCoinbase = true
 				observation.CoinbaseTotalSats = total
-				observation.WorkerPayoutSats = total - uint64(float64(total)*fee/100)
+				observation.WorkerPayoutSats = total - poolShare
 				observation.EstimatedPoolFeePct = &fee
+				observation.CoinbaseOutputs = nil
+				observation.CoinbaseOutputCount = 2 // private worker destination plus a zero-value commitment
+				if poolShare > 0 {
+					observation.CoinbaseOutputs = append(observation.CoinbaseOutputs, model.CoinbaseOutput{ValueSats: poolShare, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"})
+					observation.CoinbaseOutputCount++
+				}
+			} else if arrived {
+				total := uint64(312_500_000)
+				first, second := total*60/100, total*25/100
+				observation.CoinbaseTotalSats = total
+				observation.CoinbaseOutputs = []model.CoinbaseOutput{
+					{ValueSats: first, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"},
+					{ValueSats: second, ScriptPubKey: "512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", Address: "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", ScriptType: "p2tr"},
+					{ValueSats: total - first - second, ScriptPubKey: "a914111111111111111111111111111111111111111187", ScriptType: "p2sh"},
+				}
+				observation.CoinbaseOutputCount = len(observation.CoinbaseOutputs) + 1
 			}
 			out = append(out, observation)
 		}

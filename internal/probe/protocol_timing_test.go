@@ -5,7 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -119,5 +123,35 @@ func TestWatchSessionMeasuresProtocolResponses(t *testing.T) {
 	}
 	if got := records[model.ProtocolAuthorize].DurationMS; got == nil || *got < 5 {
 		t.Errorf("authorize timing did not include response delay: %v", got)
+	}
+}
+
+func TestWatchSessionReportsInvalidTLSCertificate(t *testing.T) {
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	server.Config.ErrorLog = log.New(io.Discard, "", 0)
+	server.StartTLS()
+	defer server.Close()
+
+	address := server.Listener.Addr().(*net.TCPAddr)
+	out := make(chan event, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := watchSession(ctx, "test-pool", model.Endpoint{Host: "127.0.0.1", Port: address.Port, TLS: true}, out); err == nil {
+		t.Fatal("session unexpectedly accepted an untrusted certificate")
+	}
+	close(out)
+
+	var tlsRecord *model.Observation
+	for e := range out {
+		if e.protocol != nil && e.protocol.ProtocolMethod == model.ProtocolTLSHandshake {
+			record := *e.protocol
+			tlsRecord = &record
+		}
+	}
+	if tlsRecord == nil {
+		t.Fatal("TLS failure observation was not published")
+	}
+	if tlsRecord.ResponseStatus != model.ProtocolStatusError || tlsRecord.ErrorCategory != model.ProtocolErrorTLSCertificateInvalid {
+		t.Fatalf("TLS failure record=%+v", *tlsRecord)
 	}
 }

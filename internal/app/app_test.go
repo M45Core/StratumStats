@@ -7,7 +7,7 @@ func TestRepositoryPoolRegistryLoadsAndConsolidates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(cfg.Pools), 33; got != want {
+	if got, want := len(cfg.Pools), 35; got != want {
 		t.Fatalf("pool count = %d, want %d", got, want)
 	}
 
@@ -20,7 +20,7 @@ func TestRepositoryPoolRegistryLoadsAndConsolidates(t *testing.T) {
 			t.Errorf("obsolete or duplicate pool %q remains", removed)
 		}
 	}
-	for _, canonical := range []string{"2miners_btc_solo", "ckpool", "m45core", "noderunners", "p2pool", "public_pool", "solohash_co_uk"} {
+	for _, canonical := range []string{"2miners_btc_solo", "ckpool", "m45core", "noderunners", "p2pool", "public_pool", "public_pool_pplns", "blitzpool_pplns", "solohash_co_uk"} {
 		if _, ok := pools[canonical]; !ok {
 			t.Errorf("canonical pool %q is missing", canonical)
 		}
@@ -38,8 +38,15 @@ func TestRepositoryPoolRegistryLoadsAndConsolidates(t *testing.T) {
 	if got := cfg.Pools[pools["noderunners"]].Category; got != "solo" {
 		t.Errorf("Noderunners category = %q, want solo", got)
 	}
-	if got := cfg.Pools[pools["public_pool"]].Category; got != "hybrid" {
-		t.Errorf("Public Pool category = %q, want hybrid", got)
+	if got := cfg.Pools[pools["public_pool"]].Category; got != "solo" {
+		t.Errorf("Public Pool Solo category = %q, want solo", got)
+	}
+	if got := cfg.Pools[pools["public_pool"]].Name; got != "Public Pool — Solo" {
+		t.Errorf("Public Pool Solo name = %q", got)
+	}
+	publicPPLNS := cfg.Pools[pools["public_pool_pplns"]]
+	if publicPPLNS.Category != "shared" || len(publicPPLNS.Products) != 1 || publicPPLNS.Products[0] != "PPLNS" || publicPPLNS.Endpoints[0].Port != 13333 {
+		t.Errorf("Public Pool PPLNS product record is incorrect: %+v", publicPPLNS)
 	}
 	if got := cfg.Pools[pools["p2pool"]].Status; got != "inactive" {
 		t.Errorf("P2Pool status = %q, want inactive", got)

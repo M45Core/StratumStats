@@ -187,12 +187,17 @@ pools can observe source IPs. Machine and key IDs remain private.
 
 ## Schema, reporting, and UI
 
-Observation schema version 6 adds:
+Observation schema version 6 added:
 
 - `observation_id` for retry-safe deduplication;
 - `source` such as `local` or `fly-scheduled`; and
 - `run_id` for operational tracing.
 
+Version 7 adds a bounded, coalesced list of positive-value coinbase outputs,
+the original output count, a truncation flag, and the aggregate omitted value.
+Version 8 omits matched worker destination addresses and scripts before telemetry
+serialization; only aggregate match and payout values remain. Public reports also
+filter matched destinations from readable version 7 history.
 Older records remain readable. Appends are serialized with one writer lock and
 one `fsync` per accepted batch.
 
@@ -201,6 +206,10 @@ of thousands of protocol records per day. The server must cache computed
 snapshots and invalidate after append instead of re-reading all JSONL on every
 ten-second dashboard poll. Daily JSONL rotation can follow without changing
 the append-only evidence model.
+
+Each report snapshot publishes `latency_window_hours: 24`. Block-template and
+protocol latency statistics exclude observations outside that rolling window;
+availability and global coinbase evidence remain cumulative.
 
 Reports support:
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "as_of": "2026-08-01",
+  "as_of": "2026-08-04",
   "aliases": {
     "2miners_asia": "2miners_btc_solo",
     "2miners_eu": "2miners_btc_solo",
@@ -260,23 +260,20 @@
     },
     {
       "id": "blitzpool",
-      "name": "Blitzpool",
+      "name": "Blitzpool — Solo",
       "operator": "yourdevice.ch",
       "website": "https://blitzpool.yourdevice.ch/",
-      "category": "hybrid",
+      "category": "solo",
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Wallet-authenticated service offering solo, shared PPLNS, group-solo, and blockparty products; configured endpoints target the solo lane.",
+      "description": "Zero-fee solo product on dedicated Stratum endpoints; measured separately from Blitzpool PPLNS.",
       "products": [
-        "SOLO",
-        "PPLNS",
-        "group solo",
-        "blockparty"
+        "SOLO"
       ],
-      "advertised_fee": "SOLO 0%; PPLNS 1%; group solo 1.5%; blockparty 1.5%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Blitzpool",
@@ -662,21 +659,18 @@
     },
     {
       "id": "letsmineit",
-      "name": "LetsMine.it",
+      "name": "LetsMine.it — Bitcoin Solo",
       "operator": "LetsMine.it",
       "website": "https://letsmine.it/",
-      "category": "hybrid",
+      "category": "solo",
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Multi-product mining platform offering solo, proportional shared, sell-hashrate, and ticket-mining products; this endpoint is the Bitcoin solo lane.",
+      "description": "Bitcoin solo product on the configured US endpoint; the operators other products are not measured by this entry.",
       "products": [
-        "SOLO",
-        "PROP",
-        "PPS",
-        "ticket mining"
+        "SOLO"
       ],
-      "advertised_fee": "SOLO 1%; PROP 1%",
+      "advertised_fee": "1%",
       "fee_checked_at": "2026-08-01",
       "last_verified": "2026-08-01",
       "research_sources": [
@@ -967,21 +961,20 @@
     },
     {
       "id": "public_pool",
-      "name": "Public Pool",
+      "name": "Public Pool — Solo",
       "operator": "Public Pool",
       "website": "https://web.public-pool.io/",
-      "category": "hybrid",
+      "category": "solo",
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Open-source zero-fee service offering separate solo and PPLNS products; configured endpoints target the solo product.",
+      "description": "Open-source zero-fee solo product on dedicated Stratum endpoints; measured separately from Public Pool PPLNS.",
       "products": [
-        "SOLO",
-        "PPLNS"
+        "SOLO"
       ],
       "advertised_fee": "0%",
-      "fee_checked_at": "2026-08-01",
-      "last_verified": "2026-08-01",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
       "research_sources": [
         {
           "title": "Public Pool dashboard",
@@ -1342,18 +1335,16 @@
     },
     {
       "id": "solopool_com",
-      "name": "SoloPool.Com",
+      "name": "SoloPool.Com — Solo",
       "operator": "SoloPool.Com",
       "website": "https://solopool.com/",
-      "category": "hybrid",
+      "category": "solo",
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Hybrid solo, proportional shared, and user-split service whose mode is selected through the Stratum password; the collector password selects solo.",
+      "description": "Solo product selected by the collectors Stratum password x; Prop and Solo Split modes are not measured by this entry.",
       "products": [
-        "SOLO",
-        "Prop+",
-        "Solo Split"
+        "SOLO"
       ],
       "advertised_fee": "2%",
       "fee_checked_at": "2026-08-01",
@@ -1554,6 +1545,104 @@
           "port": 551,
           "tls": true,
           "label": "TLS",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "public_pool_pplns",
+      "name": "Public Pool — PPLNS",
+      "operator": "Public Pool",
+      "website": "https://web.public-pool.io/",
+      "category": "shared",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Open-source zero-fee PPLNS product on dedicated Stratum endpoints; measured separately from Public Pool Solo.",
+      "products": [
+        "PPLNS"
+      ],
+      "advertised_fee": "0%",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
+      "research_sources": [
+        {
+          "title": "Public Pool dashboard",
+          "url": "https://web.public-pool.io/"
+        },
+        {
+          "title": "Public Pool source",
+          "url": "https://github.com/benjamin-wilson/public-pool"
+        }
+      ],
+      "endpoints": [
+        {
+          "host": "public-pool.io",
+          "port": 13333,
+          "tls": false,
+          "label": "PPLNS Stratum V1",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "public-pool.io",
+          "port": 14333,
+          "tls": true,
+          "label": "PPLNS Stratum V1 TLS",
+          "sources": [
+            "pool-research"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "blitzpool_pplns",
+      "name": "Blitzpool — PPLNS",
+      "operator": "yourdevice.ch",
+      "website": "https://blitzpool.yourdevice.ch/",
+      "category": "shared",
+      "status": "active",
+      "auth_model": "wallet",
+      "probe_status": "compatible",
+      "description": "Non-custodial PPLNS product on dedicated Stratum endpoints; measured separately from Blitzpool Solo.",
+      "products": [
+        "PPLNS"
+      ],
+      "advertised_fee": "1%",
+      "fee_checked_at": "2026-08-04",
+      "last_verified": "2026-08-04",
+      "research_sources": [
+        {
+          "title": "Blitzpool",
+          "url": "https://blitzpool.yourdevice.ch/"
+        },
+        {
+          "title": "Blitzpool mining modes",
+          "url": "https://blitzpool.yourdevice.ch/mining-modes"
+        },
+        {
+          "title": "Blitzpool PPLNS",
+          "url": "https://blitzpool.yourdevice.ch/mining-modes/pplns"
+        }
+      ],
+      "endpoints": [
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 3340,
+          "tls": false,
+          "label": "PPLNS",
+          "sources": [
+            "pool-research"
+          ]
+        },
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 6640,
+          "tls": true,
+          "label": "PPLNS TLS",
           "sources": [
             "pool-research"
           ]

@@ -48,7 +48,9 @@ Collector fit is separate. Account-based pools may publish jobs but still reject
 | TinyMiner ports 3333 and 4333 | Corrected to current ports 3334 and 4334 |
 | Braiins Solo port 443 marked TLS | Corrected to documented plaintext Stratum |
 | NodeRunners type unsure | Corrected to solo |
-| Parasite, Public Pool, SoloPool.Com, ViaBTC | Corrected from a single-mode label to hybrid |
+| Parasite and ViaBTC | Corrected from a single-mode label to hybrid |
+| Public Pool and Blitzpool | Split solo and PPLNS into separate product records with their own endpoints |
+| LetsMine.it and SoloPool.Com | Named and typed for the solo mode actually selected by the collector |
 | Original Bitcoin P2Pool | Retained as an inactive decentralized historical reference with no central endpoint |
 
 ## Current registry
@@ -62,7 +64,8 @@ Advertised fees are snapshots, not promises. A blank fee means the review did no
 | [AtlasPool](https://atlaspool.io/) | solo | active | 1.5% | Finder address documented in coinbase output |
 | [Binance Pool](https://pool.binance.com/en) | shared | active | not confirmed | Account-based FPPS |
 | [Bitcoin Merch Lucky Pool](https://pool.bitcoinmerch.com/) | solo | active | 2% | Home-miner-oriented solo service |
-| [Blitzpool](https://blitzpool.yourdevice.ch/) | hybrid | active | 0% to 1.5% by mode | Configured endpoints select its solo lane |
+| [Blitzpool — Solo](https://blitzpool.yourdevice.ch/mining-modes/solo) | solo | active | 0% | Dedicated solo endpoints |
+| [Blitzpool — PPLNS](https://blitzpool.yourdevice.ch/mining-modes/pplns) | shared | active | 1% | Dedicated PPLNS endpoints |
 | [Braiins Pool](https://braiins.com/pool) | shared | active | 2.5% standard; 0% with Braiins OS | Account-based FPPS |
 | [Braiins Solo](https://solo.braiins.com/) | solo | active | 0.5% | Anonymous solo product; finder-address output documented |
 | [Solo CKPool](https://solo.ckpool.org/) | solo | active | 2% | Current global host replaces duplicate aliases |
@@ -71,14 +74,15 @@ Advertised fees are snapshots, not promises. A blank fee means the review did no
 | [Go Brrr Pool](https://pool.gobrrr.me/) | solo | active | 0% | Community pool; worker-address output documented |
 | [HeliosPool](https://heliospool.com/) | solo | active | 1% | Regional multi-chain operator; Bitcoin record |
 | [KanoPool](https://kano.is/) | hybrid | active | 0.5% | Account selects PPLNS or solo |
-| [LetsMine.it](https://letsmine.it/) | hybrid | active | 1% for SOLO and PROP | Configured endpoint is the Bitcoin solo lane |
+| [LetsMine.it — Bitcoin Solo](https://letsmine.it/) | solo | active | 1% | Configured endpoint is the Bitcoin solo lane |
 | [M45Core.com](https://m45core.com/) | solo | active | 0% | Main and corrected TinyMiner lanes; EU removed |
 | [Mineshop Solo Pool](https://solo.mineshop.eu/) | solo | active | 0% | Finder address documented in coinbase output |
 | [Noderunners Mining Pool](https://noderunners.network/en/pool) | solo | active | 0% | Community pool with TCP and TLS |
 | [OCEAN](https://ocean.xyz/) | shared | active | 2%; 1% for miner-selected templates | TIDES rewards with miner-selected template option |
 | [P2Pool original Bitcoin network](https://github.com/p2pool/p2pool) | decentralized | inactive | not applicable | Historical sharechain; no central endpoint |
 | [Parasite Pool](https://parasite.space/) | hybrid | active | 0% | Finder bonus plus shared round |
-| [Public Pool](https://web.public-pool.io/) | hybrid | active | 0% | Configured endpoints select solo; shared product also exists |
+| [Public Pool — Solo](https://web.public-pool.io/) | solo | active | 0% | Dedicated ports 3333 and 4333 |
+| [Public Pool — PPLNS](https://web.public-pool.io/) | shared | active | 0% | Dedicated ports 13333 and 14333 |
 | [PyBLOCK](https://pool.pyblock.xyz/) | solo | active | 0.4% | Bitcoin solo product |
 | [Satoshi Radio Mining Pool](https://pool.satoshiradio.nl/) | solo | active | not confirmed | Community home-miner pool |
 | [SECPOOL](https://v3.secpool.com/) | shared | active | PPLNS 0% displayed; FPPS 4% | Account-based; displayed PPLNS rate may be promotional |
@@ -86,7 +90,7 @@ Advertised fees are snapshots, not promises. A blank fee means the review did no
 | [SoloFury](https://solofury.com/) | solo | active | 1% | Multi-coin operator; Bitcoin record |
 | [SoloHash Bitcoin Solo](https://solohash.co.uk/pool/bitcoin-solo) | solo | active | 0.5% | Three regions and two difficulty lanes |
 | [SoloMining.de](https://pool.solomining.de/) | solo | active | 0% | Open-source TCP and TLS service |
-| [SoloPool.Com](https://solopool.com/) | hybrid | active | 2% | Password selects solo, shared, or split mode |
+| [SoloPool.Com — Solo](https://solopool.com/) | solo | active | 2% | Collector password selects the solo product |
 | [SoloPool.org Bitcoin Solo](https://btc.solopool.org/) | solo | active | 1.5% | Separate operator from SoloPool.Com |
 | [SpiderPool](https://www.spiderpool.com/) | shared | active | PPLNS 1% displayed; FPPS 4% | Account-based; PPLNS rate may be promotional |
 | [ViaBTC](https://www.viabtc.com/) | hybrid | active | 1% to 4% by mode | Account-based PPS+, PPLNS, and SOLO |

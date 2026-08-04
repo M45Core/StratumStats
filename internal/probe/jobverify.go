@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+
+	"github.com/proofofmike/stratumstats/internal/model"
 )
 
 // Job contains the mining.notify fields needed to reconstruct the coinbase
@@ -20,14 +22,18 @@ type Job struct {
 }
 
 type Verification struct {
-	Valid               bool
-	Errors              []string
-	MerkleRoot          string
-	CoinbaseAnalyzed    bool
-	WorkerWalletSeen    bool
-	CoinbaseTotalSats   uint64
-	WorkerPayoutSats    uint64
-	EstimatedPoolFeePct *float64
+	Valid                    bool
+	Errors                   []string
+	MerkleRoot               string
+	CoinbaseAnalyzed         bool
+	WorkerWalletSeen         bool
+	CoinbaseTotalSats        uint64
+	WorkerPayoutSats         uint64
+	CoinbaseOutputs          []model.CoinbaseOutput
+	CoinbaseOutputCount      int
+	CoinbaseOutputsTruncated bool
+	CoinbaseOmittedSats      uint64
+	EstimatedPoolFeePct      *float64
 }
 
 func VerifyJob(j Job) Verification {
@@ -78,7 +84,10 @@ func VerifyJob(j Job) Verification {
 	}
 	var root string
 	var coinbaseAnalyzed, workerWalletSeen bool
-	var coinbaseTotalSats, workerPayoutSats uint64
+	var coinbaseTotalSats, workerPayoutSats, coinbaseOmittedSats uint64
+	var coinbaseOutputs []model.CoinbaseOutput
+	var coinbaseOutputCount int
+	var coinbaseOutputsTruncated bool
 	var estimatedPoolFeePct *float64
 	if len(errs) == 0 {
 		coinbase := append(append(append(append([]byte{}, cb1...), ex1...), make([]byte, j.ExtraNonce2Size)...), cb2...)
@@ -90,6 +99,10 @@ func VerifyJob(j Job) Verification {
 			workerWalletSeen = summary.WorkerWalletSeen
 			coinbaseTotalSats = summary.TotalSats
 			workerPayoutSats = summary.WorkerSats
+			coinbaseOutputs = summary.Outputs
+			coinbaseOutputCount = summary.OutputCount
+			coinbaseOutputsTruncated = summary.OutputsTruncated
+			coinbaseOmittedSats = summary.OmittedSats
 			if summary.WorkerWalletSeen && summary.TotalSats > 0 {
 				fee := 100 * float64(summary.TotalSats-summary.WorkerSats) / float64(summary.TotalSats)
 				estimatedPoolFeePct = &fee
@@ -101,7 +114,7 @@ func VerifyJob(j Job) Verification {
 		}
 		root = hex.EncodeToString(hash)
 	}
-	return Verification{Valid: len(errs) == 0, Errors: errs, MerkleRoot: root, CoinbaseAnalyzed: coinbaseAnalyzed, WorkerWalletSeen: workerWalletSeen, CoinbaseTotalSats: coinbaseTotalSats, WorkerPayoutSats: workerPayoutSats, EstimatedPoolFeePct: estimatedPoolFeePct}
+	return Verification{Valid: len(errs) == 0, Errors: errs, MerkleRoot: root, CoinbaseAnalyzed: coinbaseAnalyzed, WorkerWalletSeen: workerWalletSeen, CoinbaseTotalSats: coinbaseTotalSats, WorkerPayoutSats: workerPayoutSats, CoinbaseOutputs: coinbaseOutputs, CoinbaseOutputCount: coinbaseOutputCount, CoinbaseOutputsTruncated: coinbaseOutputsTruncated, CoinbaseOmittedSats: coinbaseOmittedSats, EstimatedPoolFeePct: estimatedPoolFeePct}
 }
 
 func doubleSHA256(data []byte) []byte {

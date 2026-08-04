@@ -1,6 +1,8 @@
 package model
 
-// ObservationVersion 6 adds authenticated-source provenance and stable record
-// identifiers so retried remote batches can be deduplicated deterministically.
-// Readers remain backward compatible with version 1 latency-only records.
-const ObservationVersion = 6
+// ObservationVersion 8 makes matched worker destinations private: only their
+// aggregate presence and payout value remain in an observation, while retained
+// destination details contain non-worker outputs exclusively.
+// Readers remain backward compatible with version 1 latency-only records and
+// version 7 destination records.
+const ObservationVersion = 8

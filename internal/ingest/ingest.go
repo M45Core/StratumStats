@@ -23,13 +23,15 @@ import (
 )
 
 const (
-	EnvelopeVersion      = 1
-	maxCompressedBytes   = 256 << 10
-	maxDecompressedBytes = 1 << 20
-	maxObservations      = 500
-	maxRunDuration       = 15 * time.Minute
-	maxRequestClockSkew  = 5 * time.Minute
-	RemoteSource         = "fly-scheduled"
+	EnvelopeVersion            = 1
+	maxCompressedBytes         = 256 << 10
+	maxDecompressedBytes       = 1 << 20
+	maxObservations            = 500
+	maxRunDuration             = 15 * time.Minute
+	maxRequestClockSkew        = 5 * time.Minute
+	maxRetainedCoinbaseOutputs = model.MaxRetainedCoinbaseOutputs
+	maxRetainedScriptHexLength = model.MaxRetainedCoinbaseScriptBytes * 2
+	RemoteSource               = "fly-scheduled"
 )
 
 var RegionVantages = map[string]string{
@@ -258,6 +260,9 @@ func validateObservation(observation model.Observation, pools map[string]bool, e
 	if !finite(observation.OffsetMS) || observation.OffsetMS < 0 {
 		return errors.New("invalid offset")
 	}
+	if err := validateCoinbaseObservation(observation); err != nil {
+		return err
+	}
 	switch observation.RecordType {
 	case model.RecordTypeProtocol:
 		if !pools[observation.PoolID] {
@@ -289,6 +294,88 @@ func validateObservation(observation model.Observation, pools map[string]bool, e
 		return errors.New("unknown record type")
 	}
 	return nil
+}
+
+func validateCoinbaseObservation(observation model.Observation) error {
+	hasEvidence := observation.CoinbaseAnalyzed || observation.WorkerWalletInCoinbase || observation.CoinbaseTotalSats != 0 ||
+		observation.WorkerPayoutSats != 0 || len(observation.CoinbaseOutputs) != 0 || observation.CoinbaseOutputCount != 0 ||
+		observation.CoinbaseOutputsTruncated || observation.CoinbaseOmittedSats != 0 || observation.EstimatedPoolFeePct != nil
+	if observation.RecordType != "" {
+		if hasEvidence {
+			return errors.New("coinbase evidence on non-block record")
+		}
+		return nil
+	}
+	if !observation.CoinbaseAnalyzed {
+		if hasEvidence {
+			return errors.New("coinbase fields without decoded transaction")
+		}
+		return nil
+	}
+	if !observation.Arrived || observation.CoinbaseTotalSats == 0 || observation.CoinbaseOutputCount < 1 || observation.CoinbaseOutputCount > 10000 ||
+		len(observation.CoinbaseOutputs) > maxRetainedCoinbaseOutputs || observation.CoinbaseOutputCount < len(observation.CoinbaseOutputs) {
+		return errors.New("invalid decoded coinbase summary")
+	}
+	if observation.CoinbaseOutputsTruncated != (observation.CoinbaseOmittedSats > 0) {
+		return errors.New("invalid omitted coinbase value")
+	}
+	var retainedTotal uint64
+	for _, output := range observation.CoinbaseOutputs {
+		if output.Worker {
+			return errors.New("worker destination must be omitted")
+		}
+		if output.ValueSats == 0 || len(output.ScriptPubKey) > maxRetainedScriptHexLength || len(output.Address) > 90 || !validCoinbaseScriptType(output.ScriptType) {
+			return errors.New("invalid retained coinbase output")
+		}
+		if output.ScriptPubKey != "" {
+			if _, err := hex.DecodeString(output.ScriptPubKey); err != nil {
+				return errors.New("invalid retained script")
+			}
+		}
+		if output.ScriptPubKeyTruncated && len(output.ScriptPubKey) != maxRetainedScriptHexLength {
+			return errors.New("invalid truncated script")
+		}
+		for _, character := range output.Address {
+			if !((character >= 0x30 && character <= 0x39) || (character >= 0x41 && character <= 0x5a) || (character >= 0x61 && character <= 0x7a)) {
+				return errors.New("invalid output address")
+			}
+		}
+		if output.ValueSats > observation.CoinbaseTotalSats-retainedTotal {
+			return errors.New("coinbase output total exceeds transaction")
+		}
+		retainedTotal += output.ValueSats
+	}
+	if observation.WorkerPayoutSats > observation.CoinbaseTotalSats || retainedTotal > observation.CoinbaseTotalSats-observation.WorkerPayoutSats ||
+		observation.CoinbaseOmittedSats > observation.CoinbaseTotalSats-observation.WorkerPayoutSats-retainedTotal ||
+		retainedTotal+observation.WorkerPayoutSats+observation.CoinbaseOmittedSats != observation.CoinbaseTotalSats {
+		return errors.New("coinbase output totals do not balance")
+	}
+	if observation.WorkerWalletInCoinbase != (observation.WorkerPayoutSats > 0) {
+		return errors.New("worker payout does not match aggregate status")
+	}
+	if observation.WorkerWalletInCoinbase {
+		if observation.EstimatedPoolFeePct == nil || !finite(*observation.EstimatedPoolFeePct) || *observation.EstimatedPoolFeePct < 0 || *observation.EstimatedPoolFeePct > 100 {
+			return errors.New("invalid estimated pool fee")
+		}
+		expected := 100 * float64(observation.CoinbaseTotalSats-observation.WorkerPayoutSats) / float64(observation.CoinbaseTotalSats)
+		if math.Abs(*observation.EstimatedPoolFeePct-expected) > 0.000001 {
+			return errors.New("estimated pool fee does not match outputs")
+		}
+	} else if observation.EstimatedPoolFeePct != nil {
+		return errors.New("estimated pool fee without worker output")
+	}
+	return nil
+}
+
+func validCoinbaseScriptType(value string) bool {
+	if oneOf(value, "p2pkh", "p2sh", "p2wpkh", "p2wsh", "p2tr", "p2pk", "op_return", "unknown") {
+		return true
+	}
+	if !strings.HasPrefix(value, "witness_v") {
+		return false
+	}
+	version, err := strconv.Atoi(strings.TrimPrefix(value, "witness_v"))
+	return err == nil && version >= 1 && version <= 16
 }
 
 func validID(value string, max int) bool {

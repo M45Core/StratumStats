@@ -1,6 +1,9 @@
 package report
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,5 +59,57 @@ func TestComputePoolFeeIgnoresSubHundredthNoise(t *testing.T) {
 	report := Compute([]model.Pool{pool}, observations, time.Now()).Reports[0]
 	if report.PoolFeeChanged || report.PoolFeeChanges != 0 || report.LatestPoolFeePct == nil || *report.LatestPoolFeePct != 68.05 {
 		t.Fatalf("sub-hundredth noise was treated as a change: %+v", report)
+	}
+}
+
+func TestComputePublishesLatestPayoutSplitAndBoundedHistory(t *testing.T) {
+	pool := model.Pool{ID: "solo", Name: "Solo"}
+	started := time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC)
+	observations := make([]model.Observation, 0, 14)
+	for i := 0; i < 14; i++ {
+		fee := float64(i) / 10
+		total := uint64(10_000)
+		poolShare := uint64(i * 10)
+		observation := model.Observation{
+			ObservedAt: started.Add(time.Duration(i) * time.Hour),
+			PoolID:     pool.ID, Vantage: "west", BlockID: fmt.Sprintf("block-%02d", i),
+			Eligible: true, Arrived: true, OffsetMS: float64(i * 10),
+			CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true,
+			CoinbaseTotalSats: total, WorkerPayoutSats: total - poolShare,
+			EstimatedPoolFeePct: &fee,
+		}
+		if i == 13 {
+			observation.CoinbaseOutputCount = 3
+			observation.CoinbaseOutputs = []model.CoinbaseOutput{
+				{ValueSats: total - poolShare, ScriptPubKey: "76a914111111111111111111111111111111111111111188ac", Address: "12ZEw5Hcv1hTb6YUQJ69y1V7uhcoDz92PH", ScriptType: "p2pkh", Worker: true},
+				{ValueSats: poolShare, ScriptPubKey: "52", ScriptType: "unknown"},
+			}
+		}
+		observations = append(observations, observation)
+	}
+
+	got := Compute([]model.Pool{pool}, observations, started.Add(14*time.Hour)).Reports[0]
+	if len(got.TemplateLatencyHistory) != reportHistoryLimit || len(got.PoolFeeHistory) != reportHistoryLimit {
+		t.Fatalf("history lengths=%d/%d, want %d", len(got.TemplateLatencyHistory), len(got.PoolFeeHistory), reportHistoryLimit)
+	}
+	if got.TemplateLatencyHistory[0].Value != 20 || got.TemplateLatencyHistory[11].Value != 130 ||
+		got.PoolFeeHistory[0].Value != 0.2 || got.PoolFeeHistory[11].Value != 1.3 {
+		t.Fatalf("unexpected recent histories: latency=%+v fee=%+v", got.TemplateLatencyHistory, got.PoolFeeHistory)
+	}
+	if got.LatestCoinbaseObservedAt == nil || !got.LatestCoinbaseObservedAt.Equal(started.Add(13*time.Hour)) ||
+		got.LatestCoinbaseTotalSats != 10_000 || got.LatestCoinbaseOutputCount != 3 || len(got.LatestPayoutDestinations) != 1 {
+		t.Fatalf("latest payout metadata=%+v", got)
+	}
+	if got.LatestPayoutDestinations[0].Percentage != 1.3 || got.LatestPayoutDestinations[0].ScriptPubKey != "52" {
+		t.Fatalf("latest payout destinations=%+v", got.LatestPayoutDestinations)
+	}
+	encoded, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, private := range []string{"12ZEw5Hcv1hTb6YUQJ69y1V7uhcoDz92PH", "76a914111111111111111111111111111111111111111188ac", "\"worker\":true"} {
+		if strings.Contains(string(encoded), private) {
+			t.Fatalf("report exposed private worker destination %q: %s", private, encoded)
+		}
 	}
 }

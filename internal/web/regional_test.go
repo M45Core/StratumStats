@@ -14,9 +14,10 @@ import (
 
 func TestReportsFilterByVantageAndRejectUnknownValues(t *testing.T) {
 	pool := model.Pool{ID: "pool", Name: "Pool"}
+	now := time.Now().UTC().Add(-time.Minute)
 	observations := []model.Observation{
-		{PoolID: "pool", Vantage: "us-west", BlockID: "west", ObservedAt: time.Unix(1, 0), Eligible: true, Arrived: true, OffsetMS: 10},
-		{PoolID: "pool", Vantage: "us-east", BlockID: "east", ObservedAt: time.Unix(2, 0), Eligible: true, Arrived: true, OffsetMS: 90},
+		{PoolID: "pool", Vantage: "us-west", BlockID: "west", ObservedAt: now.Add(-time.Second), Eligible: true, Arrived: true, OffsetMS: 10},
+		{PoolID: "pool", Vantage: "us-east", BlockID: "east", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 90},
 	}
 	handler, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
 	if err != nil {

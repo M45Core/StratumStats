@@ -28,7 +28,7 @@ func TestProtocolTimingsRemainSeparateFromBlockSamples(t *testing.T) {
 		protocol(model.ProtocolPing, model.ProtocolStatusUnsupported, 2),
 	}
 
-	snapshot := Compute([]model.Pool{{ID: "pool", Name: "Pool"}}, observations, time.Unix(0, 0))
+	snapshot := Compute([]model.Pool{{ID: "pool", Name: "Pool"}}, observations, time.Time{})
 	report := snapshot.Reports[0]
 	if report.Blocks != 0 || report.Arrivals != 0 {
 		t.Fatalf("protocol records became block samples: %+v", report)
@@ -44,5 +44,21 @@ func TestProtocolTimingsRemainSeparateFromBlockSamples(t *testing.T) {
 	}
 	if report.PingTiming.Attempts != 2 || report.PingTiming.Successes != 1 || report.PingTiming.Unsupported != 1 {
 		t.Fatalf("ping timing=%+v", report.PingTiming)
+	}
+}
+
+func TestTLSCertificateValidationFailuresRemainVisible(t *testing.T) {
+	duration := 12.5
+	now := time.Now().UTC()
+	observations := []model.Observation{
+		{ObservedAt: now.Add(-2 * time.Minute), PoolID: "pool", RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolTLSHandshake, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration},
+		{ObservedAt: now.Add(-time.Minute), PoolID: "pool", RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolTLSHandshake, ResponseStatus: model.ProtocolStatusError, ErrorCategory: model.ProtocolErrorTLSCertificateInvalid, DurationMS: &duration},
+	}
+	got := Compute([]model.Pool{{ID: "pool", Name: "Pool"}}, observations, now).Reports[0]
+	if got.TLSTiming.Attempts != 2 || got.TLSTiming.Successes != 1 || got.TLSTiming.Errors != 1 || got.TLSTiming.CertificateErrors != 1 {
+		t.Fatalf("TLS timing=%+v", got.TLSTiming)
+	}
+	if !got.TLSObserved {
+		t.Fatal("successful TLS handshake was not retained alongside the certificate error")
 	}
 }

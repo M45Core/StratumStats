@@ -25,6 +25,15 @@ def unique_endpoints:
   }
 )) as $census_pools |
 
+($metadata[0].pools | map({
+  id: .id,
+  name: .name,
+  website: (.website // ""),
+  category: (.category // "unknown"),
+  sources: ["pool-research"],
+  endpoints: (.endpoints // [])
+})) as $metadata_pools |
+
 ($metadata[0].pools | map({key: .id, value: .}) | from_entries) as $metadata_by_id |
 
 {
@@ -36,7 +45,7 @@ def unique_endpoints:
     {name: "pool-research", path: "pool-metadata.json"}
   ],
   pools: (
-    ($primary_pools + $census_pools)
+    ($primary_pools + $census_pools + $metadata_pools)
     | map(select(.id as $id | (($metadata[0].exclude_ids // []) | index($id) | not)))
     | sort_by(.id)
     | group_by(.id)

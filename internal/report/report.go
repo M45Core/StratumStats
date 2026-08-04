@@ -9,9 +9,14 @@ import (
 	"github.com/proofofmike/stratumstats/internal/model"
 )
 
-const MethodologyVersion = "2026-08-01.14"
+const (
+	MethodologyVersion = "2026-08-04.22"
+	reportHistoryLimit = 12
+	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
+	LatencyWindow = 24 * time.Hour
+)
 
-type feeSample struct {
+type metricSample struct {
 	at    time.Time
 	order int
 	value float64
@@ -25,7 +30,7 @@ type coinbaseSample struct {
 type accumulator struct {
 	pool     model.Pool
 	blocks   map[string]bool
-	offsets  map[string]float64
+	offsets  map[string]metricSample
 	tls      bool
 	coinbase map[string]coinbaseSample
 	timings  map[string]*timingAccumulator
@@ -34,6 +39,7 @@ type accumulator struct {
 // Compute applies only objective probe measurements. Operator size, fees,
 // sponsorships, and subjective reputation are deliberately excluded.
 func Compute(pools []model.Pool, observations []model.Observation, now time.Time) model.Snapshot {
+	now = now.UTC()
 	observations = uniqueObservations(observations)
 	acc := make(map[string]*accumulator, len(pools))
 	observedBlocks := make(map[string]bool)
@@ -41,7 +47,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 	templateDeliveries := make(map[string]bool)
 	canonicalWindows := make(map[string]time.Time)
 	for _, p := range pools {
-		acc[p.ID] = &accumulator{pool: p, blocks: map[string]bool{}, offsets: map[string]float64{}, coinbase: map[string]coinbaseSample{}}
+		acc[p.ID] = &accumulator{pool: p, blocks: map[string]bool{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{}}
 	}
 	for _, o := range observations {
 		if acc[o.PoolID] == nil || o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != "" || !o.Eligible || o.BlockID == "" {
@@ -62,7 +68,9 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 			continue
 		}
 		if protocolRecord {
-			addProtocolObservation(a, o)
+			if withinLatencyWindow(o.ObservedAt, now) {
+				addProtocolObservation(a, o)
+			}
 			continue
 		}
 		if !o.Eligible || o.BlockID == "" {
@@ -77,8 +85,8 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		a.blocks[key] = true
 		if o.Arrived && o.OffsetMS >= 0 {
 			templateDeliveries[globalKey] = true
-			if old, exists := a.offsets[key]; !exists || o.OffsetMS < old {
-				a.offsets[key] = o.OffsetMS
+			if old, exists := a.offsets[key]; !exists || o.OffsetMS < old.value {
+				a.offsets[key] = metricSample{at: o.ObservedAt, order: order, value: o.OffsetMS}
 			}
 		}
 		if o.Arrived && o.CoinbaseAnalyzed {
@@ -94,7 +102,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 
 	reports := make([]model.PoolReport, 0, len(acc))
 	for _, a := range acc {
-		reports = append(reports, build(a))
+		reports = append(reports, build(a, now))
 	}
 	sort.SliceStable(reports, func(i, j int) bool {
 		return reports[i].PoolName < reports[j].PoolName
@@ -102,6 +110,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 	return model.Snapshot{
 		GeneratedAt:         now.UTC(),
 		Methodology:         MethodologyVersion,
+		LatencyWindowHours:  int(LatencyWindow / time.Hour),
 		BlocksObserved:      len(observedBlocks),
 		EligiblePoolSamples: len(eligiblePoolSamples),
 		TemplateDeliveries:  len(templateDeliveries),
@@ -109,9 +118,12 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		Disclosure: []string{
 			"Reports use automated observations only; no pool pays or applies for placement.",
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
+			"Block-template latency, latency history, and protocol timing statistics use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
 			"The probe uses pseudonymous miner credentials, but a pool can still observe its source IP.",
-			"Observed pool fee is inferred only when a decoded coinbase output matches the generated worker script; optional donations or splits may be included.",
+			"Observed solo-pool fee is inferred only when a decoded coinbase output matches the generated worker script; optional donations or splits may be included.",
+			"Matched worker payout destinations are reduced to aggregate verification and fee evidence; their address and script are never published.",
+			"Coinbase destinations identify decoded output scripts, not who controls a non-worker address.",
 		},
 	}
 }
@@ -148,10 +160,17 @@ func ComputeVantages(pools []model.Pool, observations []model.Observation, vanta
 		regional.Reports[index].PoolFeeChanges = evidence.PoolFeeChanges
 		regional.Reports[index].PoolFeeSamples = evidence.PoolFeeSamples
 		regional.Reports[index].PoolFeeLastChangedAt = evidence.PoolFeeLastChangedAt
+		regional.Reports[index].LatestCoinbaseObservedAt = evidence.LatestCoinbaseObservedAt
+		regional.Reports[index].LatestCoinbaseTotalSats = evidence.LatestCoinbaseTotalSats
+		regional.Reports[index].LatestCoinbaseOutputCount = evidence.LatestCoinbaseOutputCount
+		regional.Reports[index].LatestPayoutDestinations = evidence.LatestPayoutDestinations
+		regional.Reports[index].LatestPayoutDestinationsTruncated = evidence.LatestPayoutDestinationsTruncated
+		regional.Reports[index].LatestPayoutOmittedSats = evidence.LatestPayoutOmittedSats
+		regional.Reports[index].PoolFeeHistory = evidence.PoolFeeHistory
 	}
 	regional.Disclosure = append(regional.Disclosure,
 		"Regional views contain scheduled samples only; availability is not continuous uptime.",
-		"Pool safety and fee evidence remain global when latency and protocol metrics are filtered by vantage.",
+		"Solo-pool safety and fee evidence remain global when latency and protocol metrics are filtered by vantage.",
 	)
 	return regional
 }
@@ -171,7 +190,7 @@ func uniqueObservations(observations []model.Observation) []model.Observation {
 	return unique
 }
 
-func build(a *accumulator) model.PoolReport {
+func build(a *accumulator, now time.Time) model.PoolReport {
 	blocks, arrivals := len(a.blocks), len(a.offsets)
 	availability := 0.0
 	if blocks > 0 {
@@ -180,29 +199,42 @@ func build(a *accumulator) model.PoolReport {
 		}
 		availability = 100 * float64(arrivals) / float64(blocks)
 	}
-	var median, p95 *float64
-	medValue, p95Value := 0.0, 0.0
-	if arrivals > 0 {
-		offsets := make([]float64, 0, arrivals)
-		for _, offset := range a.offsets {
-			offsets = append(offsets, offset)
+
+	latencySamples := make([]metricSample, 0, arrivals)
+	offsetValues := make([]float64, 0, arrivals)
+	for _, sample := range a.offsets {
+		if !withinLatencyWindow(sample.at, now) {
+			continue
 		}
-		sort.Float64s(offsets)
-		medValue = percentile(offsets, .5)
-		p95Value = percentile(offsets, .95)
-		median, p95 = ptr(round(medValue, 1)), ptr(round(p95Value, 1))
+		latencySamples = append(latencySamples, sample)
+		offsetValues = append(offsetValues, sample.value)
 	}
+	var median, p95 *float64
+	if len(offsetValues) > 0 {
+		sort.Float64s(offsetValues)
+		medianValue := percentile(offsetValues, .5)
+		p95Value := percentile(offsetValues, .95)
+		median, p95 = ptr(round(medianValue, 1)), ptr(round(p95Value, 1))
+	}
+
 	coinbaseSamples, workerAddressMatches := len(a.coinbase), 0
-	feeSamples := make([]feeSample, 0, coinbaseSamples)
+	feeSamples := make([]metricSample, 0, coinbaseSamples)
+	var latestCoinbase coinbaseSample
+	hasLatestCoinbase := false
 	for _, sample := range a.coinbase {
 		o := sample.observation
 		if o.WorkerWalletInCoinbase {
 			workerAddressMatches++
 		}
 		if o.EstimatedPoolFeePct != nil && *o.EstimatedPoolFeePct >= 0 && *o.EstimatedPoolFeePct <= 100 {
-			feeSamples = append(feeSamples, feeSample{at: o.ObservedAt, order: sample.order, value: *o.EstimatedPoolFeePct})
+			feeSamples = append(feeSamples, metricSample{at: o.ObservedAt, order: sample.order, value: *o.EstimatedPoolFeePct})
+		}
+		if !hasLatestCoinbase || o.ObservedAt.After(latestCoinbase.observation.ObservedAt) || (o.ObservedAt.Equal(latestCoinbase.observation.ObservedAt) && sample.order > latestCoinbase.order) {
+			latestCoinbase = sample
+			hasLatestCoinbase = true
 		}
 	}
+
 	workerAddressObservedPct := (*float64)(nil)
 	workerAddressStatus := "unknown"
 	if coinbaseSamples > 0 {
@@ -217,6 +249,7 @@ func build(a *accumulator) model.PoolReport {
 			workerAddressStatus = "varied"
 		}
 	}
+
 	latestPoolFeePct := (*float64)(nil)
 	previousPoolFeePct := (*float64)(nil)
 	poolFeeChanges := 0
@@ -249,16 +282,91 @@ func build(a *accumulator) model.PoolReport {
 			previousPoolFeePct = &previousValue
 		}
 	}
+
+	var latestCoinbaseObservedAt *time.Time
+	var latestCoinbaseTotalSats, latestPayoutOmittedSats uint64
+	var latestCoinbaseOutputCount int
+	var latestPayoutDestinations []model.PayoutDestination
+	latestPayoutDestinationsTruncated := false
+	if hasLatestCoinbase {
+		observation := latestCoinbase.observation
+		if !observation.ObservedAt.IsZero() {
+			observedAt := observation.ObservedAt.UTC()
+			latestCoinbaseObservedAt = &observedAt
+		}
+		latestCoinbaseTotalSats = observation.CoinbaseTotalSats
+		latestCoinbaseOutputCount = observation.CoinbaseOutputCount
+		if latestCoinbaseOutputCount == 0 && len(observation.CoinbaseOutputs) > 0 {
+			latestCoinbaseOutputCount = len(observation.CoinbaseOutputs)
+		}
+		latestPayoutDestinationsTruncated = observation.CoinbaseOutputsTruncated
+		latestPayoutOmittedSats = observation.CoinbaseOmittedSats
+		latestPayoutDestinations = make([]model.PayoutDestination, 0, len(observation.CoinbaseOutputs))
+		for _, output := range observation.CoinbaseOutputs {
+			// Version 8 observations already omit this private destination. Keep
+			// the filter here so historical version 7 records cannot expose it.
+			if output.Worker {
+				continue
+			}
+			percentage := 0.0
+			if observation.CoinbaseTotalSats > 0 {
+				percentage = round(100*float64(output.ValueSats)/float64(observation.CoinbaseTotalSats), 4)
+			}
+			latestPayoutDestinations = append(latestPayoutDestinations, model.PayoutDestination{
+				ValueSats: output.ValueSats, Percentage: percentage,
+				ScriptPubKey: output.ScriptPubKey, ScriptPubKeyTruncated: output.ScriptPubKeyTruncated,
+				Address: output.Address, ScriptType: output.ScriptType,
+			})
+		}
+	}
+
 	return model.PoolReport{
-		PoolID: a.pool.ID, PoolName: a.pool.Name, Category: a.pool.Category, Sources: a.pool.Sources,
-		Blocks: blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95,
+		PoolID: a.pool.ID, PoolName: a.pool.Name, Category: a.pool.Category, Products: a.pool.Products, Sources: a.pool.Sources,
+		Blocks: blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median),
 		Availability: round(availability, 1), TLSObserved: a.tls,
 		ConnectTiming: timingStats(a, model.ProtocolConnect), TLSTiming: timingStats(a, model.ProtocolTLSHandshake),
 		SubscribeTiming: timingStats(a, model.ProtocolSubscribe), AuthorizeTiming: timingStats(a, model.ProtocolAuthorize), PingTiming: timingStats(a, model.ProtocolPing),
 		CoinbaseSamples: coinbaseSamples, WorkerAddressObservedPct: workerAddressObservedPct, WorkerAddressStatus: workerAddressStatus,
 		LatestPoolFeePct: latestPoolFeePct, PreviousPoolFeePct: previousPoolFeePct,
 		PoolFeeChanged: poolFeeChanges > 0, PoolFeeChanges: poolFeeChanges, PoolFeeSamples: len(feeSamples), PoolFeeLastChangedAt: poolFeeLastChangedAt,
+		LatestCoinbaseObservedAt: latestCoinbaseObservedAt, LatestCoinbaseTotalSats: latestCoinbaseTotalSats,
+		LatestCoinbaseOutputCount: latestCoinbaseOutputCount, LatestPayoutDestinations: latestPayoutDestinations,
+		LatestPayoutDestinationsTruncated: latestPayoutDestinationsTruncated, LatestPayoutOmittedSats: latestPayoutOmittedSats,
+		TemplateLatencyHistory: recentMetricHistory(latencySamples, 1), PoolFeeHistory: recentMetricHistory(feeSamples, 2),
 	}
+}
+
+func recentMetricHistory(samples []metricSample, places int) []model.MetricHistoryPoint {
+	if len(samples) == 0 {
+		return nil
+	}
+	sort.SliceStable(samples, func(i, j int) bool {
+		if samples[i].at.Equal(samples[j].at) {
+			return samples[i].order < samples[j].order
+		}
+		return samples[i].at.Before(samples[j].at)
+	})
+	if len(samples) > reportHistoryLimit {
+		samples = samples[len(samples)-reportHistoryLimit:]
+	}
+	history := make([]model.MetricHistoryPoint, 0, len(samples))
+	for _, sample := range samples {
+		history = append(history, model.MetricHistoryPoint{ObservedAt: sample.at.UTC(), Value: round(sample.value, places)})
+	}
+	return history
+}
+
+func withinLatencyWindow(observedAt, now time.Time) bool {
+	cutoff := now.Add(-LatencyWindow)
+	return !observedAt.Before(cutoff) && !observedAt.After(now)
+}
+
+func estimatedMiningLoss(latencyMS *float64) *float64 {
+	if latencyMS == nil {
+		return nil
+	}
+	value := round(*latencyMS/600_000*100, 4)
+	return &value
 }
 
 func observationKey(o model.Observation) string {

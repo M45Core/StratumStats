@@ -149,3 +149,50 @@ func TestBuildProbeConfigIncludesOnlyCompatiblePoolsAndIsStable(t *testing.T) {
 		t.Fatalf("config=%+v second revision=%q", first, second.ConfigRevision)
 	}
 }
+
+func TestValidateCoinbaseObservationRequiresBalancedBoundedEvidence(t *testing.T) {
+	fee := 1.5
+	valid := model.Observation{
+		Arrived: true, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true,
+		CoinbaseTotalSats: 10_000, WorkerPayoutSats: 9_850, EstimatedPoolFeePct: &fee,
+		CoinbaseOutputCount: 3,
+		CoinbaseOutputs: []model.CoinbaseOutput{
+			{ValueSats: 150, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"},
+		},
+	}
+	if err := validateCoinbaseObservation(valid); err != nil {
+		t.Fatalf("valid coinbase evidence rejected: %v", err)
+	}
+
+	privateDestination := valid
+	privateDestination.CoinbaseOutputs = append([]model.CoinbaseOutput{{
+		ValueSats: 9_850, ScriptPubKey: "76a914111111111111111111111111111111111111111188ac",
+		Address: "12ZEw5Hcv1hTb6YUQJ69y1V7uhcoDz92PH", ScriptType: "p2pkh", Worker: true,
+	}}, privateDestination.CoinbaseOutputs...)
+	if err := validateCoinbaseObservation(privateDestination); err == nil {
+		t.Fatal("retained private worker destination accepted")
+	}
+
+	zeroFee := 0.0
+	allWorker := valid
+	allWorker.CoinbaseTotalSats = 9_850
+	allWorker.WorkerPayoutSats = 9_850
+	allWorker.EstimatedPoolFeePct = &zeroFee
+	allWorker.CoinbaseOutputCount = 1
+	allWorker.CoinbaseOutputs = nil
+	if err := validateCoinbaseObservation(allWorker); err != nil {
+		t.Fatalf("private-only coinbase evidence rejected: %v", err)
+	}
+
+	unbalanced := valid
+	unbalanced.CoinbaseTotalSats--
+	if err := validateCoinbaseObservation(unbalanced); err == nil {
+		t.Fatal("unbalanced coinbase evidence accepted")
+	}
+
+	tooMany := valid
+	tooMany.CoinbaseOutputs = make([]model.CoinbaseOutput, maxRetainedCoinbaseOutputs+1)
+	if err := validateCoinbaseObservation(tooMany); err == nil {
+		t.Fatal("oversized retained output list accepted")
+	}
+}

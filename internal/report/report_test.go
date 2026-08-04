@@ -16,7 +16,7 @@ func TestComputeReportsAvailabilityAndLatency(t *testing.T) {
 		obs = append(obs, model.Observation{PoolID: "fast", BlockID: block, Eligible: true, Arrived: true, OffsetMS: 20, TLS: true})
 		obs = append(obs, model.Observation{PoolID: "slow", BlockID: block, Eligible: true, Arrived: i < 30, OffsetMS: 900})
 	}
-	s := Compute(pools, obs, time.Unix(0, 0))
+	s := Compute(pools, obs, time.Time{})
 	if len(s.Reports) != 2 || s.Reports[0].PoolID != "fast" {
 		t.Fatalf("unexpected order: %+v", s.Reports)
 	}
@@ -28,6 +28,9 @@ func TestComputeReportsAvailabilityAndLatency(t *testing.T) {
 	}
 	if s.Reports[0].MedianMS == nil || s.Reports[1].MedianMS == nil || *s.Reports[0].MedianMS >= *s.Reports[1].MedianMS {
 		t.Fatal("median latency not reported")
+	}
+	if s.Reports[0].EstimatedMiningLossPct == nil || *s.Reports[0].EstimatedMiningLossPct != 0.0033 || s.Reports[1].EstimatedMiningLossPct == nil || *s.Reports[1].EstimatedMiningLossPct != 0.15 {
+		t.Fatalf("estimated mining loss = %v/%v, want 0.0033/0.15", s.Reports[0].EstimatedMiningLossPct, s.Reports[1].EstimatedMiningLossPct)
 	}
 
 	if s.Reports[0].Blocks != 40 {
@@ -49,7 +52,7 @@ func TestComputeDeduplicatesArrivalsByVantageAndBlock(t *testing.T) {
 		{PoolID: pool.ID, Vantage: "west", BlockID: "three"},
 		{PoolID: "removed-pool", Vantage: "west", BlockID: "four", Eligible: true, Arrived: true, OffsetMS: 5},
 	}
-	snapshot := Compute([]model.Pool{pool}, observations, time.Now())
+	snapshot := Compute([]model.Pool{pool}, observations, time.Time{})
 	report := snapshot.Reports[0]
 	if report.Blocks != 3 || report.Arrivals != 2 {
 		t.Fatalf("templates=%d/%d, want 2/3", report.Arrivals, report.Blocks)
@@ -72,7 +75,7 @@ func TestComputeDeduplicatesRetriedObservationIDs(t *testing.T) {
 	pools := []model.Pool{{ID: "pool", Name: "Pool"}}
 	duration := 12.0
 	record := model.Observation{Version: model.ObservationVersion, ObservationID: "run/1", RecordType: model.RecordTypeProtocol, PoolID: "pool", ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration}
-	snapshot := Compute(pools, []model.Observation{record, record}, time.Now())
+	snapshot := Compute(pools, []model.Observation{record, record}, time.Time{})
 	if got := snapshot.Reports[0].ConnectTiming.Attempts; got != 1 {
 		t.Fatalf("attempts=%d, want 1", got)
 	}
@@ -85,7 +88,7 @@ func TestComputeVantageFiltersTimingButRetainsGlobalCoinbaseEvidence(t *testing.
 		{PoolID: "pool", Vantage: "us-west", BlockID: "west", ObservedAt: time.Unix(1, 0), Eligible: true, Arrived: true, OffsetMS: 10},
 		{PoolID: "pool", Vantage: "us-east", BlockID: "east", ObservedAt: time.Unix(2, 0), Eligible: true, Arrived: true, OffsetMS: 90, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
 	}
-	snapshot := ComputeVantage(pools, observations, "us-west", time.Now())
+	snapshot := ComputeVantage(pools, observations, "us-west", time.Unix(3, 0))
 	got := snapshot.Reports[0]
 	if got.Blocks != 1 || got.MedianMS == nil || *got.MedianMS != 10 {
 		t.Fatalf("regional report=%+v", got)
@@ -104,7 +107,7 @@ func TestComputeIgnoresReopenedWindowsForSameBlock(t *testing.T) {
 		{PoolID: "first", Vantage: "west", BlockID: "block", ObservedAt: started.Add(20 * time.Second), Eligible: true, Arrived: true, OffsetMS: 200},
 		{PoolID: "late", Vantage: "west", BlockID: "block", ObservedAt: started.Add(20 * time.Second), Eligible: true, Arrived: true, OffsetMS: 0},
 	}
-	snapshot := Compute(pools, observations, time.Now())
+	snapshot := Compute(pools, observations, started.Add(time.Hour))
 	if snapshot.BlocksObserved != 1 || snapshot.EligiblePoolSamples != 2 || snapshot.TemplateDeliveries != 2 {
 		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 1/2/2", snapshot.BlocksObserved, snapshot.EligiblePoolSamples, snapshot.TemplateDeliveries)
 	}
@@ -113,6 +116,53 @@ func TestComputeIgnoresReopenedWindowsForSameBlock(t *testing.T) {
 	}
 	if snapshot.Reports[1].MedianMS == nil || *snapshot.Reports[1].MedianMS != 100 {
 		t.Fatalf("late median = %v, want 100; reopened zero must be ignored", snapshot.Reports[1].MedianMS)
+	}
+}
+
+func TestComputeLatencyUsesRolling24Hours(t *testing.T) {
+	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
+	fee := 1.25
+	oldDuration, recentDuration, futureDuration := 1_000.0, 20.0, 9_000.0
+	observations := []model.Observation{
+		{PoolID: "pool", Vantage: "west", BlockID: "old", ObservedAt: now.Add(-24*time.Hour - time.Minute), Eligible: true, Arrived: true, OffsetMS: 5_000, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
+		{PoolID: "pool", Vantage: "west", BlockID: "boundary", ObservedAt: now.Add(-24 * time.Hour), Eligible: true, Arrived: true, OffsetMS: 30},
+		{PoolID: "pool", Vantage: "west", BlockID: "recent-one", ObservedAt: now.Add(-2 * time.Hour), Eligible: true, Arrived: true, OffsetMS: 50},
+		{PoolID: "pool", Vantage: "west", BlockID: "recent-two", ObservedAt: now.Add(-time.Hour), Eligible: true, Arrived: true, OffsetMS: 70},
+		{PoolID: "pool", Vantage: "west", BlockID: "future", ObservedAt: now.Add(time.Second), Eligible: true, Arrived: true, OffsetMS: 9_000},
+		{PoolID: "pool", RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusOK, DurationMS: &oldDuration, ObservedAt: now.Add(-24*time.Hour - time.Minute)},
+		{PoolID: "pool", RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusOK, DurationMS: &recentDuration, ObservedAt: now.Add(-time.Hour)},
+		{PoolID: "pool", RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusOK, DurationMS: &futureDuration, ObservedAt: now.Add(time.Second)},
+	}
+
+	snapshot := Compute([]model.Pool{{ID: "pool", Name: "Pool"}}, observations, now)
+	if snapshot.LatencyWindowHours != 24 {
+		t.Fatalf("latency window=%d hours, want 24", snapshot.LatencyWindowHours)
+	}
+	got := snapshot.Reports[0]
+	if got.MedianMS == nil || *got.MedianMS != 50 || got.P95MS == nil || *got.P95MS != 70 {
+		t.Fatalf("24-hour latency median/p95=%v/%v, want 50/70", got.MedianMS, got.P95MS)
+	}
+	if got.EstimatedMiningLossPct == nil || *got.EstimatedMiningLossPct != 0.0083 {
+		t.Fatalf("estimated mining loss=%v, want 0.0083", got.EstimatedMiningLossPct)
+	}
+	if len(got.TemplateLatencyHistory) != 3 || got.TemplateLatencyHistory[0].Value != 30 || got.TemplateLatencyHistory[2].Value != 70 {
+		t.Fatalf("24-hour latency history=%+v", got.TemplateLatencyHistory)
+	}
+	if got.ConnectTiming.Attempts != 1 || got.ConnectTiming.MedianMS == nil || *got.ConnectTiming.MedianMS != 20 {
+		t.Fatalf("24-hour protocol timing=%+v", got.ConnectTiming)
+	}
+	if got.Blocks != 5 || got.Arrivals != 5 || got.Availability != 100 {
+		t.Fatalf("cumulative availability changed: blocks=%d arrivals=%d availability=%.1f", got.Blocks, got.Arrivals, got.Availability)
+	}
+	if got.WorkerAddressStatus != "always_observed" || got.LatestPoolFeePct == nil || *got.LatestPoolFeePct != fee {
+		t.Fatalf("older payout evidence was discarded: %+v", got)
+	}
+
+	stale := Compute([]model.Pool{{ID: "stale", Name: "Stale"}}, []model.Observation{{
+		PoolID: "stale", BlockID: "old", ObservedAt: now.Add(-24*time.Hour - time.Nanosecond), Eligible: true, Arrived: true, OffsetMS: 10,
+	}}, now).Reports[0]
+	if stale.MedianMS != nil || stale.P95MS != nil || stale.EstimatedMiningLossPct != nil || len(stale.TemplateLatencyHistory) != 0 {
+		t.Fatalf("stale-only latency was published: %+v", stale)
 	}
 }
 

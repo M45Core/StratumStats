@@ -7,12 +7,13 @@ import (
 )
 
 type timingAccumulator struct {
-	attempts    int
-	durations   []float64
-	rejected    int
-	unsupported int
-	timeouts    int
-	errors      int
+	attempts          int
+	durations         []float64
+	rejected          int
+	unsupported       int
+	timeouts          int
+	errors            int
+	certificateErrors int
 }
 
 func addProtocolObservation(a *accumulator, o model.Observation) {
@@ -43,6 +44,9 @@ func addProtocolObservation(a *accumulator, o model.Observation) {
 		t.timeouts++
 	default:
 		t.errors++
+		if o.ProtocolMethod == model.ProtocolTLSHandshake && o.ErrorCategory == model.ProtocolErrorTLSCertificateInvalid {
+			t.certificateErrors++
+		}
 	}
 }
 
@@ -58,6 +62,7 @@ func timingStats(a *accumulator, method string) model.TimingStats {
 	stats.Unsupported = t.unsupported
 	stats.Timeouts = t.timeouts
 	stats.Errors = t.errors
+	stats.CertificateErrors = t.certificateErrors
 	if len(t.durations) > 0 {
 		sort.Float64s(t.durations)
 		median := round(percentile(t.durations, .5), 1)

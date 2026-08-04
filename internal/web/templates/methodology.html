@@ -11,6 +11,17 @@
   <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
   <nav><a href="/">Reports</a><a href="/pools">Pool registry</a><a href="/api/v1/methodology">Method API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
 </header>
+<aside class="donation-banner" aria-label="Support StratumStats">
+  <div class="donation-copy">
+    <strong>This site is run by donations.</strong>
+    <span>Help keep independent Bitcoin pool telemetry online.</span>
+  </div>
+  <a class="donation-link" href="bitcoin:3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL?label=StratumStats%20donation" aria-label="Donate Bitcoin to StratumStats">
+    <span class="donation-symbol" aria-hidden="true">₿</span>
+    <span>Donate Bitcoin</span>
+    <code>3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL</code>
+  </a>
+</aside>
 <main class="prose">
   <p class="eyebrow">Method {{.Methodology}}</p>
   <h1>Measurements that can be challenged.</h1>
@@ -18,26 +29,50 @@
 
   <h2>Published measurements</h2>
   <div class="method-grid">
-    <article><h3>Availability</h3><p>Observed valid block-template arrivals divided by unique eligible vantage-and-block samples. The numerator and denominator are shown beside the percentage. Each distinct Bitcoin block counts once per vantage; repeated or later reopened windows cannot increase the count.</p></article>
-    <article><h3>Median delivery</h3><p>Median first-valid-template delay relative to the earliest structurally valid template observed for the same block and vantage.</p></article>
-    <article><h3>Tail delivery</h3><p>95th-percentile relative delay, exposing intermittent stalls that a median can hide.</p></article>
-    <article><h3>Transport security</h3><p>Whether a configured TLS endpoint successfully completed a measured Stratum session.</p></article>
+    <article><h3>Availability</h3><p>Observed valid block-template arrivals divided by unique eligible vantage-and-block samples; unlike latency statistics, availability remains cumulative across retained evidence. The numerator and denominator are shown beside the percentage. Each distinct Bitcoin block counts once per vantage; repeated or later reopened windows cannot increase the count.</p></article>
+    <article><h3>Median delivery</h3><p>Median first-valid-template delay relative to the earliest structurally valid template observed for the same block and vantage, using only observations from the rolling 24 hours before report generation.</p></article>
+    <article><h3>Tail delivery</h3><p>95th-percentile relative delay from the same rolling 24-hour window, exposing intermittent stalls that a median can hide.</p></article>
+    <article><h3 id="estimated-mining-loss">Estimated mining loss</h3><p>A stale-work proxy calculated as <code>median relative delay ÷ 600,000 ms × 100</code>. It estimates the share of Bitcoin target-interval mining time lost while waiting for a newer template. Because latency is relative to the fastest pool observed from the same vantage, this is incremental—not absolute—and is not measured revenue loss.</p></article>
+    <article><h3>Transport security</h3><p>Whether a configured TLS endpoint completed a measured Stratum session with a certificate valid for its hostname, validity period, and the probe system’s trusted certificate authorities. Any certificate-validation failure is reported as an error.</p></article>
   </div>
 
   <h2>Protocol response timings</h2>
-  <p>Connection setup is recorded as separate JSONL evidence: TCP connect (including name resolution), TLS handshake when used, <code>mining.subscribe</code>, and <code>mining.authorize</code>. Durations run from the local request start through the matching response and are aggregated independently from block-delivery latency.</p>
+  <p>Connection setup is recorded as separate JSONL evidence: TCP connect (including name resolution), TLS handshake when used, <code>mining.subscribe</code>, and <code>mining.authorize</code>. TLS requires version 1.2 or newer and uses normal hostname, validity-period, chain, and system-trust-store verification; verification is never bypassed. A failed certificate check is recorded as <code>tls_certificate_invalid</code> and shown as a red TLS error even when another endpoint succeeded. Durations run from the local request start through the matching response and are aggregated independently from block-delivery latency. Protocol attempts, medians, and P95 values also use the rolling 24-hour window.</p>
   <p><code>mining.ping</code> is an optional Stratum V1 extension. A valid <code>pong</code> is timed and may be sampled again during a long session. Unsupported responses and timeouts remain visible, but they do not reduce availability or count as failed block delivery.</p>
 
   <h2>Coinbase-only first templates</h2>
   <p>After a new block, Bitcoin Core validates the block and rebuilds transaction state. A structurally valid coinbase-only template lets miners stop working on the stale parent immediately, so it counts as block-template delivery without waiting for transaction branches. Empty-first remains raw evidence and does not alter this benchmark.</p>
 
   <h2>Coinbase output observations</h2>
-  <p>For every structurally valid job, the probe reconstructs the coinbase with its negotiated extranonces and checks whether an output matches the generated worker address script. Normal-list placement requires that address in every decoded sample. Missing, varied, and no-data entries remain in Unsafe until positive evidence is available; the compact list does not spend a separate column repeating that status.</p>
-  <p>When the worker output is present, the observed pool fee is <code>100 × (all coinbase outputs − worker outputs) / all coinbase outputs</code>. Optional donations or configured splits can be included, so this is the effective percentage visible in that job—not a claim about advertised policy. No fee is inferred from jobs where the worker output is absent.</p>
-  <p>Fee history follows the PoolCensus change approach: consecutive observations are compared at the displayed 0.01% precision so smaller fluctuations do not create noisy changes. The list shows the latest value and either stable with its sample count or the previous → current value with a change count. It never reports a median fee.</p>
+  <p>For every structurally valid job, the probe reconstructs the coinbase with its negotiated extranonces and checks whether a positive-value output matches the generated worker address script. Free and non-free solo placement requires that destination in every decoded sample. Missing, varied, and no-data entries are classified as Unsafe until positive evidence is available. A non-solo record appears in Pools offering PPLNS whenever its researched product list includes PPLNS, whether dedicated or multi-mode. Remaining non-solo records appear in Other non-solo pools. Pools without a block-template latency sample in the last 24 hours are omitted from the dashboard sections.</p>
+  <p>For a solo job with a matched worker output, the observed effective fee is <code>100 × (all coinbase outputs − worker outputs) / all coinbase outputs</code>. Optional donations or configured splits can be included, so this is the effective percentage visible in that job—not a claim about advertised policy. No fee is inferred from a solo job where the worker output is absent.</p>
+  <p>This coinbase calculation does not measure a non-solo pool’s miner fee: PPLNS, FPPS, and similar pools account for shares and pay participants separately from the block coinbase. Their dashboard rows therefore show researched operator-advertised terms and the date those terms were checked. If no sourced term is present, the dashboard says <em>advertised fee not confirmed</em>.</p>
+  <p>The probe uses the matched worker destination only for aggregate verification and fee calculation; its address and script are discarded before telemetry serialization. It coalesces the remaining positive-value scripts, retains the largest non-worker destinations, and caps each observation at 64 retained destinations. It records the original transaction-output count and aggregates value beyond the cap. Standard mainnet P2PKH, P2SH, Bech32, and Bech32m scripts are displayed as addresses linked to their mempool.space explorer pages; unknown or oversized scripts use a bounded, explicitly marked script prefix and are not linked.</p>
+  <p>A non-worker destination is only an output script that did not equal the probe worker script. It does not establish ownership: it may represent a pool fee, donation, witness commitment, payout split, or another participant. Percentages are each retained destination’s share of the total decoded coinbase value.</p>
+  <p>Solo fee history follows the PoolCensus change approach: consecutive worker-matched observations are compared at the displayed 0.01% precision so smaller fluctuations do not create noisy changes. The list shows the latest value and either stable with its sample count or the previous → current value with a change count. It never reports a median fee. The expandable dashboard panel shows the 12 most recent canonical template-latency samples as a line graph and lists only observed effective-fee transitions; unchanged fee samples are omitted. Non-solo panels show the advertised product terms instead of inventing an observed fee history.</p>
+
+  <section class="glossary-section" id="glossary">
+    <h2>Mining jargon glossary</h2>
+    <p>These are the short definitions used by the dashboard. The methodology above explains how each measurement is calculated.</p>
+    <dl class="glossary">
+      <div><dt id="stratum">Stratum</dt><dd>The protocol mining hardware uses to receive work from a pool and return share results.</dd></div>
+      <div><dt id="block-template-latency">Block-template latency</dt><dd>The relative delay until a pool sends its first structurally valid job for a new Bitcoin block, measured from the same vantage point. Reported median and P95 values use the rolling 24-hour window.</dd></div>
+      <div><dt id="mining-loss">Estimated mining loss</dt><dd>Rolling-24-hour median relative template delay divided by Bitcoin’s 600-second target interval. It is an incremental stale-work estimate, not an observed payout or revenue loss.</dd></div>
+      <div><dt id="p95">P95</dt><dd>The 95th percentile. Dashboard latency P95 uses the rolling 24-hour window. Ninety-five percent of successful samples were this fast or faster; the slowest five percent took longer.</dd></div>
+      <div><dt id="availability">Availability</dt><dd>Valid block-template deliveries divided by samples where the probe was connected and eligible to receive one.</dd></div>
+      <div><dt id="tcp">TCP</dt><dd>The basic network connection between the probe and a pool, including local name resolution in this measurement.</dd></div>
+      <div><dt id="tls">TLS</dt><dd>Encryption and certificate-based server identity checking layered over TCP. A certificate must match the endpoint hostname, be within its validity period, and chain to a certificate authority trusted by the probe system.</dd></div>
+      <div><dt id="subscribe"><code>mining.subscribe</code></dt><dd>The Stratum request that starts a mining session and obtains session-specific values.</dd></div>
+      <div><dt id="authorize"><code>mining.authorize</code></dt><dd>The Stratum request that submits the worker identity for acceptance by the pool.</dd></div>
+      <div><dt id="pplns">PPLNS</dt><dd>Pay Per Last N Shares. Rewards are distributed according to work submitted during a recent share window.</dd></div>
+      <div><dt id="coinbase-payout">Coinbase payout</dt><dd>The outputs of the special first transaction in a block, which creates the block reward and assigns it to payout addresses.</dd></div>
+      <div><dt id="pool-fee">Pool fee</dt><dd>For solo pools, the observed coinbase share not assigned to the matched worker destination. For non-solo pools, an explicitly labeled operator-advertised product term.</dd></div>
+      <div><dt id="non-worker-destination">Non-worker destination</dt><dd>A positive-value coinbase output whose script did not match the probe worker script. It describes a destination, not who owns or controls it.</dd></div>
+    </dl>
+  </section>
 
   <h2>What is deliberately excluded</h2>
-  <p>Pool size, popularity, advertising, sponsorship, subjective reputation, unverified operator claims, and any composite score. Payment correctness outside the observed coinbase outputs still needs a controlled hashrate/payment study.</p>
+  <p>Pool size, popularity, sponsorship, subjective reputation, operator claims presented as measurements, and any composite score. Advertised non-solo fee terms remain clearly labeled registry metadata rather than probe results. Payment correctness outside the observed coinbase outputs still needs a controlled hashrate/payment study.</p>
 
   <h2>Anonymity and its limit</h2>
   <p>Each connection uses a newly generated valid-looking Bitcoin address, ordinary worker name, and rotated miner agent. Credentials are never persisted. This reduces special treatment based on a known benchmark account, but it does not conceal the probe’s source IP. Published vantage labels should be coarse regions, never hostnames or IP addresses.</p>
