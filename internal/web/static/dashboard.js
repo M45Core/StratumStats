@@ -97,8 +97,8 @@
     button.setAttribute("aria-expanded", String(expanded));
     const action = expanded ? "Hide" : "Show";
     const poolName = row.dataset.sortPool || "pool";
-    button.setAttribute("aria-label", action + " payout and history for " + poolName);
-    button.title = action + " payout details and recent history";
+    button.setAttribute("aria-label", action + " details for " + poolName);
+    button.title = action + " payment and recent performance details";
     panel.hidden = !expanded;
   }
 

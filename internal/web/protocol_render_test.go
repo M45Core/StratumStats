@@ -30,7 +30,7 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	home := httptest.NewRecorder()
 	h.ServeHTTP(home, httptest.NewRequest("GET", "/", nil))
 	body := home.Body.String()
-	for _, want := range []string{"Block template latency", "42.5", "12.5", "TLS certificate error", "tls-timing-error", "CERT ERROR", "certificate validation failed", "0/1 ok"} {
+	for _, want := range []string{"Median block delay", "42.5", "12.5", "Security error", "tls-timing-error", "SECURITY ERROR", "The pool security certificate could not be verified", "0/1 worked"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
 		}
@@ -45,12 +45,12 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	reports := httptest.NewRecorder()
 	h.ServeHTTP(reports, httptest.NewRequest("GET", "/api/v1/reports", nil))
 	if !strings.Contains(reports.Body.String(), `"certificate_errors":1`) {
-		t.Fatalf("report API omitted TLS certificate error count: %s", reports.Body.String())
+		t.Fatalf("report API omitted Security error count: %s", reports.Body.String())
 	}
 	stylesheet := httptest.NewRecorder()
 	h.ServeHTTP(stylesheet, httptest.NewRequest("GET", "/static/style.css", nil))
 	if !strings.Contains(stylesheet.Body.String(), ".tls-error-label,.tls-timing-error") || !strings.Contains(stylesheet.Body.String(), "color:var(--red)!important") {
-		t.Fatal("TLS certificate error state is not styled red")
+		t.Fatal("Security error state is not styled red")
 	}
 
 	methodology := httptest.NewRecorder()

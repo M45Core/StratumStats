@@ -22,27 +22,27 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	h.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
 	body := w.Body.String()
 	for _, want := range []string{
-		"Bitcoin pool telemetry.",
-		"Block template latency",
+		"Bitcoin pool performance.",
+		"Median block delay",
 		"Free solo pools",
-		"Non-free solo pools",
-		"Unsafe solo pools",
-		"Pools offering PPLNS",
-		"Other non-solo pools",
+		"Paid solo pools",
+		"Unverified solo pools",
+		"PPLNS shared pools",
+		"Other shared pools",
 		"Bitcoin blocks observed",
 		"Pools with block data",
-		"Demo data — synthetic measurements shown for interface preview only.",
+		"Preview only — these numbers are examples, not live results.",
 		"https://github.com/proofofmike/stratumstats",
 		"/static/dashboard.js",
 		"data-sort-key=\"fee\"",
 		"data-sort-key=\"loss\"",
 		"Est. mining loss",
-		"jargon-hint",
-		"aria-label=\"Jump to pool area\"",
+		"Availability",
+		"aria-label=\"Jump to pool group\"",
 		"href=\"#free-solo-pools\"",
 		"href=\"#unsafe-solo-pools\"",
-		"/methodology#pplns",
-		"rolling 24-hour window",
+		"PPLNS shared pools",
+		"latest 24 hours",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
@@ -70,7 +70,7 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 
 	methodology := httptest.NewRecorder()
 	h.ServeHTTP(methodology, httptest.NewRequest("GET", "/methodology", nil))
-	for _, want := range []string{"Mining jargon glossary", "id=\"stratum\"", "id=\"pplns\"", "id=\"coinbase-payout\"", "Pay Per Last N Shares"} {
+	for _, want := range []string{"How the measurements work.", "id=\"block-template-latency\"", "id=\"pplns\"", "id=\"coinbase-payout\"", "Pay Per Last N Shares"} {
 		if !strings.Contains(methodology.Body.String(), want) {
 			t.Errorf("methodology glossary missing %q", want)
 		}
@@ -97,8 +97,8 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 
 	stylesheet := httptest.NewRecorder()
 	h.ServeHTTP(stylesheet, httptest.NewRequest("GET", "/static/style.css", nil))
-	if !strings.Contains(stylesheet.Body.String(), ".sort-button[data-sort-key=\"loss\"]{white-space:nowrap}") {
-		t.Fatal("estimated mining loss sort header is allowed to wrap")
+	if !strings.Contains(stylesheet.Body.String(), ".sort-button[data-sort-key=\"loss\"],.sort-button[data-sort-key=\"p95\"]{white-space:nowrap}") {
+		t.Fatal("estimated mining loss or P95 sort header is allowed to wrap")
 	}
 }
 

@@ -108,7 +108,7 @@ func TestDashboardRendersRegionalSelectionAndStatus(t *testing.T) {
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest("GET", "/?vantage=us-west", nil))
 	body := response.Body.String()
-	for _, expected := range []string{`aria-current="page">West`, "US West", "scheduled samples", "last seen"} {
+	for _, expected := range []string{`aria-current="page">West`, "US West", "last checked", "last checked"} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("dashboard missing %q", expected)
 		}

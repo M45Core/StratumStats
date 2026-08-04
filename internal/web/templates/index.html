@@ -1,56 +1,56 @@
-{{define "timing-compact"}}{{if .Attempts}}{{if .CertificateErrors}}<strong class="timing-cert-error" title="Certificate validation failed during {{.CertificateErrors}} TLS handshake attempt(s) in the rolling 24-hour window">CERT ERROR</strong><small>certificate validation failed · {{.Successes}}/{{.Attempts}} ok</small>{{else if .MedianMS}}<strong>{{printf "%.1f ms" (metric .MedianMS)}}</strong><small><a class="jargon-link" href="/methodology#p95" title="95th percentile over the rolling 24-hour window: 95% of successful samples were this fast or faster">P95</a> {{printf "%.1f" (metric .P95MS)}} · {{.Successes}}/{{.Attempts}} ok{{if .Timeouts}} · {{.Timeouts}} timeout{{end}}{{if .Errors}} · {{.Errors}} error{{end}}{{if .Rejected}} · {{.Rejected}} rejected{{end}}</small>{{else}}<strong>—</strong><small>0/{{.Attempts}} ok{{if .Unsupported}} · {{.Unsupported}} unsupported{{end}}{{if .Timeouts}} · {{.Timeouts}} timeout{{end}}{{if .Errors}} · {{.Errors}} error{{end}}{{if .Rejected}} · {{.Rejected}} rejected{{end}}</small>{{end}}{{else}}<strong>—</strong><small>no samples</small>{{end}}{{end}}
+{{define "timing-compact"}}{{if .Attempts}}{{if .CertificateErrors}}<strong class="timing-cert-error" title="The pool security certificate could not be verified">SECURITY ERROR</strong><small>{{.Successes}}/{{.Attempts}} worked</small>{{else if .MedianMS}}<strong>{{printf "%.1f ms" (metric .MedianMS)}}</strong><small>P95 {{printf "%.1f" (metric .P95MS)}} · {{.Successes}}/{{.Attempts}} worked{{if .Timeouts}} · {{.Timeouts}} timed out{{end}}{{if .Errors}} · {{.Errors}} failed{{end}}{{if .Rejected}} · {{.Rejected}} refused{{end}}</small>{{else}}<strong>—</strong><small>0/{{.Attempts}} worked{{if .Unsupported}} · {{.Unsupported}} not supported{{end}}{{if .Timeouts}} · {{.Timeouts}} timed out{{end}}{{if .Errors}} · {{.Errors}} failed{{end}}{{if .Rejected}} · {{.Rejected}} refused{{end}}</small>{{end}}{{else}}<strong>—</strong><small>no checks yet</small>{{end}}{{end}}
 {{define "pool-list"}}
 <div class="measurement-list">
   <div class="measurement-head">
-    <span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="pool" data-sort-type="text">Pool <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="ascending"><button type="button" class="sort-button" data-sort-key="median" data-sort-type="number"> <abbr class="jargon" title="Delay until a pool sends its first valid template for a new block, compared from the same vantage point, using only the rolling 24-hour window">Block template latency median</abbr> <b aria-hidden="true">↑</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="p95" data-sort-type="number"> <abbr class="jargon" title="95th percentile over the rolling 24-hour window: 95% of successful samples were this fast or faster">P95</abbr> <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="loss" data-sort-type="number"><abbr class="jargon" title="Rolling-24-hour median template delay as a percentage of Bitcoin’s 10-minute target interval; incremental relative to the fastest observed pool">Est. mining loss</abbr> <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="availability" data-sort-type="number"> <abbr class="jargon" title="Valid template deliveries divided by eligible block samples">Availability</abbr> <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="connection" data-sort-type="number" title="Sort by TCP median"> <abbr class="jargon" title="Time to establish the network connection during the rolling 24-hour window; sorting uses the TCP median">Connection</abbr> <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="setup" data-sort-type="number" title="Sort by Subscribe median"> <abbr class="jargon" title="Time for mining.subscribe and mining.authorize during the rolling 24-hour window; sorting uses Subscribe median">Stratum setup</abbr> <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="fee" data-sort-type="number"> <abbr class="jargon" title="Solo: observed effective fee from worker-matched coinbase outputs. Non-solo: operator-advertised fee from the pool registry; sorting uses the first listed percentage">Pool fee</abbr> <b aria-hidden="true">↕</b></button></span>
+    <span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="pool" data-sort-type="text">Pool <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="ascending"><button type="button" class="sort-button" data-sort-key="median" data-sort-type="number" title="Median delay until a pool sends valid work for a new block. Lower is better.">Median block delay <b aria-hidden="true">↑</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="p95" data-sort-type="number" title="95% of measured block updates arrived within this delay. Lower is better.">P95 <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="loss" data-sort-type="number" title="Estimated stale mining time caused by the median relative delay. This is not measured revenue loss.">Est. mining loss <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="availability" data-sort-type="number" title="Valid block-template deliveries divided by eligible block observations. Higher is better.">Availability <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="connection" data-sort-type="number" title="TCP and secure TLS connection timings.">Connection <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="setup" data-sort-type="number" title="Stratum subscribe and worker authorization timings.">Stratum setup <b aria-hidden="true">↕</b></button></span><span role="columnheader" aria-sort="none"><button type="button" class="sort-button" data-sort-key="fee" data-sort-type="number" title="Observed effective fee for solo pools; operator-published fee for shared pools.">Pool fee <b aria-hidden="true">↕</b></button></span>
   </div>
   {{range $r := .}}
   <article class="measurement-row" data-pool-id="{{.PoolID}}" data-sort-pool="{{.PoolName}}" data-sort-median="{{if .MedianMS}}{{printf "%.6f" (metric .MedianMS)}}{{end}}" data-sort-p95="{{if .P95MS}}{{printf "%.6f" (metric .P95MS)}}{{end}}" data-sort-loss="{{if .EstimatedMiningLossPct}}{{printf "%.6f" (metric .EstimatedMiningLossPct)}}{{end}}" data-sort-availability="{{printf "%.6f" .Availability}}" data-sort-connection="{{if .ConnectTiming.MedianMS}}{{printf "%.6f" (metric .ConnectTiming.MedianMS)}}{{end}}" data-sort-setup="{{if .SubscribeTiming.MedianMS}}{{printf "%.6f" (metric .SubscribeTiming.MedianMS)}}{{end}}" data-sort-fee="{{if .FeeSortValue}}{{printf "%.6f" (metric .FeeSortValue)}}{{end}}">
     <div class="measurement-pool">
       <strong><a href="/pools#{{.PoolID}}">{{.PoolName}}</a><a class="pool-info-link" href="/pools#{{.PoolID}}" aria-label="More information about {{.PoolName}}" title="Click for more information"><span aria-hidden="true">i</span></a></strong>
-      <small>{{.Category}}{{if .TLSTiming.CertificateErrors}} · <span class="tls-error-label" title="Certificate validation failed during at least one TLS handshake in the rolling 24-hour window">TLS certificate error</span>{{else if .TLSTiming.Errors}} · <span class="tls-error-label" title="At least one TLS handshake failed in the rolling 24-hour window">TLS error</span>{{else if .TLSObserved}} · TLS{{end}}</small>
-      <button type="button" class="details-toggle" aria-expanded="false" aria-controls="payout-history-{{.PoolID}}" aria-label="Show payout and history for {{.PoolName}}" title="Show payout details and recent history"><span>Payout &amp; history</span><span class="details-plus" aria-hidden="true">+</span></button>
+      <small>{{if .IsSolo}}Solo{{else}}Shared{{end}}{{if .TLSTiming.CertificateErrors}} · <span class="tls-error-label" title="The pool security certificate could not be verified">Security error</span>{{else if .TLSTiming.Errors}} · <span class="tls-error-label" title="A secure connection failed">Secure connection failed</span>{{else if .TLSObserved}} · Secure connection{{end}}</small>
+      <button type="button" class="details-toggle" aria-expanded="false" aria-controls="payout-history-{{.PoolID}}" aria-label="Show details for {{.PoolName}}" title="Show payment and recent performance details"><span>More details</span><span class="details-plus" aria-hidden="true">+</span></button>
     </div>
     <div class="template-median">
       {{if $r.MedianMS}}<strong>{{printf "%.1f ms" (metric $r.MedianMS)}}</strong><div class="median-bar-track" aria-hidden="true"><span class="median-bar {{$r.LatencyClass}}"></span></div>{{else}}<strong>—</strong><div class="median-bar-track" aria-hidden="true"></div>{{end}}
     </div>
     <div class="p95-value">{{if $r.P95MS}}<strong>{{printf "%.1f ms" (metric $r.P95MS)}}</strong>{{else}}<strong>—</strong>{{end}}</div>
-    <div class="mining-loss-compact">{{if .EstimatedMiningLossPct}}<strong>{{printf "%.4f%%" (metric .EstimatedMiningLossPct)}}</strong><small>from median delay</small>{{else}}<strong>—</strong><small>not measured</small>{{end}}</div>
-    <div class="availability-compact"><strong>{{printf "%.1f%%" $r.Availability}}</strong><progress max="100" value="{{$r.Availability}}">{{$r.Availability}}%</progress><small>{{$r.Arrivals}}/{{$r.Blocks}} eligible samples</small></div>
-    <div class="stacked-stat"><span><a class="jargon-link" href="/methodology#tcp" title="The basic network connection to the pool">TCP</a> {{template "timing-compact" $r.ConnectTiming}}</span><span class="{{if or $r.TLSTiming.Errors $r.TLSTiming.Timeouts}}tls-timing-error{{end}}"><a class="jargon-link" href="/methodology#tls" title="Encryption and certificate identity checking layered over TCP">TLS</a> {{template "timing-compact" $r.TLSTiming}}</span></div>
-    <div class="stacked-stat"><span><a class="jargon-link" href="/methodology#subscribe" title="Starts a Stratum mining session">Sub</a> {{template "timing-compact" $r.SubscribeTiming}}</span><span><a class="jargon-link" href="/methodology#authorize" title="Submits the worker identity for pool acceptance">Auth</a> {{template "timing-compact" $r.AuthorizeTiming}}</span></div>
-    <div class="fee-compact">{{if .IsSolo}}{{if .LatestPoolFeePct}}<strong>{{printf "%.2f%%" (metric .LatestPoolFeePct)}}</strong>{{if .PoolFeeChanged}}<small class="fee-changed">changed {{printf "%.2f" (metric .PreviousPoolFeePct)}} → {{printf "%.2f%%" (metric .LatestPoolFeePct)}}</small><small>{{.PoolFeeChanges}} change(s) · {{.PoolFeeSamples}} samples{{if .UnsafeReason}}*{{end}}</small>{{else if gt .PoolFeeSamples 1}}<small>stable · {{.PoolFeeSamples}} samples</small>{{else}}<small>1 sample · no history</small>{{end}}{{else}}<strong>—</strong><small>{{if .UnsafeReason}}cannot infer{{else}}not measured{{end}}</small>{{end}}{{else if .AdvertisedFee}}<strong>{{.AdvertisedFee}}</strong><small>advertised{{if .FeeCheckedAt}} · checked {{.FeeCheckedAt}}{{end}}</small>{{else}}<strong>—</strong><small>advertised fee not confirmed</small>{{end}}</div>
+    <div class="mining-loss-compact">{{if .EstimatedMiningLossPct}}<strong>{{printf "%.4f%%" (metric .EstimatedMiningLossPct)}}</strong><small>estimated</small>{{else}}<strong>—</strong><small>not measured</small>{{end}}</div>
+    <div class="availability-compact"><strong>{{printf "%.1f%%" $r.Availability}}</strong><progress max="100" value="{{$r.Availability}}">{{$r.Availability}}%</progress><small>{{$r.Arrivals}} of {{$r.Blocks}} checks</small></div>
+    <div class="stacked-stat"><span><a class="jargon-link" href="/methodology#tcp" title="Basic network connection to the pool">TCP</a> {{template "timing-compact" $r.ConnectTiming}}</span><span class="{{if or $r.TLSTiming.Errors $r.TLSTiming.Timeouts}}tls-timing-error{{end}}"><a class="jargon-link" href="/methodology#tls" title="Encrypted connection and certificate check">TLS</a> {{template "timing-compact" $r.TLSTiming}}</span></div>
+    <div class="stacked-stat"><span><a class="jargon-link" href="/methodology#subscribe" title="Starts a Stratum mining session">Subscribe</a> {{template "timing-compact" $r.SubscribeTiming}}</span><span><a class="jargon-link" href="/methodology#authorize" title="Pool accepts the worker identity">Authorize</a> {{template "timing-compact" $r.AuthorizeTiming}}</span></div>
+    <div class="fee-compact">{{if .IsSolo}}{{if .LatestPoolFeePct}}<strong>{{printf "%.2f%%" (metric .LatestPoolFeePct)}}</strong>{{if .PoolFeeChanged}}<small class="fee-changed">changed {{printf "%.2f" (metric .PreviousPoolFeePct)}} → {{printf "%.2f%%" (metric .LatestPoolFeePct)}}</small><small>{{.PoolFeeChanges}} change(s) · {{.PoolFeeSamples}} checks{{if .UnsafeReason}}*{{end}}</small>{{else if gt .PoolFeeSamples 1}}<small>stable · {{.PoolFeeSamples}} checks</small>{{else}}<small>1 check</small>{{end}}{{else}}<strong>—</strong><small>{{if .UnsafeReason}}not available{{else}}not measured{{end}}</small>{{end}}{{else if .AdvertisedFee}}<strong>{{.AdvertisedFee}}</strong><small>published{{if .FeeCheckedAt}} · checked {{.FeeCheckedAt}}{{end}}</small>{{else}}<strong>—</strong><small>published fee not found</small>{{end}}</div>
     <div id="payout-history-{{.PoolID}}" class="measurement-details" hidden>
       <div class="details-grid">
-        <section class="payout-details" aria-label="{{if .IsSolo}}Latest decoded coinbase payout{{else}}Latest decoded pool coinbase{{end}}">
+        <section class="payout-details" aria-label="Latest coinbase payout">
           <div class="detail-heading">
-            <div><p>{{if .IsSolo}}Latest decoded coinbase payout{{else}}Latest decoded pool coinbase{{end}}</p>{{if $r.LatestCoinbaseTotalSats}}<h3>{{btc $r.LatestCoinbaseTotalSats}}</h3>{{else}}<h3>Destination split not captured</h3>{{end}}</div>
-            <div class="detail-meta">{{if $r.LatestCoinbaseObservedAt}}<time datetime="{{$r.LatestCoinbaseObservedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{historyTime ($r.LatestCoinbaseObservedAt)}}</time>{{end}}<span>{{$r.LatestCoinbaseOutputCount}} transaction outputs</span><span>{{$r.CoinbaseSamples}} decoded coinbase samples</span></div>
+            <div><p>Latest coinbase payout</p>{{if $r.LatestCoinbaseTotalSats}}<h3>{{btc $r.LatestCoinbaseTotalSats}}</h3>{{else}}<h3>Payment details not available</h3>{{end}}</div>
+            <div class="detail-meta">{{if $r.LatestCoinbaseObservedAt}}<time datetime="{{$r.LatestCoinbaseObservedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{historyTime ($r.LatestCoinbaseObservedAt)}}</time>{{end}}<span>{{$r.LatestCoinbaseOutputCount}} payments</span><span>{{$r.CoinbaseSamples}} block checks</span></div>
           </div>
           {{if $r.LatestPayoutDestinations}}
           <ol class="payout-destinations">
             {{range $r.LatestPayoutDestinations}}
             <li class="non-worker-destination">
-              <div class="payout-destination-head"><span><a class="jargon-link" href="/methodology#non-worker-destination" title="A coinbase output that did not match this probe worker script; it does not prove ownership">Non-worker destination</a></span><strong>{{payoutPct .Percentage}}</strong></div>
-              {{if .Address}}<a class="wallet-explorer-link" href="https://mempool.space/address/{{.Address}}" target="_blank" rel="noopener noreferrer" aria-label="View {{.Address}} on mempool.space" title="View this public Bitcoin address on mempool.space"><code title="{{.ScriptType}} · scriptPubKey {{.ScriptPubKey}}{{if .ScriptPubKeyTruncated}} (retained prefix){{end}}">{{.Address}}</code><span aria-hidden="true">↗</span></a>{{else}}<code title="scriptPubKey {{.ScriptPubKey}}{{if .ScriptPubKeyTruncated}} (retained prefix){{end}}">{{.ScriptType}} · {{shortScript .ScriptPubKey}}{{if .ScriptPubKeyTruncated}}…{{end}}</code>{{end}}
-              <div class="payout-amount"><span>{{btc .ValueSats}}</span><progress max="100" value="{{printf "%.4f" .Percentage}}" title="{{payoutPct .Percentage}} of decoded coinbase value">{{payoutPct .Percentage}}</progress></div>
+              <div class="payout-destination-head"><span><a class="jargon-link" href="/methodology#non-worker-destination" title="A coinbase output not sent to the probe worker; it does not prove ownership">Non-worker destination</a></span><strong>{{payoutPct .Percentage}}</strong></div>
+              {{if .Address}}<a class="wallet-explorer-link" href="https://mempool.space/address/{{.Address}}" target="_blank" rel="noopener noreferrer" aria-label="View {{.Address}} on mempool.space" title="View this public Bitcoin address on mempool.space"><code title="{{.ScriptType}}">{{.Address}}</code><span aria-hidden="true">↗</span></a>{{else}}<code title="Raw coinbase output script">{{.ScriptType}} · {{shortScript .ScriptPubKey}}{{if .ScriptPubKeyTruncated}}…{{end}}</code>{{end}}
+              <div class="payout-amount"><span>{{btc .ValueSats}}</span><progress max="100" value="{{printf "%.4f" .Percentage}}" title="{{payoutPct .Percentage}} of the block payment">{{payoutPct .Percentage}}</progress></div>
             </li>
             {{end}}
           </ol>
-          {{if $r.LatestPayoutDestinationsTruncated}}<p class="retention-note">Showing {{len $r.LatestPayoutDestinations}} retained destinations; {{btc .LatestPayoutOmittedSats}} ({{payoutPct (payoutShare .LatestPayoutOmittedSats .LatestCoinbaseTotalSats)}}) across smaller destinations is aggregated outside the list.</p>{{end}}
-          <p class="evidence-note">The matched worker destination is intentionally omitted from this page and all public APIs. “Non-worker destination” means the output did not match this probe’s generated worker script. It does not identify who controls the address, and can include pool fees, donations, commitments, or payout splits.{{if not .IsSolo}} For this non-solo pool, these are block coinbase destinations—not its later payouts to miners.{{end}}</p>
+          {{if $r.LatestPayoutDestinationsTruncated}}<p class="retention-note">Showing {{len $r.LatestPayoutDestinations}} retained destinations; {{btc .LatestPayoutOmittedSats}} across smaller destinations is combined.</p>{{end}}
+          <p class="evidence-note">The test miner address is kept private. Other payments may include pool fees, donations, or payment splits; they do not prove who owns an address.{{if not .IsSolo}} These are payments from the block itself, not later payments to miners.{{end}}</p>
           {{else}}
-          {{if and .IsSolo $r.LatestCoinbaseTotalSats}}<p class="details-empty">The matched worker destination is private and omitted. No non-worker destination was retained from this observation.</p>{{else if .IsSolo}}<p class="details-empty">Destination percentages will appear after this pool produces a new output-aware observation. Existing latency and fee-change history remains available.</p>{{else}}<p class="details-empty">Coinbase destinations will appear after a new output-aware observation. They describe the pool’s block transaction, not its later payouts to miners.</p>{{end}}
+          {{if and .IsSolo $r.LatestCoinbaseTotalSats}}<p class="details-empty">The test miner address is private. No other payment was recorded.</p>{{else if .IsSolo}}<p class="details-empty">Payment details will appear after a new block is checked.</p>{{else}}<p class="details-empty">Block payment details will appear after a new block is checked. These are not later payments to miners.</p>{{end}}
           {{end}}
         </section>
-        <section class="history-details" aria-label="Recent metric history">
+        <section class="history-details" aria-label="Recent performance">
           <div class="history-block">
-            <div class="history-heading"><div><p>Recent history</p><h3>Template latency</h3></div><span>last 24h · {{len $r.TemplateLatencyHistory}} samples</span></div>
+            <div class="history-heading"><div><p>Recent history</p><h3>Block-template latency</h3></div><span>last 24 hours · {{len $r.TemplateLatencyHistory}} checks</span></div>
             {{if $r.TemplateLatencyHistory}}
             <div class="latency-chart-shell">
               <svg class="latency-line-chart" viewBox="0 0 640 204" role="img" aria-labelledby="latency-chart-title-{{.PoolID}} latency-chart-desc-{{.PoolID}}">
-                <title id="latency-chart-title-{{.PoolID}}">Recent template latency for {{.PoolName}}</title>
-                <desc id="latency-chart-desc-{{.PoolID}}">Line graph of {{len .LatencyChart.Points}} relative template-latency samples from the rolling 24-hour window. Lower values are faster.</desc>
+                <title id="latency-chart-title-{{.PoolID}}">Recent block-template latency for {{.PoolName}}</title>
+                <desc id="latency-chart-desc-{{.PoolID}}">Line graph of {{len .LatencyChart.Points}} block-template latency samples from the last 24 hours. Lower is better.</desc>
                 <g class="latency-chart-grid" aria-hidden="true">
                   <line x1="56" y1="18" x2="624" y2="18"></line><line x1="56" y1="58" x2="624" y2="58"></line><line x1="56" y1="98" x2="624" y2="98"></line><line x1="56" y1="138" x2="624" y2="138"></line><line x1="56" y1="178" x2="624" y2="178"></line>
                   <text x="49" y="24" text-anchor="end">{{printf "%.0f" .LatencyChart.MaxValue}} ms</text><text x="49" y="104" text-anchor="end">{{printf "%.0f" .LatencyChart.MidValue}} ms</text><text x="49" y="184" text-anchor="end">0 ms</text>
@@ -66,8 +66,8 @@
             <ol class="visually-hidden latency-chart-data">
               {{range .TemplateLatencyHistory}}<li>{{.ObservedAt.Format "02 Jan 2006 15:04:05 UTC"}}: {{printf "%.1f ms" .Value}}</li>{{end}}
             </ol>
-            <p>Relative first-template delay during the rolling 24-hour window; lower is faster. Hover or focus a point for its exact value.</p>
-            {{else}}<p class="details-empty">No template deliveries in the last 24 hours.</p>{{end}}
+            <p>Relative delay until the first valid template arrives; lower is better.</p>
+            {{else}}<p class="details-empty">No template deliveries recorded in the last 24 hours.</p>{{end}}
           </div>
           {{if .IsSolo}}
           <div class="history-block">
@@ -78,13 +78,13 @@
               <li><time datetime="{{.ObservedAt.Format "2006-01-02T15:04:05Z07:00"}}" title="{{.ObservedAt.Format "02 Jan 2006 15:04:05 UTC"}}">{{historyTime .ObservedAt}}</time><span class="fee-change-values"><span>{{printf "%.2f%%" .Previous}}</span><span class="fee-change-arrow" aria-hidden="true">→</span><strong>{{printf "%.2f%%" .Value}}</strong></span></li>
               {{end}}
             </ol>
-            <p>Only transitions at the displayed 0.01% precision are listed; unchanged observations are omitted. Values are inferred from the worker-matched share of decoded coinbase value.</p>
-            {{else if $r.PoolFeeHistory}}<p class="details-empty">No effective-fee changes in the recent worker-matched samples.</p>{{else}}<p class="details-empty">No worker-matched fee history.</p>{{end}}
+            <p>Only fee changes are shown.</p>
+            {{else if $r.PoolFeeHistory}}<p class="details-empty">No recent fee changes.</p>{{else}}<p class="details-empty">No fee history yet.</p>{{end}}
           </div>
           {{else}}
           <div class="history-block advertised-fee-block">
-            <div class="history-heading"><div><p>Pool terms</p><h3>Advertised fee</h3></div>{{if .FeeCheckedAt}}<span>checked {{.FeeCheckedAt}}</span>{{end}}</div>
-            {{if .AdvertisedFee}}<strong class="advertised-fee-value">{{.AdvertisedFee}}</strong><p>Operator-advertised product terms from the pool registry. A share pool’s miner fee cannot be inferred from its block coinbase because participant balances and payouts are handled separately.</p>{{else}}<p class="details-empty">Advertised fee not confirmed in the pool registry.</p>{{end}}
+            <div class="history-heading"><div><p>Pool terms</p><h3>Published fee</h3></div>{{if .FeeCheckedAt}}<span>checked {{.FeeCheckedAt}}</span>{{end}}</div>
+            {{if .AdvertisedFee}}<strong class="advertised-fee-value">{{.AdvertisedFee}}</strong><p>Fee published by the pool. Shared-pool fees cannot be measured from a block payment.</p>{{else}}<p class="details-empty">Published fee not found.</p>{{end}}
           </div>
           {{end}}
         </section>
@@ -101,8 +101,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>StratumStats — Bitcoin pool telemetry</title>
-  <meta name="description" content="Detailed block-template latency and Stratum measurements for Bitcoin mining pools.">
+  <title>StratumStats — Compare Bitcoin mining pools</title>
+  <meta name="description" content="Clear, independent speed, reliability, and fee checks for Bitcoin mining pools.">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -113,7 +113,7 @@
 <aside class="donation-banner" aria-label="Support StratumStats">
   <div class="donation-copy">
     <strong>This site is run by donations.</strong>
-    <span>Help keep independent Bitcoin pool telemetry online.</span>
+    <span>Help keep independent pool checks online.</span>
   </div>
   <a class="donation-link" href="bitcoin:3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL?label=StratumStats%20donation" aria-label="Donate Bitcoin to StratumStats">
     <span class="donation-symbol" aria-hidden="true">₿</span>
@@ -123,12 +123,11 @@
 </aside>
 <main>
   <section class="hero dashboard-hero compact-hero">
-    <div><h1>Bitcoin pool telemetry.</h1><p class="lede">Block-template delivery first, with supporting <a class="jargon-link" href="/methodology#stratum" title="The protocol miners use to receive work from pools">Stratum</a> and <a class="jargon-link" href="/methodology#coinbase-payout" title="Outputs in the special transaction that creates each block reward">coinbase</a> measurements on the same line.</p></div>
+    <div><h1>Bitcoin pool performance.</h1><p class="lede">Compare block-template delivery, availability, Stratum connection timings, and pool fees.</p></div>
   </section>
-  <p class="jargon-hint"><a href="/methodology#glossary">Underlined terms</a> explain mining jargon; hover for a quick definition.</p>
-  {{if .Demo}}<div class="notice dashboard-notice compact-notice">Demo data — synthetic measurements shown for interface preview only.</div>{{end}}
+  {{if .Demo}}<div class="notice dashboard-notice compact-notice">Preview only — these numbers are examples, not live results.</div>{{end}}
 
-  {{if not .Demo}}<section class="vantage-bar" aria-label="Regional measurement vantage">
+  {{if not .Demo}}<section class="vantage-bar" aria-label="Measurement region">
     <div class="vantage-selector">
       <a href="/" {{if eq .SelectedVantage ""}}aria-current="page"{{end}}>All data</a>
       <a href="/?vantage=us-all" {{if eq .SelectedVantage "us-all"}}aria-current="page"{{end}}>US combined</a>
@@ -136,47 +135,47 @@
       <a href="/?vantage=us-central" {{if eq .SelectedVantage "us-central"}}aria-current="page"{{end}}>Central</a>
       <a href="/?vantage=us-east" {{if eq .SelectedVantage "us-east"}}aria-current="page"{{end}}>East</a>
     </div>
-    <p><strong>{{.SelectedLabel}}</strong>{{with .VantageStatus}} · scheduled samples{{if .LastObservationAt}} · last seen {{.LastObservationAt.Format "02 Jan 15:04 UTC"}}{{end}}{{if .Stale}} · <span class="vantage-stale">stale</span>{{end}}{{else}} · combined measurements{{end}}</p>
+    <p><strong>{{.SelectedLabel}}</strong>{{with .VantageStatus}}{{if .LastObservationAt}} · last checked {{.LastObservationAt.Format "02 Jan 15:04 UTC"}}{{end}}{{if .Stale}} · <span class="vantage-stale">out of date</span>{{end}}{{else}} · all regions{{end}}</p>
   </section>{{end}}
 
   <section class="summary-stats compact-summary" aria-label="Measurement summary" data-live-summary>
     <article><span>Pools monitored</span><strong>{{.PoolCount}}</strong></article>
     <article><span>Bitcoin blocks observed</span><strong>{{.BlocksObserved}}</strong></article>
     <article><span>Pools with block data</span><strong>{{.PoolsWithBlockData}}</strong></article>
-    <article class="summary-unsafe"><span>Unsafe pools</span><strong>{{.UnsafeCount}}</strong></article>
+    <article class="summary-unsafe"><span>Needs verification</span><strong>{{.UnsafeCount}}</strong></article>
   </section>
 
-  <nav class="section-jump" aria-label="Jump to pool area"><span>Jump to</span><a href="#free-solo-pools">Free solo</a><a href="#non-free-solo-pools">Non-free solo</a><a href="#pplns-share-pools">Offers PPLNS</a><a href="#other-non-solo-pools">Other non-solo</a><a href="#unsafe-solo-pools">Unsafe solo</a></nav>
+  <nav class="section-jump" aria-label="Jump to pool group"><span>Jump to</span><a href="#free-solo-pools">Free solo</a><a href="#non-free-solo-pools">Paid solo</a><a href="#pplns-share-pools">PPLNS shared</a><a href="#other-non-solo-pools">Other shared</a><a href="#unsafe-solo-pools">Unverified solo</a></nav>
 
   <section id="free-solo-pools" class="pool-section compact-section free-section" data-pool-section="free">
-    <div class="section-head list-section-head"><div><p class="eyebrow free-eyebrow">Solo · verified worker output · latest observed fee 0.00%</p><h2>Free solo pools</h2></div><p>Verified 0.00% effective fee · fastest median first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow free-eyebrow">Solo mining · measured fee is 0.00%</p><h2>Free solo pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="free-pools-list">{{template "pool-list" .FreePools}}</div>
   </section>
 
   <section id="non-free-solo-pools" class="pool-section compact-section" data-pool-section="normal">
-    <div class="section-head list-section-head"><div><p class="eyebrow">Solo · verified worker output</p><h2>Non-free solo pools</h2></div><p>Fee above 0.00% or not yet measured · fastest median first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow">Solo mining · fee applies or is not known yet</p><h2>Paid solo pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="normal-pools-list">{{template "pool-list" .NormalPools}}</div>
   </section>
 
   <section id="pplns-share-pools" class="pool-section compact-section category-section pplns-section" data-pool-section="pplns">
-    <div class="section-head list-section-head"><div><p class="eyebrow pplns-eyebrow">Non-solo · offers <a class="jargon-link" href="/methodology#pplns" title="Pay Per Last N Shares: rewards are based on recent contributed work">PPLNS</a></p><h2>Pools offering PPLNS</h2></div><p>Dedicated or multi-mode · fastest median first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow pplns-eyebrow">Shared mining · rewards based on recent work</p><h2>PPLNS shared pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="pplns-pools-list">{{template "pool-list" .PPLNSPools}}</div>
   </section>
 
   <section id="other-non-solo-pools" class="pool-section compact-section category-section other-section" data-pool-section="other">
-    <div class="section-head list-section-head"><div><p class="eyebrow other-eyebrow">Non-solo · no PPLNS product listed</p><h2>Other non-solo pools</h2></div><p>Fastest median first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow other-eyebrow">Other shared reward methods</p><h2>Other shared pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="other-pools-list">{{template "pool-list" .OtherPools}}</div>
   </section>
 
   <section id="unsafe-solo-pools" class="pool-section compact-section unsafe-section" data-pool-section="unsafe">
-    <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Solo · worker wallet not confirmed in <a class="jargon-link" href="/methodology#coinbase-payout" title="Outputs in the special transaction that creates each block reward">coinbase payout</a></p><h2>Unsafe solo pools</h2></div><p>Same measurements · fastest median first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Solo mining · payout address not verified yet</p><h2>Unverified solo pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="unsafe-pools-list">{{template "pool-list" .UnsafePools}}</div>
   </section>
 
-  <p class="dashboard-footnote" data-live-footnote>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · {{.SelectedLabel}} · Method {{.Snapshot.Methodology}} · Latency median, P95, history, and protocol timings use the rolling {{.Snapshot.LatencyWindowHours}} hours ending at this update. Median bars use a fixed 0–4+ second scale. Availability is observed deliveries ÷ eligible block samples and remains cumulative{{if .SelectedVantage}} during scheduled connected windows{{end}}. Estimated mining loss is incremental stale-work time: median relative delay ÷ 600 seconds × 100. It is a proxy, not measured revenue loss. * Solo fee inference requires matched coinbase outputs. Non-solo fees are advertised terms.</p>
+  <p class="dashboard-footnote" data-live-footnote>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · {{.SelectedLabel}}. Median, P95, history, and Stratum timings use the latest {{.Snapshot.LatencyWindowHours}} hours. Availability uses all eligible block observations. Estimated mining loss is median relative delay ÷ 600 seconds; it is not measured revenue loss. Solo fees require a matched coinbase payout; shared-pool fees are operator-published terms.</p>
   <p class="visually-hidden" role="status" aria-live="polite" data-live-status></p>
 </main>
-<footer><span>StratumStats</span><span>Raw measurements, kept separate.</span></footer>
+<footer><span>StratumStats</span><span>Independent Bitcoin pool checks.</span></footer>
 <script defer src="/static/dashboard.js"></script>
 </body>
 </html>{{end}}

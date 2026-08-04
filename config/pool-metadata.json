@@ -23,7 +23,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo-mining product with regional endpoints; a finder receives the block reward less the advertised pool fee.",
+      "description": "Bitcoin solo pool with connection addresses in several regions; a finder receives the block reward less the advertised pool fee.",
       "products": [
         "SOLO"
       ],
@@ -112,7 +112,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool with FPPS and PPLNS reward modes.",
+      "description": "Shared Bitcoin pool that requires an account with fixed-pay and recent-work reward options.",
       "products": [
         "FPPS",
         "PPLNS"
@@ -167,7 +167,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo-mining service whose documented jobs place the finding miner address in a coinbase output.",
+      "description": "Bitcoin solo pool where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -227,7 +227,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool using FPPS with balances tracked in Binance accounts before withdrawal.",
+      "description": "Shared Bitcoin pool that requires an account using fixed payments with balances tracked in Binance accounts before withdrawal.",
       "products": [
         "FPPS"
       ],
@@ -281,7 +281,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo-mining pool oriented toward home-mining devices.",
+      "description": "Bitcoin solo pool for home miners.",
       "products": [
         "SOLO"
       ],
@@ -324,7 +324,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Zero-fee solo product measured separately from Blitzpool PPLNS. Group-Solo and Blockparty are address-selected services on overlapping ports and are documented but not mislabeled as independently measured rows.",
+      "description": "Solo pool with no fee. Its shared pool is listed separately.",
       "products": [
         "SOLO"
       ],
@@ -384,7 +384,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool using FPPS; earnings are credited to an account before payout.",
+      "description": "Shared Bitcoin pool that requires an account using fixed payments; earnings are credited to an account before payout.",
       "products": [
         "FPPS"
       ],
@@ -439,7 +439,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Anonymous Bitcoin solo-mining product whose documented jobs place the miner address in a coinbase output.",
+      "description": "Bitcoin solo pool with no account required where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -495,7 +495,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Anonymous not-for-profit Bitcoin solo-mining service whose documented jobs place the worker address in a coinbase output.",
+      "description": "Community-run Bitcoin solo pool where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -542,7 +542,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool with selectable FPPS and PPLNS products and merged-mining rewards.",
+      "description": "Shared Bitcoin pool that requires an account with fixed-pay and recent-work options and extra rewards from related coins.",
       "products": [
         "FPPS",
         "PPLNS"
@@ -715,7 +715,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "German community Bitcoin solo pool based on ckpool-solo whose documented jobs place the worker address in a coinbase output.",
+      "description": "German community solo pool where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -753,7 +753,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Regional multi-chain solo-pool operator; this record covers its Bitcoin product.",
+      "description": "Solo pool operating in several regions and supporting several coins. Results here are for Bitcoin.",
       "products": [
         "SOLO"
       ],
@@ -846,7 +846,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based pool offering shared three-day PPLNS and selectable solo modes on the same infrastructure.",
+      "description": "Pool that requires an account, with recent-work shared rewards and solo options.",
       "products": [
         "PPLNS",
         "SOLO"
@@ -973,7 +973,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Registration-free Bitcoin solo product on dedicated port 3332 across six regions. LetsMine also operates a separately measurable PROP product on port 3432.",
+      "description": "Solo pool with no account required and connections in six regions. Its shared pool is listed separately.",
       "products": [
         "SOLO"
       ],
@@ -1066,7 +1066,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Registration-free proportional Bitcoin pool on dedicated port 3432 across six regions; rewards are split by contributed work when the PROP round finds a block.",
+      "description": "Shared pool with no account required and connections in six regions. Rewards are based on contributed work.",
       "products": [
         "PROP"
       ],
@@ -1155,7 +1155,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Zero-fee Bitcoin solo pool with a separate TinyMiner lane for very low-hashrate devices; the retired EU service is excluded.",
+      "description": "Bitcoin solo pool with no fee and a separate option for low-power devices.",
       "products": [
         "SOLO",
         "TinyMiner SOLO"
@@ -1225,7 +1225,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "European Bitcoin solo pool whose documented jobs place the finder address in a coinbase output, with an ancillary store-points program.",
+      "description": "European solo pool where verified block payments include the miner address. It also offers store rewards.",
       "products": [
         "SOLO"
       ],
@@ -1294,7 +1294,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Community-run Bitcoin solo pool whose documented jobs place the worker address in a coinbase output.",
+      "description": "Community-run Bitcoin solo pool where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -1341,7 +1341,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Shared TIDES pool with optional miner-selected block templates through DATUM.",
+      "description": "Shared pool that lets miners choose their own block contents.",
       "products": [
         "TIDES"
       ],
@@ -1379,7 +1379,7 @@
       "status": "inactive",
       "auth_model": "local_node",
       "probe_status": "no_central_endpoint",
-      "description": "Original decentralized PPLNS-style Bitcoin sharechain; effectively dormant for production Bitcoin and retained as a historical reference.",
+      "description": "Original decentralized Bitcoin mining network; not currently active for regular Bitcoin mining and kept for reference.",
       "products": [
         "PPLNS sharechain"
       ],
@@ -1409,7 +1409,7 @@
       "status": "active",
       "auth_model": "wallet_or_lightning",
       "probe_status": "compatible",
-      "description": "Finder-bonus shared-round pool that pays a fixed finder award and distributes the remaining reward among round contributors.",
+      "description": "Shared pool that gives a bonus to the miner who finds a block and splits the rest among contributors.",
       "products": [
         "finder bonus",
         "shared round"
@@ -1448,7 +1448,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Open-source zero-fee solo product on dedicated Stratum endpoints; measured separately from Public Pool PPLNS.",
+      "description": "Open-source solo pool with no fee. Its shared pool is listed separately.",
       "products": [
         "SOLO"
       ],
@@ -1495,7 +1495,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo-mining pool whose documented jobs place the finder address in a coinbase output.",
+      "description": "Bitcoin solo pool where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -1569,7 +1569,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool supporting PPLNS and FPPS with earnings credited before payout.",
+      "description": "Shared Bitcoin pool that requires an account with recent-work and fixed-pay reward options with earnings credited before payout.",
       "products": [
         "PPLNS",
         "FPPS"
@@ -1642,7 +1642,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Bitcoin solo pool whose documented jobs place the finder address in a coinbase output.",
+      "description": "Bitcoin solo pool where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -1684,7 +1684,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Wallet-authenticated multi-coin SHA-256 solo-pool operator; this record covers Bitcoin.",
+      "description": "Requires a Bitcoin address to connect to this solo-pool operator for several coins; this record covers Bitcoin.",
       "products": [
         "SOLO"
       ],
@@ -1807,7 +1807,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Multi-region Bitcoin solo product with low- and high-difficulty lanes; regional registry rows are consolidated here.",
+      "description": "Multi-region Bitcoin solo product with options for small and large miners; regional locations are grouped here.",
       "products": [
         "SOLO"
       ],
@@ -1900,7 +1900,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Open-source Bitcoin solo-mining pool whose documented jobs place the worker address in a coinbase output.",
+      "description": "Open-source Bitcoin solo pool where verified block payments include the miner address.",
       "products": [
         "SOLO"
       ],
@@ -1949,7 +1949,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Solo product selected by the collectors Stratum password x; Prop and Solo Split modes are not measured by this entry.",
+      "description": "Solo service. Its proportional and split-solo services are not included in these results.",
       "products": [
         "SOLO"
       ],
@@ -2022,7 +2022,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Multi-region wallet-authenticated Bitcoin solo pool with low-, medium-, and high-difficulty lanes; unrelated to SoloPool.Com.",
+      "description": "Solo pool with connections in several regions and options for small, medium, and large miners. A Bitcoin address is required.",
       "products": [
         "SOLO"
       ],
@@ -2118,7 +2118,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based shared Bitcoin pool offering PPLNS and FPPS with daily account settlement.",
+      "description": "Shared Bitcoin pool that requires an account with recent-work and fixed-pay reward options with daily account settlement.",
       "products": [
         "PPLNS",
         "FPPS"
@@ -2232,7 +2232,7 @@
       "status": "active",
       "auth_model": "account",
       "probe_status": "requires_credentials",
-      "description": "Account-based multi-mode Bitcoin pool offering PPS+, PPLNS, and SOLO settlement.",
+      "description": "Bitcoin pool that requires an account with fixed-pay, recent-work, and solo options.",
       "products": [
         "PPS+",
         "PPLNS",
@@ -2364,7 +2364,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Open-source zero-fee PPLNS product on dedicated Stratum endpoints; measured separately from Public Pool Solo.",
+      "description": "Open-source shared pool with no fee. Its solo pool is listed separately.",
       "products": [
         "PPLNS"
       ],
@@ -2411,7 +2411,7 @@
       "status": "active",
       "auth_model": "wallet",
       "probe_status": "compatible",
-      "description": "Non-custodial PPLNS product on dedicated Stratum endpoints; measured separately from Blitzpool Solo.",
+      "description": "Shared pool that pays miners directly. Its solo pool is listed separately.",
       "products": [
         "PPLNS"
       ],

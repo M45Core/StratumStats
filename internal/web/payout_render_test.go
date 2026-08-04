@@ -40,10 +40,10 @@ func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
 	body := page.Body.String()
 	for _, want := range []string{
 		"Free solo pools",
-		"Non-free solo pools",
-		"Unsafe solo pools",
-		"Pools offering PPLNS",
-		"Other non-solo pools",
+		"Paid solo pools",
+		"Unverified solo pools",
+		"PPLNS shared pools",
+		"Other shared pools",
 		"Free Pool",
 		"Present Pool",
 		"Slower Pool",
@@ -57,7 +57,7 @@ func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
 		"0.75%",
 		"0.0042%",
 		"changed 0.50 → 0.75%",
-		"1 change(s) · 2 samples",
+		"1 change(s) · 2 checks",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard missing %q", want)
@@ -68,14 +68,14 @@ func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
 			t.Errorf("dashboard contains old label %q", unwanted)
 		}
 	}
-	freeSectionAt, normalAt, unsafeAt := strings.Index(body, "<h2>Free solo pools</h2>"), strings.Index(body, "<h2>Non-free solo pools</h2>"), strings.Index(body, "<h2>Unsafe solo pools</h2>")
+	freeSectionAt, normalAt, unsafeAt := strings.Index(body, "<h2>Free solo pools</h2>"), strings.Index(body, "<h2>Paid solo pools</h2>"), strings.Index(body, "<h2>Unverified solo pools</h2>")
 	freePoolAt := strings.Index(body, "Free Pool")
 	presentAt, slowerAt := strings.Index(body, "Present Pool"), strings.Index(body, "Slower Pool")
 	absentAt := strings.Index(body, "Absent Pool")
 	if freeSectionAt < 0 || normalAt < 0 || unsafeAt < 0 || !(freeSectionAt < freePoolAt && freePoolAt < normalAt && normalAt < presentAt && presentAt < slowerAt && slowerAt < unsafeAt && unsafeAt < absentAt) {
 		t.Fatalf("pools were not grouped by verification and sorted by template latency")
 	}
-	pplnsSectionAt, otherSectionAt := strings.Index(body, "<h2>Pools offering PPLNS</h2>"), strings.Index(body, "<h2>Other non-solo pools</h2>")
+	pplnsSectionAt, otherSectionAt := strings.Index(body, "<h2>PPLNS shared pools</h2>"), strings.Index(body, "<h2>Other shared pools</h2>")
 	pplnsPoolAt, otherPoolAt := strings.Index(body, "PPLNS Pool"), strings.Index(body, "Other Pool")
 	if !(pplnsSectionAt < pplnsPoolAt && pplnsPoolAt < otherSectionAt && otherSectionAt < otherPoolAt && otherPoolAt < unsafeAt) {
 		t.Fatalf("non-solo pools were not separated into PPLNS and Other sections")
@@ -121,10 +121,10 @@ func TestDashboardLabelsNonSoloFeesAsAdvertised(t *testing.T) {
 	for _, want := range []string{
 		`data-sort-fee="1.000000"`,
 		"<strong>PPLNS 1%</strong>",
-		"advertised · checked 2026-08-04",
-		"Latest decoded pool coinbase",
-		"<h3>Advertised fee</h3>",
-		"cannot be inferred from its block coinbase",
+		"published · checked 2026-08-04",
+		"Latest coinbase payout",
+		"<h3>Published fee</h3>",
+		"Shared-pool fees cannot be measured from a block payment",
 	} {
 		if !strings.Contains(advertisedRow, want) {
 			t.Errorf("advertised non-solo row missing %q", want)
@@ -137,8 +137,8 @@ func TestDashboardLabelsNonSoloFeesAsAdvertised(t *testing.T) {
 	}
 
 	unconfirmedRow := renderedPoolRow(t, body, "unconfirmed")
-	if !strings.Contains(unconfirmedRow, "advertised fee not confirmed") {
-		t.Fatal("non-solo row without sourced terms does not say advertised fee not confirmed")
+	if !strings.Contains(unconfirmedRow, "published fee not found") {
+		t.Fatal("non-solo row without sourced terms does not say published fee not found")
 	}
 	if strings.Contains(unconfirmedRow, "not measured") {
 		t.Fatal("non-solo row still describes its pool fee as not measured")
@@ -196,13 +196,13 @@ func TestDashboardRendersExpandablePayoutAndMetricHistory(t *testing.T) {
 	for _, want := range []string{
 		"measurement-pool",
 		"measurement-details",
-		"Payout &amp; history",
+		"More details",
 		"details-toggle",
-		"Show payout details and recent history",
+		"Show payment and recent performance details",
 		"aria-controls=\"payout-history-detail\"",
-		"Latest decoded coinbase payout",
-		"Non-worker destination",
-		"matched worker destination is intentionally omitted",
+		"Latest coinbase payout",
+		"Other payment",
+		"test miner address is kept private",
 		"/methodology#non-worker-destination",
 		"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
 		"wallet-explorer-link",
@@ -210,17 +210,17 @@ func TestDashboardRendersExpandablePayoutAndMetricHistory(t *testing.T) {
 		"rel=\"noopener noreferrer\"",
 		"View this public Bitcoin address on mempool.space",
 		"1.25%",
-		"Template latency",
+		"Block-template latency",
 		"latency-line-chart",
 		"latency-chart-line",
-		"Recent template latency for Detail Pool",
+		"Recent block-template latency for Detail Pool",
 		"points=\"56.0,98.0 624.0,18.0\"",
-		"lower is faster",
+		"lower is better",
 		"tabindex=\"0\"",
 		"Observed effective fee",
 		"fee-change-list",
 		"1.00%",
-		"Only transitions at the displayed 0.01% precision are listed",
+		"Only fee changes are shown",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("expanded dashboard missing %q", want)
@@ -235,7 +235,7 @@ func TestDashboardRendersExpandablePayoutAndMetricHistory(t *testing.T) {
 		t.Fatalf("wallet explorer links=%d, want one public non-worker address", links)
 	}
 
-	latencyAt := strings.Index(body, "<h3>Template latency</h3>")
+	latencyAt := strings.Index(body, "<h3>Block-template latency</h3>")
 	feeAt := strings.Index(body, "<h3>Observed effective fee</h3>")
 	if latencyAt < 0 || feeAt <= latencyAt {
 		t.Fatal("latency or fee history section not found")
