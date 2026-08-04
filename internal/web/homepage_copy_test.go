@@ -81,13 +81,18 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	if script.Code != 200 {
 		t.Fatalf("dashboard updater status=%d", script.Code)
 	}
-	for _, want := range []string{"fetch(window.location.pathname + window.location.search", "data-pool-id", "row-updated", "sortStates", "applySort"} {
+	for _, want := range []string{"fetch(window.location.pathname + window.location.search", "data-pool-id", "row-updated", "sortStates", "applySort", "placeRows", "captureViewport", "restoreViewport"} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("dashboard updater missing %q", want)
 		}
 	}
 	if strings.Contains(script.Body.String(), "location.reload") {
 		t.Fatal("dashboard updater performs a full page reload")
+	}
+	for _, unwanted := range []string{"rows.forEach((row) => list.append(row))", "if (footnote && nextFootnote) footnote.innerHTML"} {
+		if strings.Contains(script.Body.String(), unwanted) {
+			t.Errorf("dashboard updater still contains scroll-disrupting refresh logic %q", unwanted)
+		}
 	}
 
 	stylesheet := httptest.NewRecorder()

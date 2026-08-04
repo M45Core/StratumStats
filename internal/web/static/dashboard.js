@@ -5,6 +5,42 @@
   let refreshing = false;
   const sortStates = new Map();
 
+  function placeRows(list, rows) {
+    let previous = list.querySelector(".measurement-head");
+    for (const row of rows) {
+      const expected = previous ? previous.nextElementSibling : list.firstElementChild;
+      if (row !== expected) list.insertBefore(row, expected);
+      previous = row;
+    }
+  }
+
+  function captureViewport() {
+    const focusedRow = document.activeElement?.closest?.(".measurement-row");
+    const visibleRow = [...document.querySelectorAll(".measurement-row")].find((row) => {
+      const bounds = row.getBoundingClientRect();
+      return bounds.bottom > 0 && bounds.top < window.innerHeight;
+    });
+    const fallback = [...document.querySelectorAll("[data-live-footnote], footer, .pool-section")].find((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.bottom > 0 && bounds.top < window.innerHeight;
+    });
+    const anchor = focusedRow?.isConnected ? focusedRow : (visibleRow || fallback);
+    return {
+      anchor,
+      anchorTop: anchor?.getBoundingClientRect().top,
+      scrollY: window.scrollY,
+    };
+  }
+
+  function restoreViewport(viewport) {
+    if (viewport.anchor?.isConnected) {
+      const shift = viewport.anchor.getBoundingClientRect().top - viewport.anchorTop;
+      if (Math.abs(shift) > 0.5) window.scrollBy(0, shift);
+      return;
+    }
+    if (window.scrollY !== viewport.scrollY) window.scrollTo(window.scrollX, viewport.scrollY);
+  }
+
   function applySort(wrapper, key, type, direction) {
     const list = wrapper.querySelector(".measurement-list");
     if (!list) return;
@@ -26,7 +62,7 @@
       }
       return direction === "ascending" ? comparison : -comparison;
     });
-    rows.forEach((row) => list.append(row));
+    placeRows(list, rows);
     sortStates.set(wrapper.id, { key, type, direction });
     list.querySelectorAll(".sort-button").forEach((button) => {
       const active = button.dataset.sortKey === key;
@@ -112,29 +148,40 @@
     list.querySelectorAll(".measurement-row[data-pool-id]").forEach((row) => {
       if (!wanted.has(row.dataset.poolId)) row.remove();
     });
-    list.querySelector(".empty")?.remove();
+    const currentEmpty = list.querySelector(".empty");
+    if (nextRows.length > 0) currentEmpty?.remove();
 
+    const orderedRows = [];
+    const changedRows = [];
     for (const nextRow of nextRows) {
       const poolID = nextRow.dataset.poolId;
       let row = existing.get(poolID);
       const detailsOpen = row && row.querySelector(".details-toggle")?.getAttribute("aria-expanded") === "true";
       const changed = !row || rowChanged(row, nextRow);
       if (!row) row = nextRow.cloneNode(true);
+      row.getAttributeNames().filter((name) => name.startsWith("data-sort-") && !nextRow.hasAttribute(name)).forEach((name) => row.removeAttribute(name));
       nextRow.getAttributeNames().filter((name) => name.startsWith("data-sort-")).forEach((name) => row.setAttribute(name, nextRow.getAttribute(name)));
       if (changed && row.isConnected) {
         row.innerHTML = nextRow.innerHTML;
         setDetailsState(row, detailsOpen);
       }
-      list.append(row);
+      orderedRows.push(row);
       if (changed) {
         updatedPools.push(row.querySelector(".measurement-pool strong")?.textContent.trim() || poolID);
-        flash(row);
+        changedRows.push(row);
       }
     }
 
+    placeRows(list, orderedRows);
+    changedRows.forEach(flash);
+
     if (nextRows.length === 0) {
-      const empty = nextList.querySelector(".empty");
-      if (empty) list.append(empty.cloneNode(true));
+      const nextEmpty = nextList.querySelector(".empty");
+      if (!currentEmpty && nextEmpty) {
+        list.append(nextEmpty.cloneNode(true));
+      } else if (currentEmpty && nextEmpty && currentEmpty.innerHTML !== nextEmpty.innerHTML) {
+        currentEmpty.innerHTML = nextEmpty.innerHTML;
+      }
     }
 
     const sortState = sortStates.get(id);
@@ -152,21 +199,32 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const nextDocument = new DOMParser().parseFromString(await response.text(), "text/html");
       const updatedPools = [];
+      const viewport = captureViewport();
+      const root = document.documentElement;
+      const previousOverflowAnchor = root.style.overflowAnchor;
+      root.style.overflowAnchor = "none";
 
-      syncList("free-pools-list", nextDocument, updatedPools);
-      syncList("normal-pools-list", nextDocument, updatedPools);
-      syncList("unsafe-pools-list", nextDocument, updatedPools);
-      syncList("pplns-pools-list", nextDocument, updatedPools);
-      syncList("other-pools-list", nextDocument, updatedPools);
+      try {
+        syncList("free-pools-list", nextDocument, updatedPools);
+        syncList("normal-pools-list", nextDocument, updatedPools);
+        syncList("unsafe-pools-list", nextDocument, updatedPools);
+        syncList("pplns-pools-list", nextDocument, updatedPools);
+        syncList("other-pools-list", nextDocument, updatedPools);
 
-      const summary = document.querySelector("[data-live-summary]");
-      const nextSummary = nextDocument.querySelector("[data-live-summary]");
-      if (summary && nextSummary && summary.innerHTML !== nextSummary.innerHTML) {
-        summary.innerHTML = nextSummary.innerHTML;
+        const summary = document.querySelector("[data-live-summary]");
+        const nextSummary = nextDocument.querySelector("[data-live-summary]");
+        if (summary && nextSummary && summary.innerHTML !== nextSummary.innerHTML) {
+          summary.innerHTML = nextSummary.innerHTML;
+        }
+        const footnote = document.querySelector("[data-live-footnote]");
+        const nextFootnote = nextDocument.querySelector("[data-live-footnote]");
+        if (footnote && nextFootnote && footnote.innerHTML !== nextFootnote.innerHTML) {
+          footnote.innerHTML = nextFootnote.innerHTML;
+        }
+      } finally {
+        restoreViewport(viewport);
+        root.style.overflowAnchor = previousOverflowAnchor;
       }
-      const footnote = document.querySelector("[data-live-footnote]");
-      const nextFootnote = nextDocument.querySelector("[data-live-footnote]");
-      if (footnote && nextFootnote) footnote.innerHTML = nextFootnote.innerHTML;
 
       if (updatedPools.length > 0) {
         const status = document.querySelector("[data-live-status]");
