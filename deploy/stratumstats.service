@@ -1,0 +1,22 @@
+[Unit]
+Description=StratumStats collector and dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stratumstats
+Group=stratumstats
+WorkingDirectory=/opt/stratumstats
+EnvironmentFile=/etc/stratumstats.env
+ExecStart=/opt/stratumstats/stratumstats serve -addr 127.0.0.1:8080 -config /opt/stratumstats/config/pools.json -data /var/lib/stratumstats/observations.jsonl
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/stratumstats
+
+[Install]
+WantedBy=multi-user.target

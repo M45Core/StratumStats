@@ -77,6 +77,222 @@ go build -o stratumstats .
 ./stratumstats collect -vantage us-west
 ```
 
+## Production deployment at stratumstats.m45core.com
+
+The production layout uses Nginx for public HTTP and HTTPS, with StratumStats
+listening only on `127.0.0.1:8080`. The standalone StratumScout Fly app sends
+authenticated observation batches to this origin. Fly never connects directly
+to port 8080.
+
+### 1. Configure DNS
+
+Create an `A` record for `stratumstats.m45core.com` pointing to the public IP of
+the StratumStats server. If it is hosted on the same server as `m45core.com`,
+the record is currently:
+
+```text
+Type:  A
+Host:  stratumstats
+Value: 64.20.34.46
+TTL:   Automatic
+```
+
+Verify the record before requesting a certificate:
+
+```bash
+dig +short stratumstats.m45core.com A
+```
+
+### Automated setup
+
+The repository includes reviewable systemd and Nginx templates under
+`deploy/`. On a systemd-based Debian or Ubuntu server with Go, Nginx, Certbot,
+and the Certbot Nginx plugin installed, the complete setup is:
+
+```bash
+# Build without changing the system.
+./scripts/build-production.sh
+
+# Install the binary, pool configuration, service account, persistent data
+# path, first-run HMAC credentials, and systemd unit. Existing data and
+# credentials are preserved on later runs.
+sudo ./scripts/install-production.sh --binary .dist/stratumstats
+
+# Install and enable the HTTP reverse proxy. Use --certbot only after DNS points
+# to this server.
+sudo ./scripts/setup-nginx.sh --certbot
+```
+
+The installer never prints the generated ingest secret. Copy the values from
+`/etc/stratumstats.env` into Fly's secret store after installation. The scripts
+support `--help`; the Nginx setup refuses to replace a differing existing site
+unless `--force` is given, and makes a timestamped backup when forced.
+
+The remaining sections document the same setup manually so every installed
+file and command can be reviewed.
+
+### 2. Install the service
+
+The examples below use `/opt/stratumstats` for the checked-out application and
+`/var/lib/stratumstats` for persistent observations. Keep the data directory on
+backed-up storage; Fly probes have no volumes and the server JSONL is the
+canonical record.
+
+Build the binary and prepare the data path:
+
+```bash
+cd /opt/stratumstats
+go build -trimpath -o stratumstats .
+
+getent group stratumstats >/dev/null || sudo groupadd --system stratumstats
+id -u stratumstats >/dev/null 2>&1 || \
+  sudo useradd --system --home-dir /var/lib/stratumstats \
+    --gid stratumstats --shell /usr/sbin/nologin stratumstats
+sudo install -d -o stratumstats -g stratumstats -m 0750 /var/lib/stratumstats
+sudo touch /var/lib/stratumstats/observations.jsonl
+sudo chown stratumstats:stratumstats /var/lib/stratumstats/observations.jsonl
+sudo chmod 0640 /var/lib/stratumstats/observations.jsonl
+```
+
+Create a shared HMAC secret. The hex output is safe to place in an environment
+file and must be copied exactly into the StratumScout Fly secrets later:
+
+```bash
+openssl rand -hex 32
+```
+
+Create `/etc/stratumstats.env`, readable only by root:
+
+```text
+STRATUMSTATS_INGEST_KEY_ID=regional-2026-01
+STRATUMSTATS_INGEST_SECRET=replace-with-the-generated-secret
+```
+
+```bash
+sudo chown root:root /etc/stratumstats.env
+sudo chmod 0600 /etc/stratumstats.env
+```
+
+Create `/etc/systemd/system/stratumstats.service`:
+
+```ini
+[Unit]
+Description=StratumStats collector and dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stratumstats
+Group=stratumstats
+WorkingDirectory=/opt/stratumstats
+EnvironmentFile=/etc/stratumstats.env
+ExecStart=/opt/stratumstats/stratumstats serve -addr 127.0.0.1:8080 -config /opt/stratumstats/config/pools.json -data /var/lib/stratumstats/observations.jsonl
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/stratumstats
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable it and confirm that it is reachable only through loopback:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now stratumstats
+sudo systemctl status stratumstats
+curl http://127.0.0.1:8080/healthz
+sudo journalctl -u stratumstats -n 100 --no-pager
+```
+
+The startup log should say `authenticated regional-probe ingestion enabled`
+without printing the key or secret.
+
+### 3. Configure Nginx and HTTPS
+
+Create `/etc/nginx/sites-available/stratumstats.m45core.com`:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name stratumstats.m45core.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        client_max_body_size 256k;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 30s;
+    }
+}
+```
+
+Enable the site, validate Nginx, and obtain the certificate:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/stratumstats.m45core.com \
+  /etc/nginx/sites-enabled/stratumstats.m45core.com
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot --nginx -d stratumstats.m45core.com
+```
+
+Certbot should add the TLS listener and redirect plain HTTP to HTTPS. Keep port
+8080 blocked from the public network; only ports 80 and 443 need to reach Nginx.
+
+Verify the public collector boundary:
+
+```bash
+curl --fail https://stratumstats.m45core.com/healthz
+curl --fail https://stratumstats.m45core.com/api/v1/probe-config
+```
+
+The first response must be `ok`. The configuration response must contain only
+intended compatible endpoints and a `config_revision` beginning with
+`sha256:`.
+
+### 4. Connect StratumScout on Fly.io
+
+StratumScout is a separate repository and Fly app. Its `fly.toml` sets:
+
+```toml
+[env]
+  COLLECTOR_URL = "https://stratumstats.m45core.com"
+  RUN_FOR = "5m"
+```
+
+Set the same key ID and secret used by the server without placing the secret in
+Git:
+
+```bash
+fly secrets set --app YOUR_SCOUT_APP \
+  INGEST_KEY_ID=regional-2026-01 \
+  INGEST_SECRET=replace-with-the-generated-secret
+```
+
+Do not create billable Fly Machines until Gate 0 of the
+[`regional probe rollout runbook`](docs/regional-probe-rollout.md) is complete.
+The first deployment is one 256 MiB shared-CPU Machine in `lax`, with the native
+`hourly` schedule, restart policy `no`, and no service, public IP, volume,
+standby, or autoscaler. Run that private canary for at least 48 hours before
+adding exactly one Machine in `dfw` and one in `iad`.
+
+After the canary starts, use the checks and completion record in the rollout
+runbook to validate uploads, termination, deduplication, data growth, and cost
+before publishing regional measurements.
+
 ## Managed Bitcoin Core (optional)
 
 The node helper installs Bitcoin Core 31.1 inside this workspace without `sudo`
