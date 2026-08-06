@@ -59,12 +59,11 @@ The dashboard checks for new measurements every 10 seconds without reloading
 the page. Changed pool rows briefly flash, and rows are moved or re-sorted when
 their verification state or block-template latency changes.
 
-A low-cost, standalone Fly.io probe for sampled US West, Central, and East
-measurements is implemented in the separate StratumScout repository and specified
-in [`docs/regional-probe-design.md`](docs/regional-probe-design.md). Its live Fly
-canary has not yet started, so it is not yet an active data source.
-Deployment gates, canary checks, promotion, and rollback are tracked in the
-[`regional probe rollout runbook`](docs/regional-probe-rollout.md).
+Regional measurements are supplied by the separate StratumScout probe. This
+repository runs the collector and dashboard; it does not deploy anything to
+Fly.io. The authenticated collector contract, probe architecture, and Fly
+operations are maintained in the
+[StratumScout repository](https://github.com/Distortions81/StratumScout).
 
 Configuration is in `config/pools.json`. The collector never submits shares.
 Current records use observation schema version 8 with retry-safe IDs, source
@@ -80,9 +79,8 @@ go build -o stratumstats .
 ## Production deployment at stratumstats.m45core.com
 
 The production layout uses Nginx for public HTTP and HTTPS, with StratumStats
-listening only on `127.0.0.1:8080`. The standalone StratumScout Fly app sends
-authenticated observation batches to this origin. Fly never connects directly
-to port 8080.
+listening only on `127.0.0.1:8080`. Authenticated remote probes send observation
+batches through Nginx; port 8080 is never exposed publicly.
 
 ### 1. Configure DNS
 
@@ -124,9 +122,10 @@ sudo ./scripts/setup-nginx.sh --certbot
 ```
 
 The installer never prints the generated ingest secret. Copy the values from
-`/etc/stratumstats.env` into Fly's secret store after installation. The scripts
-support `--help`; the Nginx setup refuses to replace a differing existing site
-unless `--force` is given, and makes a timestamped backup when forced.
+`/etc/stratumstats.env` into the remote probe's secret configuration after
+installation. The scripts support `--help`; the Nginx setup refuses to replace
+a differing existing site unless `--force` is given, and makes a timestamped
+backup when forced.
 
 The remaining sections document the same setup manually so every installed
 file and command can be reviewed.
@@ -135,8 +134,7 @@ file and command can be reviewed.
 
 The examples below use `/opt/stratumstats` for the checked-out application and
 `/var/lib/stratumstats` for persistent observations. Keep the data directory on
-backed-up storage; Fly probes have no volumes and the server JSONL is the
-canonical record.
+backed-up storage; the server JSONL is the canonical record.
 
 Build the binary and prepare the data path:
 
@@ -155,7 +153,7 @@ sudo chmod 0640 /var/lib/stratumstats/observations.jsonl
 ```
 
 Create a shared HMAC secret. The hex output is safe to place in an environment
-file and must be copied exactly into the StratumScout Fly secrets later:
+file and must be copied exactly into the remote probe's secret configuration:
 
 ```bash
 openssl rand -hex 32
@@ -262,36 +260,6 @@ curl --fail https://stratumstats.m45core.com/api/v1/probe-config
 The first response must be `ok`. The configuration response must contain only
 intended compatible endpoints and a `config_revision` beginning with
 `sha256:`.
-
-### 4. Connect StratumScout on Fly.io
-
-StratumScout is a separate repository and Fly app. Its `fly.toml` sets:
-
-```toml
-[env]
-  COLLECTOR_URL = "https://stratumstats.m45core.com"
-  RUN_FOR = "5m"
-```
-
-Set the same key ID and secret used by the server without placing the secret in
-Git:
-
-```bash
-fly secrets set --app YOUR_SCOUT_APP \
-  INGEST_KEY_ID=regional-2026-01 \
-  INGEST_SECRET=replace-with-the-generated-secret
-```
-
-Do not create billable Fly Machines until Gate 0 of the
-[`regional probe rollout runbook`](docs/regional-probe-rollout.md) is complete.
-The first deployment is one 256 MiB shared-CPU Machine in `lax`, with the native
-`hourly` schedule, restart policy `no`, and no service, public IP, volume,
-standby, or autoscaler. Run that private canary for at least 48 hours before
-adding exactly one Machine in `dfw` and one in `iad`.
-
-After the canary starts, use the checks and completion record in the rollout
-runbook to validate uploads, termination, deduplication, data growth, and cost
-before publishing regional measurements.
 
 ## Managed Bitcoin Core (optional)
 
@@ -521,5 +489,6 @@ endpoint sets, and deduplicates normalized host/port/TLS tuples.
 `STRATUMSTATS_INGEST_KEY_ID` and `STRATUMSTATS_INGEST_SECRET` are set for a
 non-demo server. The secret must contain at least 32 bytes. Requests use the
 versioned, gzip-compressed HMAC-SHA256 contract documented in
-[`docs/regional-probe-design.md`](docs/regional-probe-design.md); unauthenticated,
-stale, malformed, and partially invalid batches are rejected before append.
+[StratumScout's regional probe design](https://github.com/Distortions81/StratumScout/blob/main/docs/regional-probe-design.md);
+unauthenticated, stale, malformed, and partially invalid batches are rejected
+before append.
