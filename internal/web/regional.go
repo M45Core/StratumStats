@@ -13,13 +13,15 @@ import (
 const reportCacheTTL = 5 * time.Second
 
 var vantageLabels = map[string]string{
-	"us-all":     "All US regions",
+	"unknown":    "Local",
+	"us-all":     "US combined",
 	"us-west":    "US West",
 	"us-central": "US Central",
 	"us-east":    "US East",
+	"europe":     "Europe",
 }
 
-var vantageOrder = []string{"us-west", "us-central", "us-east"}
+var vantageOrder = []string{"us-west", "us-central", "us-east", "europe"}
 
 type snapshotCache struct {
 	mu           sync.Mutex
@@ -173,6 +175,24 @@ func selectedVantageStatus(statuses vantageStatusResponse, vantage string) *vant
 		}
 	}
 	return nil
+}
+
+func availableVantages(observations []model.Observation) map[string]bool {
+	available := make(map[string]bool, len(vantageOrder))
+	for _, observation := range observations {
+		if _, known := vantageLabels[observation.Vantage]; known {
+			available[observation.Vantage] = true
+		}
+	}
+	return available
+}
+
+func hideStaleRegionalVantages(available map[string]bool, statuses vantageStatusResponse) {
+	for _, status := range statuses.Vantages {
+		if status.Stale {
+			delete(available, status.ID)
+		}
+	}
 }
 
 type statusResponseWriter struct {

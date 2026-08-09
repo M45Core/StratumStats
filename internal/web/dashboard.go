@@ -15,6 +15,7 @@ type dashboardPool struct {
 	model.PoolReport
 	LatencyClass     string
 	UnsafeReason     string
+	WalletEvidence   string
 	AdvertisedFee    string
 	FeeCheckedAt     string
 	IsSolo           bool
@@ -52,9 +53,11 @@ type dashboardPage struct {
 	Demo               bool
 	FreePools          []dashboardPool
 	NormalPools        []dashboardPool
-	UnsafePools        []dashboardPool
+	MissingWalletPools []dashboardPool
+	PendingWalletPools []dashboardPool
 	PPLNSPools         []dashboardPool
 	OtherPools         []dashboardPool
+	NoRecentDataPools  []dashboardPool
 	PoolCount          int
 	BlocksObserved     int
 	PoolsWithBlockData int
@@ -62,6 +65,8 @@ type dashboardPage struct {
 	SelectedVantage    string
 	SelectedLabel      string
 	VantageStatus      *vantageStatus
+	AvailableVantages  map[string]bool
+	ShowUSCombined     bool
 }
 
 func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, selectedVantage string, status *vantageStatus) dashboardPage {
@@ -83,10 +88,6 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 		poolMetadata[pool.ID] = pool
 	}
 	for _, report := range snapshot.Reports {
-		if report.MedianMS == nil {
-			continue
-		}
-		page.PoolsWithBlockData++
 		metadata := poolMetadata[report.PoolID]
 		isSolo := report.Category == "solo"
 		feeSortValue := report.LatestPoolFeePct
@@ -99,6 +100,11 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			IsSolo: isSolo, FeeSortValue: feeSortValue,
 			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
 		}
+		if report.MedianMS == nil {
+			page.NoRecentDataPools = append(page.NoRecentDataPools, pool)
+			continue
+		}
+		page.PoolsWithBlockData++
 		if report.Category != "solo" {
 			if offersPPLNS(report.Products) {
 				page.PPLNSPools = append(page.PPLNSPools, pool)
@@ -112,16 +118,23 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			// Positive worker-address evidence is required for the solo lists.
 		case "not_observed":
 			pool.UnsafeReason = fmt.Sprintf("worker wallet not found in %d decoded coinbase payouts", report.CoinbaseSamples)
+			pool.WalletEvidence = "missing"
 		case "varied":
 			pool.UnsafeReason = fmt.Sprintf("worker wallet not found in some of %d decoded coinbase payouts", report.CoinbaseSamples)
+			pool.WalletEvidence = "missing"
 		default:
 			pool.UnsafeReason = "worker wallet payout not yet verified"
+			pool.WalletEvidence = "pending"
 		}
 		if pool.UnsafeReason != "" {
 			page.UnsafeCount++
 		}
 		if pool.UnsafeReason != "" {
-			page.UnsafePools = append(page.UnsafePools, pool)
+			if pool.WalletEvidence == "missing" {
+				page.MissingWalletPools = append(page.MissingWalletPools, pool)
+			} else {
+				page.PendingWalletPools = append(page.PendingWalletPools, pool)
+			}
 		} else if report.LatestPoolFeePct != nil && *report.LatestPoolFeePct == 0 {
 			page.FreePools = append(page.FreePools, pool)
 		} else {
@@ -130,9 +143,11 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 	}
 	sortByTemplateLatency(page.FreePools)
 	sortByTemplateLatency(page.NormalPools)
-	sortByTemplateLatency(page.UnsafePools)
+	sortByTemplateLatency(page.MissingWalletPools)
+	sortByTemplateLatency(page.PendingWalletPools)
 	sortByTemplateLatency(page.PPLNSPools)
 	sortByTemplateLatency(page.OtherPools)
+	sortByTemplateLatency(page.NoRecentDataPools)
 	return page
 }
 

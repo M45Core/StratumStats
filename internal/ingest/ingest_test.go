@@ -83,6 +83,23 @@ func TestReceiverAcceptsAuthenticatedBatchAndSetsProvenance(t *testing.T) {
 	}
 }
 
+func TestReceiverAcceptsGermanyProbe(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	var appended []model.Observation
+	receiver := Receiver{
+		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
+		Now:    func() time.Time { return now },
+		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
+	}
+	envelope := testEnvelope(now)
+	envelope.Region, envelope.Vantage = "fra", "europe"
+	response := httptest.NewRecorder()
+	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
+	if response.Code != http.StatusAccepted || len(appended) != 1 || appended[0].Vantage != "europe" {
+		t.Fatalf("status=%d observations=%+v", response.Code, appended)
+	}
+}
+
 func TestReceiverRejectsBadSignatureWithoutAppend(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	called := false

@@ -46,25 +46,39 @@ func (s Server) Handler() (http.Handler, error) {
 		return cache.snapshot(vantage, time.Now().UTC())
 	}
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		vantage := r.URL.Query().Get("vantage")
-		if !validVantage(vantage) {
-			http.Error(w, "unknown vantage", http.StatusBadRequest)
-			return
-		}
 		now := time.Now().UTC()
-		data, err := cache.snapshot(vantage, now)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
 		observations, err := cache.records(now)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		available := availableVantages(observations)
 		statuses := buildVantageStatuses(observations, now)
+		hideStaleRegionalVantages(available, statuses)
+		vantage := r.URL.Query().Get("vantage")
+		if vantage == "" && !s.Demo {
+			if available["us-west"] || available["us-central"] || available["us-east"] {
+				vantage = "us-all"
+			} else if available["unknown"] {
+				vantage = "unknown"
+			} else {
+				vantage = "us-all"
+			}
+		}
+		if !validVantage(vantage) {
+			http.Error(w, "unknown vantage", http.StatusBadRequest)
+			return
+		}
+		data, err := cache.snapshot(vantage, now)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		page := buildDashboardPage(data, s.Pools, s.Demo, vantage, selectedVantageStatus(statuses, vantage))
+		page.AvailableVantages = available
+		page.ShowUSCombined = available["us-west"] || available["us-central"] || available["us-east"]
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = t.ExecuteTemplate(w, "index.html", buildDashboardPage(data, s.Pools, s.Demo, vantage, selectedVantageStatus(statuses, vantage)))
+		_ = t.ExecuteTemplate(w, "index.html", page)
 	})
 	mux.HandleFunc("GET /pools", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

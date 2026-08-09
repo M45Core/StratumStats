@@ -12,7 +12,7 @@ import (
 func TestDashboardFormatsLatencyValues(t *testing.T) {
 	pool := model.Pool{ID: "measured", Name: "Measured Pool"}
 	observation := model.Observation{Version: 1, ObservedAt: time.Now(), Vantage: "test", BlockID: "sample", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 12.34}
-	h, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return []model.Observation{observation}, nil }}).Handler()
+	h, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return []model.Observation{observation}, nil }, Demo: true}).Handler()
 	if err != nil {
 		t.Fatal(err)
 	}

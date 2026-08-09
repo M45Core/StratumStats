@@ -59,11 +59,20 @@ The dashboard checks for new measurements every 10 seconds without reloading
 the page. Changed pool rows briefly flash, and rows are moved or re-sorted when
 their verification state or block-template latency changes.
 
+Local collection uses the default `unknown` vantage. When no regional probe has
+published US data, the dashboard shows those observations under the **Local**
+view rather than an empty US combined view.
+
 Regional measurements are supplied by the separate StratumScout probe. This
 repository runs the collector and dashboard; it does not deploy anything to
 Fly.io. The authenticated collector contract, probe architecture, and Fly
 operations are maintained in the
 [StratumScout repository](https://github.com/Distortions81/StratumScout).
+
+The dashboard combines its US view from Los Angeles, Dallas, and Ashburn
+probes. The Europe view is supplied by a Germany probe in Fly's Frankfurt
+region (`fra`); its public label remains the coarse `europe` vantage. Each
+regional view compares only observations from that same vantage.
 
 Configuration is in `config/pools.json`. The collector never submits shares.
 Current records use observation schema version 8 with retry-safe IDs, source
@@ -359,13 +368,12 @@ Late jobs cannot reopen a finalized block or create additional zero-latency
 baselines.
 
 The dashboard sorts each section by median block-template latency. Solo pools
-use three sections: Free solo pools, Non-free solo pools, and Unsafe solo pools. Free requires
+use five sections: Free solo pools, Non-free solo pools, Pools without recent latency data, Worker wallet not found, and Worker wallet verification pending. Free requires
 sampled coinbases to consistently contain the generated worker address and the
 latest observed effective pool fee to be 0.00%. Non-free has the same worker-output
-requirement but a nonzero or not-yet-measured fee. Absent, varied, and
-not-yet-verified worker output entries remain in Unsafe. Any non-solo product record whose researched product list includes PPLNS appears in Pools offering PPLNS, whether PPLNS is dedicated or one of several payout modes. Remaining non-solo pools appear in Other non-solo pools. JSON API reports retain deterministic
+requirement but a nonzero or not-yet-measured fee. Absent or varied worker-wallet entries are called out as not found; no-data entries remain pending verification. Any non-solo product record whose researched product list includes PPLNS appears in Pools offering PPLNS, whether PPLNS is dedicated or one of several payout modes. Remaining non-solo pools appear in Other non-solo pools. JSON API reports retain deterministic
 alphabetical ordering. Pools without an observed block-template latency sample
-are omitted from every dashboard section. Each displayed section can be sorted in either direction by any column; missing values remain last. Every pool row has an expandable Payout & history panel. Solo panels include destination percentages and recent latency line graph and timestamped observed-fee changes. Non-solo panels label decoded block coinbase destinations separately from later miner payouts and show advertised fee terms instead of an inapplicable measured-fee state.
+appear in Pools without recent latency data. Each displayed section can be sorted in either direction by any column; missing values remain last. Every pool row has an expandable Payout & history panel. Solo panels include destination percentages and recent latency line graph and timestamped observed-fee changes. Non-solo panels label decoded block coinbase destinations separately from later miner payouts and show advertised fee terms instead of an inapplicable measured-fee state.
 
 ## Protocol response timings
 
@@ -401,8 +409,8 @@ The probe reconstructs each structurally valid coinbase using its negotiated
 extranonces and checks for the exact generated worker address script. The main
 dashboard uses this evidence to determine list placement without spending a
 separate column on it. Normal requires the worker address in every decoded
-sample. Missing, varied, and no-data entries appear in Unsafe until positive
-evidence is available.
+sample. Missing and varied entries appear under Worker wallet not found; no-data
+entries appear under Worker wallet verification pending.
 
 These are output-presence observations, not pool types or judgments about
 payment correctness. A pool can account for earnings outside the coinbase
@@ -454,7 +462,7 @@ verification layer.
 ## Pool registry
 
 The generated `config/pools.json` is enriched by the manually researched
-`config/pool-metadata.json`. The current registry contains 36 distinct pool or
+`config/pool-metadata.json`. The current registry contains 27 distinct pool or
 product records after regional and duplicate aliases are consolidated.
 
 Context kept separate from telemetry includes:
@@ -484,6 +492,7 @@ endpoint sets, and deduplicates normalized host/port/TLS tuples.
 
 - `GET /api/v1/reports` — current pool reports and disclosures
 - `GET /api/v1/reports?vantage=us-west` — one scheduled regional view
+- `GET /api/v1/reports?vantage=europe` — the Germany probe's Europe view
 - `GET /api/v1/vantages` — regional sample counts and collector health
 - `GET /api/v1/probe-config` — minimal compatible endpoint configuration
 - `GET /api/v1/pools` — researched pool identity, type, status, terms, endpoints, and sources

@@ -9,7 +9,7 @@ import (
 	"github.com/proofofmike/stratumstats/internal/model"
 )
 
-func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
+func TestDashboardSeparatesMissingAndPendingWorkerWalletEvidence(t *testing.T) {
 	previousFee, fee, freeFee := 0.5, 0.75, 0.0
 	now := time.Now()
 	pools := []model.Pool{
@@ -30,7 +30,7 @@ func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
 		{Version: 1, ObservedAt: now, Vantage: "test", BlockID: "five", PoolID: "pplns", Eligible: true, Arrived: true, OffsetMS: 75},
 		{Version: 1, ObservedAt: now, Vantage: "test", BlockID: "six", PoolID: "other", Eligible: true, Arrived: true, OffsetMS: 100},
 	}
-	h, err := (Server{Pools: pools, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
+	h, err := (Server{Pools: pools, Load: func() ([]model.Observation, error) { return observations, nil }, Demo: true}).Handler()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,13 +41,16 @@ func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
 	for _, want := range []string{
 		"Free solo pools",
 		"Paid solo pools",
-		"Unverified solo pools",
+		"Worker wallet not found",
+		"Pools without recent latency data",
+		"worker wallet not found in 1 decoded coinbase payouts",
 		"PPLNS shared pools",
 		"Other shared pools",
 		"Free Pool",
 		"Present Pool",
 		"Slower Pool",
 		"Absent Pool",
+		"Unknown Pool",
 		"PPLNS Pool",
 		"Other Pool",
 		"Pool fee",
@@ -63,21 +66,22 @@ func TestDashboardSeparatesUnsafeCoinbaseObservations(t *testing.T) {
 			t.Errorf("dashboard missing %q", want)
 		}
 	}
-	for _, unwanted := range []string{"Unknown Pool", "Trust pool", "Direct coinbase", "Payout custody", "Worker address observed", "Worker address absent"} {
+	for _, unwanted := range []string{"Trust pool", "Direct coinbase", "Payout custody", "Worker address observed", "Worker address absent", "Worker wallet verification pending", "href=\"#pending-worker-wallet-pools\""} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("dashboard contains old label %q", unwanted)
 		}
 	}
-	freeSectionAt, normalAt, unsafeAt := strings.Index(body, "<h2>Free solo pools</h2>"), strings.Index(body, "<h2>Paid solo pools</h2>"), strings.Index(body, "<h2>Unverified solo pools</h2>")
+	freeSectionAt, normalAt, noDataAt, missingAt := strings.Index(body, "<h2>Free solo pools</h2>"), strings.Index(body, "<h2>Paid solo pools</h2>"), strings.Index(body, "<h2>Pools without recent latency data</h2>"), strings.Index(body, "<h2>Worker wallet not found</h2>")
 	freePoolAt := strings.Index(body, "Free Pool")
 	presentAt, slowerAt := strings.Index(body, "Present Pool"), strings.Index(body, "Slower Pool")
 	absentAt := strings.Index(body, "Absent Pool")
-	if freeSectionAt < 0 || normalAt < 0 || unsafeAt < 0 || !(freeSectionAt < freePoolAt && freePoolAt < normalAt && normalAt < presentAt && presentAt < slowerAt && slowerAt < unsafeAt && unsafeAt < absentAt) {
+	unknownAt := strings.Index(body, "Unknown Pool")
+	if freeSectionAt < 0 || normalAt < 0 || noDataAt < 0 || missingAt < 0 || !(freeSectionAt < freePoolAt && freePoolAt < normalAt && normalAt < presentAt && presentAt < slowerAt && slowerAt < noDataAt && noDataAt < unknownAt && unknownAt < missingAt && missingAt < absentAt) {
 		t.Fatalf("pools were not grouped by verification and sorted by template latency")
 	}
 	pplnsSectionAt, otherSectionAt := strings.Index(body, "<h2>PPLNS shared pools</h2>"), strings.Index(body, "<h2>Other shared pools</h2>")
 	pplnsPoolAt, otherPoolAt := strings.Index(body, "PPLNS Pool"), strings.Index(body, "Other Pool")
-	if !(pplnsSectionAt < pplnsPoolAt && pplnsPoolAt < otherSectionAt && otherSectionAt < otherPoolAt && otherPoolAt < unsafeAt) {
+	if !(pplnsSectionAt < pplnsPoolAt && pplnsPoolAt < otherSectionAt && otherSectionAt < otherPoolAt && otherPoolAt < noDataAt) {
 		t.Fatalf("non-solo pools were not separated into PPLNS and Other sections")
 	}
 
@@ -109,7 +113,7 @@ func TestDashboardLabelsNonSoloFeesAsAdvertised(t *testing.T) {
 		{Version: 1, ObservedAt: now, Vantage: "test", BlockID: "one", PoolID: "advertised", Eligible: true, Arrived: true, OffsetMS: 40},
 		{Version: 1, ObservedAt: now, Vantage: "test", BlockID: "two", PoolID: "unconfirmed", Eligible: true, Arrived: true, OffsetMS: 50},
 	}
-	handler, err := (Server{Pools: pools, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
+	handler, err := (Server{Pools: pools, Load: func() ([]model.Observation, error) { return observations, nil }, Demo: true}).Handler()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +189,7 @@ func TestDashboardRendersExpandablePayoutAndMetricHistory(t *testing.T) {
 			},
 		},
 	}
-	handler, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
+	handler, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return observations, nil }, Demo: true}).Handler()
 	if err != nil {
 		t.Fatal(err)
 	}

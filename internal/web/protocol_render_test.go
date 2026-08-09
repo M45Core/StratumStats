@@ -15,6 +15,7 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	duration := 12.5
 	h, err := (Server{
 		Pools: []model.Pool{{ID: "test", Name: "Test Pool"}},
+		Demo:  true,
 		Load: func() ([]model.Observation, error) {
 			return []model.Observation{
 				{Version: model.ObservationVersion, ObservedAt: observedAt, Vantage: "test", BlockID: "block", PoolID: "test", Eligible: true, Arrived: true, OffsetMS: 42.5},

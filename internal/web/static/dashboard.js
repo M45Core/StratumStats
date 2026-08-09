@@ -207,9 +207,11 @@
       try {
         syncList("free-pools-list", nextDocument, updatedPools);
         syncList("normal-pools-list", nextDocument, updatedPools);
-        syncList("unsafe-pools-list", nextDocument, updatedPools);
+        syncList("missing-wallet-pools-list", nextDocument, updatedPools);
+        syncList("pending-wallet-pools-list", nextDocument, updatedPools);
         syncList("pplns-pools-list", nextDocument, updatedPools);
         syncList("other-pools-list", nextDocument, updatedPools);
+        syncList("no-recent-data-pools-list", nextDocument, updatedPools);
 
         const summary = document.querySelector("[data-live-summary]");
         const nextSummary = nextDocument.querySelector("[data-live-summary]");
