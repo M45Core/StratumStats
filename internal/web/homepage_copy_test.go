@@ -32,7 +32,6 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 		"Bitcoin blocks observed",
 		"Pools with block data",
 		"Preview only — these numbers are examples, not live results.",
-		"https://github.com/proofofmike/stratumstats",
 		"/static/dashboard.js",
 		"data-sort-key=\"fee\"",
 		"data-sort-key=\"loss\"",
@@ -49,6 +48,8 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 		}
 	}
 	for _, unwanted := range []string{
+		"/api/v1/",
+		"https://github.com/proofofmike/stratumstats",
 		"Independent pool telemetry",
 		"Fair by construction",
 		"No composite score",
@@ -73,6 +74,11 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	for _, want := range []string{"How the measurements work.", "id=\"block-template-latency\"", "id=\"pplns\"", "id=\"coinbase-payout\"", "Pay Per Last N Shares"} {
 		if !strings.Contains(methodology.Body.String(), want) {
 			t.Errorf("methodology glossary missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{"fresh Bitcoin address", "worker name", "miner agent", "probe IP", "rotation behavior"} {
+		if strings.Contains(methodology.Body.String(), unwanted) {
+			t.Errorf("methodology exposes operational detail %q", unwanted)
 		}
 	}
 
@@ -117,6 +123,11 @@ func TestDonationBannerAppearsOnEveryPublicPage(t *testing.T) {
 			h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 			if w.Code != 200 {
 				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+			for _, unwanted := range []string{"/api/v1/", "https://github.com/proofofmike/stratumstats"} {
+				if strings.Contains(w.Body.String(), unwanted) {
+					t.Errorf("public page still links to %q", unwanted)
+				}
 			}
 			for _, want := range []string{
 				"donation-banner",

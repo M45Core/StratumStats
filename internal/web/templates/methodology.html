@@ -9,7 +9,7 @@
 <body>
 <header>
   <a class="brand" href="/"><span class="mark">S</span> StratumStats</a>
-  <nav><a href="/">Reports</a><a href="/pools">Pool registry</a><a href="/api/v1/methodology">Method API</a><a href="https://github.com/proofofmike/stratumstats" target="_blank" rel="noreferrer">Source</a></nav>
+  <nav><a href="/">Reports</a><a href="/pools">Pool registry</a></nav>
 </header>
 <aside class="donation-banner" aria-label="Support StratumStats">
   <div class="donation-copy">
@@ -57,7 +57,7 @@
   <p>Pool size, popularity, sponsorship, paid placement, subjective reputation, and any composite score. Published fee terms are shown as pool claims, not probe measurements.</p>
 
   <h2>Privacy and disclosures</h2>
-  <p>Each connection uses a fresh Bitcoin address, worker name, and miner agent. Pools can still see the probe IP, so published locations use broad regions rather than hostnames or addresses.</p>
+  <p>Operational details that could identify measurement traffic are intentionally withheld. Published results are aggregated to protect measurement integrity.</p>
   <ul>{{range .Disclosure}}<li>{{.}}</li>{{end}}</ul>
 </main>
 <footer><span>StratumStats</span><span>Measurements with context.</span></footer>
