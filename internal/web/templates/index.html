@@ -147,56 +147,42 @@
     <article class="summary-unsafe"><span>Worker payout alerts</span><strong>{{.UnsafeCount}}</strong></article>
   </section>
 
-  {{if or .FreePools .NormalPools .PPLNSPools .OtherPools .NoRecentDataPools .MissingWalletPools .PendingWalletPools}}<nav class="section-jump" aria-label="Jump to pool group"><span>Jump to</span>{{if .FreePools}}<a href="#free-solo-pools">Free solo</a>{{end}}{{if .NormalPools}}<a href="#non-free-solo-pools">Paid solo</a>{{end}}{{if .PPLNSPools}}<a href="#pplns-share-pools">PPLNS shared</a>{{end}}{{if .OtherPools}}<a href="#other-non-solo-pools">Other shared</a>{{end}}{{if .NoRecentDataPools}}<a href="#no-recent-data-pools">No recent data</a>{{end}}{{if .MissingWalletPools}}<a href="#missing-worker-wallet-pools">Worker wallet missing</a>{{end}}{{if .PendingWalletPools}}<a href="#pending-worker-wallet-pools">Verification pending</a>{{end}}</nav>{{end}}
+  <nav class="section-jump" aria-label="Jump to pool group" {{if not (or .FreePools .NormalPools .PPLNSPools .OtherPools .NoRecentDataPools .MissingWalletPools .PendingWalletPools)}}hidden{{end}}><span>Jump to</span><a href="#free-solo-pools" {{if not .FreePools}}hidden{{end}}>Free solo</a><a href="#non-free-solo-pools" {{if not .NormalPools}}hidden{{end}}>Paid solo</a><a href="#pplns-share-pools" {{if not .PPLNSPools}}hidden{{end}}>PPLNS shared</a><a href="#other-non-solo-pools" {{if not .OtherPools}}hidden{{end}}>Other shared</a><a href="#no-recent-data-pools" {{if not .NoRecentDataPools}}hidden{{end}}>No recent data</a><a href="#missing-worker-wallet-pools" {{if not .MissingWalletPools}}hidden{{end}}>Worker wallet missing</a><a href="#pending-worker-wallet-pools" {{if not .PendingWalletPools}}hidden{{end}}>Verification pending</a></nav>
 
-  {{if .FreePools}}
-  <section id="free-solo-pools" class="pool-section compact-section free-section" data-pool-section="free">
+  <section id="free-solo-pools" class="pool-section compact-section free-section" data-pool-section="free" {{if not .FreePools}}hidden{{end}}>
     <div class="section-head list-section-head"><div><p class="eyebrow free-eyebrow">Solo mining · measured fee is 0.00%</p><h2>Free solo pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="free-pools-list">{{template "pool-list" .FreePools}}</div>
   </section>
-  {{end}}
 
-  {{if .NormalPools}}
-  <section id="non-free-solo-pools" class="pool-section compact-section" data-pool-section="normal">
+  <section id="non-free-solo-pools" class="pool-section compact-section" data-pool-section="normal" {{if not .NormalPools}}hidden{{end}}>
     <div class="section-head list-section-head"><div><p class="eyebrow">Solo mining · fee applies or is not known yet</p><h2>Paid solo pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="normal-pools-list">{{template "pool-list" .NormalPools}}</div>
   </section>
-  {{end}}
 
-  {{if .PPLNSPools}}
-  <section id="pplns-share-pools" class="pool-section compact-section category-section pplns-section" data-pool-section="pplns">
+  <section id="pplns-share-pools" class="pool-section compact-section category-section pplns-section" data-pool-section="pplns" {{if not .PPLNSPools}}hidden{{end}}>
     <div class="section-head list-section-head"><div><p class="eyebrow pplns-eyebrow">Shared mining · rewards based on recent work</p><h2>PPLNS shared pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="pplns-pools-list">{{template "pool-list" .PPLNSPools}}</div>
   </section>
-  {{end}}
 
-  {{if .OtherPools}}
-  <section id="other-non-solo-pools" class="pool-section compact-section category-section other-section" data-pool-section="other">
+  <section id="other-non-solo-pools" class="pool-section compact-section category-section other-section" data-pool-section="other" {{if not .OtherPools}}hidden{{end}}>
     <div class="section-head list-section-head"><div><p class="eyebrow other-eyebrow">Other shared reward methods</p><h2>Other shared pools</h2></div><p>Median block delay: fastest first</p></div>
     <div id="other-pools-list">{{template "pool-list" .OtherPools}}</div>
   </section>
-  {{end}}
 
-  {{if .NoRecentDataPools}}
-  <section id="no-recent-data-pools" class="pool-section compact-section incomplete-section" data-pool-section="no-recent-data">
+  <section id="no-recent-data-pools" class="pool-section compact-section incomplete-section" data-pool-section="no-recent-data" {{if not .NoRecentDataPools}}hidden{{end}}>
     <div class="section-head list-section-head"><div><p class="eyebrow incomplete-eyebrow">Active pools · no comparable block-template delivery in the last 24 hours</p><h2>Pools without recent latency data</h2></div><p>Alphabetical</p></div>
     <div id="no-recent-data-pools-list">{{template "pool-list" .NoRecentDataPools}}</div>
   </section>
-  {{end}}
 
-  {{if .MissingWalletPools}}
-  <section id="missing-worker-wallet-pools" class="pool-section compact-section unsafe-section" data-pool-section="wallet-missing">
+  <section id="missing-worker-wallet-pools" class="pool-section compact-section unsafe-section" data-pool-section="wallet-missing" {{if not .MissingWalletPools}}hidden{{end}}>
     <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Solo mining · the test worker wallet was absent from decoded coinbase payout(s)</p><h2>Worker wallet not found</h2></div><p>Median block delay: fastest first</p></div>
     <div id="missing-wallet-pools-list">{{template "pool-list" .MissingWalletPools}}</div>
   </section>
-  {{end}}
 
-  {{if .PendingWalletPools}}
-  <section id="pending-worker-wallet-pools" class="pool-section compact-section pending-wallet-section" data-pool-section="wallet-pending">
+  <section id="pending-worker-wallet-pools" class="pool-section compact-section pending-wallet-section" data-pool-section="wallet-pending" {{if not .PendingWalletPools}}hidden{{end}}>
     <div class="section-head list-section-head"><div><p class="eyebrow">Solo mining · more decoded coinbase evidence is needed</p><h2>Worker wallet verification pending</h2></div><p>Median block delay: fastest first</p></div>
     <div id="pending-wallet-pools-list">{{template "pool-list" .PendingWalletPools}}</div>
   </section>
-  {{end}}
 
   <p class="dashboard-footnote" data-live-footnote>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · {{.SelectedLabel}}. Median, P95, history, and Stratum timings use the latest {{.Snapshot.LatencyWindowHours}} hours. Availability uses all eligible block observations. Estimated mining loss is median relative delay ÷ 600 seconds; it is not measured revenue loss. Solo fees require a matched coinbase payout; shared-pool fees are operator-published terms.</p>
   <p class="visually-hidden" role="status" aria-live="polite" data-live-status></p>

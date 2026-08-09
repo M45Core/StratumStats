@@ -70,9 +70,11 @@ operations are maintained in the
 [StratumScout repository](https://github.com/Distortions81/StratumScout).
 
 The dashboard combines its US view from Los Angeles, Dallas, and Ashburn
-probes. The Europe view is supplied by a Germany probe in Fly's Frankfurt
-region (`fra`); its public label remains the coarse `europe` vantage. Each
-regional view compares only observations from that same vantage.
+probes. It accepts the Europe view from a Germany probe in Fly's Frankfurt
+region (`fra`), whose public label remains the coarse `europe` vantage.
+Deploy the matching `fra` mapping in StratumScout before that probe begins
+uploading observations. Each regional view compares only observations from that
+same vantage.
 
 Configuration is in `config/pools.json`. The collector never submits shares.
 Current records use observation schema version 8 with retry-safe IDs, source

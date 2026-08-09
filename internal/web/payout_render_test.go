@@ -66,9 +66,14 @@ func TestDashboardSeparatesMissingAndPendingWorkerWalletEvidence(t *testing.T) {
 			t.Errorf("dashboard missing %q", want)
 		}
 	}
-	for _, unwanted := range []string{"Trust pool", "Direct coinbase", "Payout custody", "Worker address observed", "Worker address absent", "Worker wallet verification pending", "href=\"#pending-worker-wallet-pools\""} {
+	for _, unwanted := range []string{"Trust pool", "Direct coinbase", "Payout custody", "Worker address observed", "Worker address absent"} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("dashboard contains old label %q", unwanted)
+		}
+	}
+	for _, hidden := range []string{`href="#pending-worker-wallet-pools" hidden`, `data-pool-section="wallet-pending" hidden`} {
+		if !strings.Contains(body, hidden) {
+			t.Errorf("empty pending section is not hidden: missing %q", hidden)
 		}
 	}
 	freeSectionAt, normalAt, noDataAt, missingAt := strings.Index(body, "<h2>Free solo pools</h2>"), strings.Index(body, "<h2>Paid solo pools</h2>"), strings.Index(body, "<h2>Pools without recent latency data</h2>"), strings.Index(body, "<h2>Worker wallet not found</h2>")

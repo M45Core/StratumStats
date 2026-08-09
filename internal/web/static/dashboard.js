@@ -129,6 +129,19 @@
     window.setTimeout(() => row.classList.remove("row-updated"), 1800);
   }
 
+  function syncSectionVisibility(list, nextList, nextDocument) {
+    const section = list.closest(".pool-section");
+    const nextSection = nextList.closest(".pool-section");
+    if (!section || !nextSection) return;
+    section.hidden = nextSection.hidden;
+    const link = document.querySelector(`.section-jump a[href="#${section.id}"]`);
+    const nextLink = nextDocument.querySelector(`.section-jump a[href="#${nextSection.id}"]`);
+    if (link && nextLink) link.hidden = nextLink.hidden;
+    const jump = document.querySelector(".section-jump");
+    const nextJump = nextDocument.querySelector(".section-jump");
+    if (jump && nextJump) jump.hidden = nextJump.hidden;
+  }
+
   function syncList(id, nextDocument, updatedPools) {
     const wrapper = document.getElementById(id);
     const nextWrapper = nextDocument.getElementById(id);
@@ -186,6 +199,7 @@
 
     const sortState = sortStates.get(id);
     if (sortState) applySort(wrapper, sortState.key, sortState.type, sortState.direction);
+    syncSectionVisibility(list, nextList, nextDocument);
   }
 
   async function refresh() {
