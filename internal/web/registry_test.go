@@ -51,12 +51,21 @@ func TestPoolRegistryPageAndAPI(t *testing.T) {
 		"hybrid",
 		"SOLO 0%; PPLNS 1%",
 		"pool.example.com:3333",
+		"data-copy-value=\"https://example.com/pool\"",
+		"data-copy-value=\"pool.example.com:3333\"",
+		"/static/copy.js",
 		"Official documentation",
 		"2026-08-01",
 	} {
 		if !strings.Contains(page.Body.String(), want) {
 			t.Errorf("registry page missing %q", want)
 		}
+	}
+
+	copyScript := httptest.NewRecorder()
+	h.ServeHTTP(copyScript, httptest.NewRequest("GET", "/static/copy.js", nil))
+	if copyScript.Code != 200 || !strings.Contains(copyScript.Body.String(), "navigator.clipboard") {
+		t.Fatalf("copy script status=%d body=%s", copyScript.Code, copyScript.Body.String())
 	}
 
 	api := httptest.NewRecorder()

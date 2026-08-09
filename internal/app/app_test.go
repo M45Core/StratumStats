@@ -7,7 +7,7 @@ func TestRepositoryPoolRegistryLoadsAndConsolidates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(cfg.Pools), 36; got != want {
+	if got, want := len(cfg.Pools), 27; got != want {
 		t.Fatalf("pool count = %d, want %d", got, want)
 	}
 
@@ -20,7 +20,7 @@ func TestRepositoryPoolRegistryLoadsAndConsolidates(t *testing.T) {
 			t.Errorf("obsolete or duplicate pool %q remains", removed)
 		}
 	}
-	for _, canonical := range []string{"2miners_btc_solo", "ckpool", "m45core", "noderunners", "p2pool", "public_pool", "public_pool_pplns", "blitzpool_pplns", "letsmineit_prop", "solohash_co_uk"} {
+	for _, canonical := range []string{"2miners_btc_solo", "ckpool", "m45core", "noderunners", "public_pool", "public_pool_pplns", "blitzpool_pplns", "letsmineit_prop", "solohash_co_uk"} {
 		if _, ok := pools[canonical]; !ok {
 			t.Errorf("canonical pool %q is missing", canonical)
 		}
@@ -52,7 +52,9 @@ func TestRepositoryPoolRegistryLoadsAndConsolidates(t *testing.T) {
 	if letsMinePROP.Category != "shared" || len(letsMinePROP.Products) != 1 || letsMinePROP.Products[0] != "PROP" || len(letsMinePROP.Endpoints) != 6 || letsMinePROP.Endpoints[0].Port != 3432 {
 		t.Errorf("LetsMine PROP product record is incorrect: %+v", letsMinePROP)
 	}
-	if got := cfg.Pools[pools["p2pool"]].Status; got != "inactive" {
-		t.Errorf("P2Pool status = %q, want inactive", got)
+	for _, excluded := range []string{"antpool", "binance_pool", "braiins_pool", "f2pool", "kano_solo_mode", "p2pool", "secpool", "spiderpool", "viabtc"} {
+		if _, ok := pools[excluded]; ok {
+			t.Errorf("inactive or account-required pool %q remains", excluded)
+		}
 	}
 }

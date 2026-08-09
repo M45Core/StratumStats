@@ -2455,6 +2455,15 @@
     }
   ],
   "exclude_ids": [
-    "demand"
+    "antpool",
+    "binance_pool",
+    "braiins_pool",
+    "demand",
+    "f2pool",
+    "kano_solo_mode",
+    "p2pool",
+    "secpool",
+    "spiderpool",
+    "viabtc"
   ]
 }

@@ -7,6 +7,7 @@
   <meta name="description" content="Plain-language details, fees, and connection information for Bitcoin mining pools.">
   <link rel="icon" href="/static/brand/stratumstats-favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/copy.js" defer></script>
 </head>
 <body>
 <header>
@@ -45,6 +46,12 @@
         </div>
       </div>
       <p class="pool-description">{{.Description}}</p>
+      {{if .Website}}
+      <div class="pool-subsection pool-website">
+        <h3>Pool website</h3>
+        <div class="copy-value"><button type="button" class="copy-button" data-copy-value="{{.Website}}" aria-label="Copy website for {{.Name}}"><code>{{.Website}}</code><span aria-hidden="true">Copy</span></button><a href="{{.Website}}" target="_blank" rel="noreferrer" aria-label="Open website for {{.Name}}">Open ↗</a></div>
+      </div>
+      {{end}}
       <dl class="pool-facts">
         <div><dt>Operator</dt><dd>{{if .Operator}}{{.Operator}}{{else}}Not established{{end}}</dd></div>
         <div><dt>Payout methods</dt><dd>{{range $i, $product := .Products}}{{if $i}} · {{end}}{{$product}}{{else}}Not confirmed{{end}}</dd></div>
@@ -55,7 +62,7 @@
         <h3>Connection addresses</h3>
         <ul class="endpoint-list">
           {{range .Endpoints}}
-          <li><code>{{.Host}}:{{.Port}}</code>{{if .TLS}}<span class="tls">Secure</span>{{end}}{{if .Region}}<small>{{.Region}}</small>{{end}}{{if .Label}}<small>{{.Label}}</small>{{end}}</li>
+          <li><button type="button" class="copy-button" data-copy-value="{{.Host}}:{{.Port}}" aria-label="Copy connection address {{.Host}}:{{.Port}}"><code>{{.Host}}:{{.Port}}</code><span aria-hidden="true">Copy</span></button>{{if .TLS}}<span class="tls">Secure</span>{{end}}{{if .Region}}<small>{{.Region}}</small>{{end}}{{if .Label}}<small>{{.Label}}</small>{{end}}</li>
           {{else}}
           <li class="muted">No public connection address.</li>
           {{end}}
