@@ -46,6 +46,8 @@ func TestPoolRegistryPageAndAPI(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Example Pool",
+		"Know a pool that should be added, removed, or corrected?",
+		"https://discord.gg/WWemsuTktk",
 		"hybrid",
 		"SOLO 0%; PPLNS 1%",
 		"pool.example.com:3333",

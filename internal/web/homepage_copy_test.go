@@ -68,6 +68,9 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 			t.Errorf("homepage still contains old copy %q", unwanted)
 		}
 	}
+	if !strings.Contains(body, `href="https://discord.gg/WWemsuTktk"`) {
+		t.Error("homepage does not link to Discord")
+	}
 
 	methodology := httptest.NewRecorder()
 	h.ServeHTTP(methodology, httptest.NewRequest("GET", "/methodology", nil))
@@ -132,6 +135,7 @@ func TestDonationBannerAppearsOnEveryPublicPage(t *testing.T) {
 			for _, want := range []string{
 				"donation-banner",
 				"This site is run by donations.",
+				"https://discord.gg/WWemsuTktk",
 				"Donate Bitcoin",
 				"bitcoin:3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL?label=StratumStats%20donation",
 				"3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL",
