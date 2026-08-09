@@ -249,6 +249,11 @@ sudo certbot --nginx -d stratumstats.m45core.com
 
 Certbot should add the TLS listener and redirect plain HTTP to HTTPS. Keep port
 8080 blocked from the public network; only ports 80 and 443 need to reach Nginx.
+The supplied Nginx setup also applies per-IP connection and ingest request
+limits, an ingest body timeout, HSTS, a restrictive Permissions-Policy, and
+Cross-Origin-Opener-Policy. Re-run `setup-nginx.sh` after updating the checked
+out deployment templates; review an existing customized Nginx configuration
+before using `--force`.
 
 Verify the public collector boundary:
 

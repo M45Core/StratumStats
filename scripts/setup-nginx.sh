@@ -3,8 +3,12 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_config="$repo_dir/deploy/nginx-stratumstats.conf"
+limits_config="$repo_dir/deploy/nginx-stratumstats-limits.conf"
+security_config="$repo_dir/deploy/nginx-stratumstats-security.conf"
 available_config="/etc/nginx/sites-available/stratumstats.m45core.com"
 enabled_config="/etc/nginx/sites-enabled/stratumstats.m45core.com"
+installed_limits_config="/etc/nginx/conf.d/stratumstats-limits.conf"
+installed_security_config="/etc/nginx/snippets/stratumstats-security.conf"
 run_certbot=false
 force=false
 
@@ -56,6 +60,10 @@ if [[ ! -d /etc/nginx/sites-available || ! -d /etc/nginx/sites-enabled ]]; then
   echo "This script expects the Debian/Ubuntu Nginx sites-available layout." >&2
   exit 1
 fi
+if [[ ! -d /etc/nginx/conf.d || ! -d /etc/nginx/snippets ]]; then
+  echo "This script expects the Debian/Ubuntu Nginx conf.d and snippets layout." >&2
+  exit 1
+fi
 
 if [[ -e "$available_config" ]] && ! cmp -s "$source_config" "$available_config"; then
   if [[ "$force" != true ]]; then
@@ -67,6 +75,8 @@ if [[ -e "$available_config" ]] && ! cmp -s "$source_config" "$available_config"
   echo "Backed up the previous site to $backup"
 fi
 
+install -o root -g root -m 0644 "$limits_config" "$installed_limits_config"
+install -o root -g root -m 0644 "$security_config" "$installed_security_config"
 install -o root -g root -m 0644 "$source_config" "$available_config"
 if [[ -L "$enabled_config" ]]; then
   current_target="$(readlink -f "$enabled_config")"

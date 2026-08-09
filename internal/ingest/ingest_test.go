@@ -98,6 +98,24 @@ func TestReceiverRejectsBadSignatureWithoutAppend(t *testing.T) {
 	}
 }
 
+func TestReceiverRejectsReplayedBatchWithoutAppendingAgain(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	appends := 0
+	receiver := Receiver{
+		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
+		Now:     func() time.Time { return now },
+		Replays: NewReplayGuard(),
+		Append:  func([]model.Observation) error { appends++; return nil },
+	}
+	first := httptest.NewRecorder()
+	receiver.ServeHTTP(first, signedRequest(t, testEnvelope(now), []byte("secret"), now))
+	second := httptest.NewRecorder()
+	receiver.ServeHTTP(second, signedRequest(t, testEnvelope(now), []byte("secret"), now))
+	if first.Code != http.StatusAccepted || second.Code != http.StatusConflict || appends != 1 {
+		t.Fatalf("first=%d second=%d appends=%d", first.Code, second.Code, appends)
+	}
+}
+
 func TestReceiverRejectsWholeBatchWhenOneObservationIsInvalid(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	envelope := testEnvelope(now)

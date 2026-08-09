@@ -80,9 +80,10 @@ func serve(args []string, demo bool) error {
 	if !demo && keyID != "" {
 		appender := &store.Appender{Path: *dataPath}
 		ingestHandler = ingest.Receiver{
-			Pools:  cfg.Pools,
-			Keys:   map[string][]byte{keyID: []byte(secret)},
-			Append: appender.Append,
+			Pools:   cfg.Pools,
+			Keys:    map[string][]byte{keyID: []byte(secret)},
+			Append:  appender.Append,
+			Replays: ingest.NewReplayGuard(),
 		}
 		log.Printf("authenticated regional-probe ingestion enabled")
 	}
@@ -90,7 +91,14 @@ func serve(args []string, demo bool) error {
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Addr: *addr, Handler: app, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
+	srv := &http.Server{
+		Addr:              *addr,
+		Handler:           app,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {

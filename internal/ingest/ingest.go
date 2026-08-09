@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/proofofmike/stratumstats/internal/model"
@@ -60,10 +61,43 @@ type acceptedResponse struct {
 }
 
 type Receiver struct {
-	Pools  []model.Pool
-	Keys   map[string][]byte
-	Append func([]model.Observation) error
-	Now    func() time.Time
+	Pools   []model.Pool
+	Keys    map[string][]byte
+	Append  func([]model.Observation) error
+	Now     func() time.Time
+	Replays *ReplayGuard
+}
+
+// ReplayGuard prevents a valid, captured batch from being appended repeatedly
+// during the lifetime of its otherwise-valid HMAC timestamp.
+type ReplayGuard struct {
+	mu      sync.Mutex
+	batches map[string]time.Time
+}
+
+func NewReplayGuard() *ReplayGuard {
+	return &ReplayGuard{batches: make(map[string]time.Time)}
+}
+
+func (guard *ReplayGuard) claim(key string, now time.Time) bool {
+	guard.mu.Lock()
+	defer guard.mu.Unlock()
+	for batch, expiry := range guard.batches {
+		if !expiry.After(now) {
+			delete(guard.batches, batch)
+		}
+	}
+	if _, exists := guard.batches[key]; exists {
+		return false
+	}
+	guard.batches[key] = now.Add(maxRequestClockSkew)
+	return true
+}
+
+func (guard *ReplayGuard) release(key string) {
+	guard.mu.Lock()
+	defer guard.mu.Unlock()
+	delete(guard.batches, key)
 }
 
 func (receiver Receiver) ServeHTTP(w http.ResponseWriter, request *http.Request) {
@@ -95,7 +129,15 @@ func (receiver Receiver) ServeHTTP(w http.ResponseWriter, request *http.Request)
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
+	replayKey := request.Header.Get("X-StratumStats-Key-ID") + "\n" + envelope.BatchID
+	if receiver.Replays != nil && !receiver.Replays.claim(replayKey, now) {
+		http.Error(w, "duplicate batch", http.StatusConflict)
+		return
+	}
 	if err := receiver.Append(observations); err != nil {
+		if receiver.Replays != nil {
+			receiver.Replays.release(replayKey)
+		}
 		http.Error(w, "append failed", http.StatusInternalServerError)
 		return
 	}
