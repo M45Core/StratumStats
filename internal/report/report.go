@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MethodologyVersion = "2026-08-09.24"
+	MethodologyVersion = "2026-08-09.25"
 	reportHistoryLimit = 12
 	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
 	LatencyWindow = 24 * time.Hour
@@ -42,6 +42,7 @@ type accumulator struct {
 func Compute(pools []model.Pool, observations []model.Observation, now time.Time) model.Snapshot {
 	now = now.UTC()
 	observations = uniqueObservations(observations)
+	completedRemoteRuns := completedScheduledRuns(observations)
 	acc := make(map[string]*accumulator, len(pools))
 	observedBlocks := make(map[string]bool)
 	eligiblePoolSamples := make(map[string]bool)
@@ -51,7 +52,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		acc[p.ID] = &accumulator{pool: p, blocks: map[string]bool{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{}}
 	}
 	for _, o := range observations {
-		if acc[o.PoolID] == nil || o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != "" || !o.Eligible || o.BlockID == "" {
+		if acc[o.PoolID] == nil || o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != "" || !o.Eligible || o.BlockID == "" || !scoreableBlockObservation(o, completedRemoteRuns) {
 			continue
 		}
 		key := blockWindowKey(o)
@@ -61,7 +62,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 	}
 	for order, o := range observations {
 		protocolRecord := o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != ""
-		if !protocolRecord && o.BlockID != "" {
+		if !protocolRecord && o.BlockID != "" && scoreableBlockObservation(o, completedRemoteRuns) {
 			observedBlocks[o.BlockID] = true
 		}
 		a := acc[o.PoolID]
@@ -74,7 +75,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 			}
 			continue
 		}
-		if !o.Eligible || o.BlockID == "" {
+		if !o.Eligible || o.BlockID == "" || !scoreableBlockObservation(o, completedRemoteRuns) {
 			continue
 		}
 		if start := canonicalWindows[blockWindowKey(o)]; !o.ObservedAt.Equal(start) {
@@ -121,12 +122,34 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
 			"Block-template latency, latency history, and protocol timing statistics use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
+			"Scheduled block observations affect scores only after their probe run completes successfully without dropped observations.",
 			"The probe uses pseudonymous miner credentials, but a pool can still observe its source IP.",
 			"Observed solo-pool fee is inferred only when a decoded coinbase output matches the generated worker script; optional donations or splits may be included.",
 			"Matched worker payout destinations are reduced to aggregate verification and fee evidence; their address and script are never published.",
 			"Coinbase destinations identify decoded output scripts, not who controls a non-worker address.",
 		},
 	}
+}
+
+// completedScheduledRuns returns the remote run IDs whose terminal record
+// proves that the whole scheduled collection was uploaded without loss. Block
+// records can arrive in earlier batches, so an interrupted server upload may
+// leave useful diagnostics in JSONL without leaving a complete scoring cohort.
+func completedScheduledRuns(observations []model.Observation) map[string]bool {
+	completed := make(map[string]bool)
+	for _, observation := range observations {
+		if observation.Source == model.SourceRemoteScheduled &&
+			observation.RecordType == model.RecordTypeProbeRun &&
+			observation.RunID != "" && observation.RunStatus == "ok" &&
+			observation.DroppedObservations == 0 {
+			completed[observation.RunID] = true
+		}
+	}
+	return completed
+}
+
+func scoreableBlockObservation(observation model.Observation, completedRemoteRuns map[string]bool) bool {
+	return observation.Source != model.SourceRemoteScheduled || completedRemoteRuns[observation.RunID]
 }
 
 // ComputeVantage filters telemetry to one coarse vantage while retaining

@@ -123,6 +123,32 @@ func TestReceiverAcceptsAuthenticatedBatchAndSetsProvenance(t *testing.T) {
 	}
 }
 
+func TestReceiverAppendsProbeRunMarkerAfterMeasurements(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	envelope := testEnvelope(now)
+	started := envelope.StartedAt
+	summary := model.Observation{
+		Version: model.ObservationVersion, ObservationID: "run-1/summary", RunID: "run-1",
+		RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started,
+		RunStatus: "ok", ConfiguredEndpoints: 1, SuccessfulSessions: 1,
+	}
+	envelope.Observations = append([]model.Observation{summary}, envelope.Observations...)
+	var appended []model.Observation
+	receiver := Receiver{
+		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
+		Now:    func() time.Time { return now },
+		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
+	}
+	response := httptest.NewRecorder()
+	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if len(appended) != 2 || appended[0].RecordType != model.RecordTypeProtocol || appended[1].RecordType != model.RecordTypeProbeRun {
+		t.Fatalf("append order=%+v, want measurements before run marker", appended)
+	}
+}
+
 func TestReceiverAcceptsGermanyProbe(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	var appended []model.Observation

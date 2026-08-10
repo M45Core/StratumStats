@@ -81,6 +81,57 @@ func TestComputeDeduplicatesRetriedObservationIDs(t *testing.T) {
 	}
 }
 
+func TestComputeScoresOnlyCompletedLosslessScheduledRuns(t *testing.T) {
+	now := time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC)
+	started := now.Add(-time.Minute)
+	pools := []model.Pool{{ID: "fast", Name: "Fast"}, {ID: "slow", Name: "Slow"}}
+	block := func(runID, blockID, poolID string, arrived bool) model.Observation {
+		return model.Observation{
+			Version: model.ObservationVersion, Source: model.SourceRemoteScheduled,
+			ObservationID: runID + "/" + blockID + "/" + poolID, RunID: runID,
+			Vantage: "us-west", BlockID: blockID, PoolID: poolID,
+			ObservedAt: now.Add(-30 * time.Second), Eligible: true, Arrived: arrived,
+		}
+	}
+	run := func(runID, status string, dropped int) model.Observation {
+		return model.Observation{
+			Version: model.ObservationVersion, Source: model.SourceRemoteScheduled,
+			ObservationID: runID + "/summary", RunID: runID, Vantage: "us-west",
+			RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started,
+			RunStatus: status, DroppedObservations: dropped,
+		}
+	}
+	observations := []model.Observation{
+		block("complete", "baseline", "fast", true),
+		block("complete", "baseline", "slow", true),
+		block("complete", "accepted", "fast", true),
+		block("complete", "accepted", "slow", false),
+		run("complete", "ok", 0),
+		block("partial", "partial", "fast", true),
+		block("partial", "partial", "slow", false),
+		run("partial", "partial", 1),
+		block("dropped", "dropped", "fast", true),
+		block("dropped", "dropped", "slow", false),
+		run("dropped", "ok", 1),
+		block("interrupted", "interrupted", "fast", true),
+		block("interrupted", "interrupted", "slow", false),
+	}
+
+	snapshot := Compute(pools, observations, now)
+	if snapshot.BlocksObserved != 2 || snapshot.EligiblePoolSamples != 4 || snapshot.TemplateDeliveries != 3 {
+		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 2/4/3", snapshot.BlocksObserved, snapshot.EligiblePoolSamples, snapshot.TemplateDeliveries)
+	}
+	if snapshot.Reports[0].Blocks != 2 || snapshot.Reports[0].Availability != 100 {
+		t.Fatalf("fast report included an incomplete run: %+v", snapshot.Reports[0])
+	}
+	if snapshot.Reports[1].Blocks != 2 || snapshot.Reports[1].Availability != 50 {
+		t.Fatalf("slow report lost the completed run's real miss: %+v", snapshot.Reports[1])
+	}
+	if snapshot.Reports[0].OverallScore == nil || snapshot.Reports[1].OverallScore == nil || *snapshot.Reports[0].OverallScore <= *snapshot.Reports[1].OverallScore {
+		t.Fatalf("completed availability miss was not reflected in scores: fast=%v slow=%v", snapshot.Reports[0].OverallScore, snapshot.Reports[1].OverallScore)
+	}
+}
+
 func TestComputeVantageFiltersTimingButRetainsGlobalCoinbaseEvidence(t *testing.T) {
 	fee := 1.25
 	pools := []model.Pool{{ID: "pool", Name: "Pool", Category: "solo"}}

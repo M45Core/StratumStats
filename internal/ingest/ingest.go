@@ -32,7 +32,7 @@ const (
 	maxRequestClockSkew        = 5 * time.Minute
 	maxRetainedCoinbaseOutputs = model.MaxRetainedCoinbaseOutputs
 	maxRetainedScriptHexLength = model.MaxRetainedCoinbaseScriptBytes * 2
-	RemoteSource               = "fly-scheduled"
+	RemoteSource               = model.SourceRemoteScheduled
 )
 
 var RegionVantages = map[string]string{
@@ -269,7 +269,21 @@ func (receiver Receiver) validate(envelope Envelope, now time.Time) ([]model.Obs
 		observation.ConfigRevision = envelope.ConfigRevision
 		observations[index] = observation
 	}
-	return observations, nil
+	// The terminal run record is the report layer's commit marker for scheduled
+	// block samples. Keep it physically after the measurements so a server
+	// restart cannot persist the marker while leaving a partial scoring cohort.
+	ordered := make([]model.Observation, 0, len(observations))
+	for _, observation := range observations {
+		if observation.RecordType != model.RecordTypeProbeRun {
+			ordered = append(ordered, observation)
+		}
+	}
+	for _, observation := range observations {
+		if observation.RecordType == model.RecordTypeProbeRun {
+			ordered = append(ordered, observation)
+		}
+	}
+	return ordered, nil
 }
 
 type endpointIdentity struct {

@@ -68,7 +68,10 @@ and limitations in detail.
 
 Regional probe ingestion is provided by
 [StratumScout](https://github.com/M45Core/StratumScout). Each regional view
-compares observations only within the same vantage.
+compares observations only within the same vantage. Scheduled block samples
+enter availability and score calculations only after the complete, lossless
+probe run has been received, so an interrupted upload cannot create a partial
+scoring cohort.
 
 ## Production installation
 
