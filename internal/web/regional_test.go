@@ -78,6 +78,22 @@ func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 	}
 }
 
+func TestVantageStatusBecomesStaleAfterTwelveHours(t *testing.T) {
+	now := time.Now().UTC()
+	observations := []model.Observation{
+		{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProbeRun, ObservedAt: now.Add(-12 * time.Hour), RunStatus: "ok"},
+		{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-east", RecordType: model.RecordTypeProbeRun, ObservedAt: now.Add(-12*time.Hour - time.Nanosecond), RunStatus: "ok"},
+	}
+
+	statuses := buildVantageStatuses(observations, now)
+	if statuses.Vantages[0].Stale {
+		t.Fatalf("us-west became stale at the 12-hour boundary: %+v", statuses.Vantages[0])
+	}
+	if !statuses.Vantages[2].Stale {
+		t.Fatalf("us-east remained current beyond the 12-hour boundary: %+v", statuses.Vantages[2])
+	}
+}
+
 func TestSnapshotCacheLoadsOnceWithinTTL(t *testing.T) {
 	loads := 0
 	handler, err := (Server{
@@ -107,7 +123,7 @@ func TestDashboardRendersRegionalSelectionAndStatus(t *testing.T) {
 	started := now.Add(-time.Minute)
 	observations := []model.Observation{
 		{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started, RunStatus: "ok"},
-		{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "europe", RecordType: model.RecordTypeProbeRun, ObservedAt: now.Add(-3 * time.Hour), RunStartedAt: &started, RunStatus: "ok"},
+		{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "europe", RecordType: model.RecordTypeProbeRun, ObservedAt: now.Add(-13 * time.Hour), RunStartedAt: &started, RunStatus: "ok"},
 	}
 	handler, err := (Server{
 		Pools: []model.Pool{{ID: "pool", Name: "Pool"}},

@@ -10,7 +10,10 @@ import (
 	"github.com/M45Core/StratumStats/internal/report"
 )
 
-const reportCacheTTL = 5 * time.Second
+const (
+	reportCacheTTL    = 5 * time.Second
+	vantageStaleAfter = 12 * time.Hour
+)
 
 var vantageLabels = map[string]string{
 	"unknown":    "Local",
@@ -159,7 +162,7 @@ func buildVantageStatuses(observations []model.Observation, now time.Time) vanta
 	for _, vantage := range vantageOrder {
 		status := statuses[vantage]
 		status.Blocks = len(blocks[vantage])
-		status.Stale = status.LastSuccessfulRunAt == nil || now.Sub(*status.LastSuccessfulRunAt) > 2*time.Hour
+		status.Stale = status.LastSuccessfulRunAt == nil || now.Sub(*status.LastSuccessfulRunAt) > vantageStaleAfter
 		response.Vantages = append(response.Vantages, *status)
 	}
 	return response
