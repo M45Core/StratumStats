@@ -24,6 +24,8 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 		Load: func() ([]model.Observation, error) {
 			return []model.Observation{
 				{Version: model.ObservationVersion, ObservedAt: observedAt, Vantage: "test", BlockID: "block", PoolID: "test", Eligible: true, Arrived: true, OffsetMS: 42.6},
+				{Version: model.ObservationVersion, ObservedAt: observedAt, RecordType: model.RecordTypeProtocol, PoolID: "test", ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration},
+				{Version: model.ObservationVersion, ObservedAt: observedAt, RecordType: model.RecordTypeProtocol, PoolID: "test", ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusTimeout},
 				{Version: model.ObservationVersion, ObservedAt: observedAt, RecordType: model.RecordTypeProtocol, PoolID: "test", ProtocolMethod: model.ProtocolSubscribe, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration},
 				{Version: model.ObservationVersion, ObservedAt: observedAt, RecordType: model.RecordTypeProtocol, PoolID: "test", ProtocolMethod: model.ProtocolTLSHandshake, ResponseStatus: model.ProtocolStatusError, ErrorCategory: model.ProtocolErrorTLSCertificateInvalid, DurationMS: &duration, TLS: true},
 				{Version: model.ObservationVersion, ObservedAt: observedAt, RecordType: model.RecordTypeProtocol, PoolID: "healthy", ProtocolMethod: model.ProtocolTLSHandshake, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration, TLS: true},
@@ -37,13 +39,13 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	home := httptest.NewRecorder()
 	h.ServeHTTP(home, httptest.NewRequest("GET", "/", nil))
 	body := home.Body.String()
-	for _, want := range []string{"Median block delay", "43 ms", "13 ms", "Security error", "tls-timing-error", "SECURITY ERROR", "The pool security certificate could not be verified", "0/1 worked", "Invalid TLS certificate", "−10.0 pts"} {
+	for _, want := range []string{"Median block delay", "43 ms", "13 ms", "Security error", "tls-timing-error", "SECURITY ERROR", "The pool security certificate could not be verified", "1 ❌", "1 failed check (1 timed out)", "Invalid TLS certificate", "−10.0 pts"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
 		}
 	}
-	if strings.Contains(body, "1/1 worked") {
-		t.Fatal("perfect protocol success count is shown redundantly")
+	if strings.Contains(body, "ok ") || strings.Contains(body, "/2") {
+		t.Fatal("protocol success count is shown redundantly")
 	}
 	if strings.Contains(body, "· Secure connection") {
 		t.Fatal("healthy TLS connection is labeled redundantly")

@@ -41,6 +41,10 @@ func (s Server) Handler() (http.Handler, error) {
 		"miningLoss":  formatMiningLoss,
 		"feePct":      formatFeePercentage,
 		"scoreGrade":  scoreGrade,
+		"failedChecks": func(stats model.TimingStats) int {
+			return stats.Timeouts + stats.Errors + stats.Rejected
+		},
+		"failureSummary": protocolFailureSummary,
 	}).ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -180,6 +184,28 @@ func formatMiningLoss(value float64) string {
 func formatFeePercentage(value float64) string {
 	formatted := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", value), "0"), ".")
 	return formatted + "%"
+}
+
+func protocolFailureSummary(stats model.TimingStats) string {
+	total := stats.Timeouts + stats.Errors + stats.Rejected
+	parts := make([]string, 0, 3)
+	if stats.Timeouts > 0 {
+		parts = append(parts, fmt.Sprintf("%d timed out", stats.Timeouts))
+	}
+	if stats.Errors > 0 {
+		parts = append(parts, fmt.Sprintf("%d error%s", stats.Errors, pluralSuffix(stats.Errors)))
+	}
+	if stats.Rejected > 0 {
+		parts = append(parts, fmt.Sprintf("%d refused", stats.Rejected))
+	}
+	return fmt.Sprintf("%d failed check%s (%s)", total, pluralSuffix(total), strings.Join(parts, ", "))
+}
+
+func pluralSuffix(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
 }
 
 func scoreGrade(score float64) string {
