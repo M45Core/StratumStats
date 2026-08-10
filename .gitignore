@@ -1,0 +1,11 @@
+/stratumstats
+/data/*.jsonl
+!/data/.gitkeep
+*.tmp
+.DS_Store
+.dist/
+.env
+.env.*
+*.env
+*.env.*
+!*.env.example

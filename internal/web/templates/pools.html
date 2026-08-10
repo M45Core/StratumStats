@@ -1,0 +1,63 @@
+{{define "pools.html"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pool details — StratumStats</title>
+  <meta name="description" content="Pool types, payout methods, operators, and official website links for Bitcoin mining pools.">
+  <link rel="icon" href="/static/brand/stratumstats-favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/"><img class="mark" src="/static/brand/stratumstats-logo.svg" alt="">StratumStats</a>
+  <nav><a href="/">Pool results</a><a href="/methodology">How it works</a><a href="https://m45core.com/" target="_blank" rel="noopener noreferrer">Powered by M45Core</a><a href="https://discord.gg/WWemsuTktk" target="_blank" rel="noopener noreferrer">Discord</a></nav>
+</header>
+<aside class="donation-banner" aria-label="Support StratumStats">
+  <div class="donation-copy">
+    <strong>This site is run by donations.</strong>
+    <span>Help keep independent pool checks online.</span>
+  </div>
+  <a class="donation-link" href="bitcoin:3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL?label=StratumStats%20donation" aria-label="Donate Bitcoin to StratumStats">
+    <span class="donation-symbol" aria-hidden="true">₿</span>
+    <span>Donate Bitcoin</span>
+    <code>3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL</code>
+  </a>
+</aside>
+<main>
+  <section class="registry-hero">
+    <p class="eyebrow">Pool information</p>
+    <h1>Know what each pool <em>offers.</em></h1>
+    <p class="lede">Compare pool type, payout methods, operators, and official websites.</p>
+  </section>
+  <div class="notice registry-notice">Pool types and payout methods identify the configured product. Performance and fee results come only from our independent checks.</div>
+  <p class="registry-feedback">Know a pool that should be added, removed, or corrected? <a href="https://discord.gg/WWemsuTktk" target="_blank" rel="noopener noreferrer">Let us know on Discord.</a></p>
+  <section class="registry-grid">
+    {{range .Pools}}
+    <article class="pool-card" id="{{.ID}}">
+      <div class="pool-card-head">
+        <div>
+          <h2>{{if .Website}}<a href="{{.Website}}" target="_blank" rel="noopener noreferrer">{{.Name}}</a>{{else}}{{.Name}}{{end}}</h2>
+        </div>
+        <div class="pool-badges">
+          <span class="pool-type pool-type-{{.Category}}">{{if eq .Category "solo"}}Solo{{else}}Shared{{end}}</span>
+          <span class="pool-status pool-status-{{.Status}}">{{if eq .Status "active"}}Active{{else}}Not active{{end}}</span>
+        </div>
+      </div>
+      {{if .Website}}
+      <div class="pool-subsection pool-website">
+        <h3>Pool website</h3>
+        <a class="website-link" href="{{.Website}}" target="_blank" rel="noopener noreferrer" aria-label="Visit the website for {{.Name}}">Visit website <span aria-hidden="true">↗</span></a>
+      </div>
+      {{end}}
+      <dl class="pool-facts">
+        <div><dt>Operator</dt><dd>{{if .Operator}}{{.Operator}}{{else}}Not established{{end}}</dd></div>
+        <div><dt>Payout methods</dt><dd>{{range $i, $product := .Products}}{{if $i}} · {{end}}{{$product}}{{else}}Not confirmed{{end}}</dd></div>
+      </dl>
+    </article>
+    {{end}}
+  </section>
+</main>
+<footer><span>StratumStats</span><span>Pool information and independent results, clearly separated.</span></footer>
+</body>
+</html>{{end}}

@@ -1,0 +1,115 @@
+{{define "methodology.html"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Methodology — StratumStats</title>
+  <link rel="icon" href="/static/brand/stratumstats-favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/"><img class="mark" src="/static/brand/stratumstats-logo.svg" alt="">StratumStats</a>
+  <nav><a href="/">Reports</a><a href="/pools">Pool registry</a><a href="https://m45core.com/" target="_blank" rel="noopener noreferrer">Powered by M45Core</a><a href="https://discord.gg/WWemsuTktk" target="_blank" rel="noopener noreferrer">Discord</a></nav>
+</header>
+<aside class="donation-banner" aria-label="Support StratumStats">
+  <div class="donation-copy">
+    <strong>This site is run by donations.</strong>
+    <span>Help keep independent pool checks online.</span>
+  </div>
+  <a class="donation-link" href="bitcoin:3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL?label=StratumStats%20donation" aria-label="Donate Bitcoin to StratumStats">
+    <span class="donation-symbol" aria-hidden="true">₿</span>
+    <span>Donate Bitcoin</span>
+    <code>3B86bWqfjdQeLEr8nkeeWU6ygksc2K7MoL</code>
+  </a>
+</aside>
+<main class="prose">
+  <p class="eyebrow">Method {{.Methodology}}</p>
+  <h1>How the measurements work.</h1>
+  <p class="lede">StratumStats measures several independent parts of pool performance and summarizes them in a transparent 0–100 score. The underlying measurements remain visible because no score makes one pool universally best.</p>
+
+  <h2>Dashboard metrics</h2>
+  <div class="method-grid">
+    <article><h3 id="block-template-latency">Median block delay</h3><p>The median delay until a pool sends its first valid block template, compared with the earliest valid template seen for the same Bitcoin block and region. Lower is better. The dashboard uses the latest 24 hours.</p></article>
+    <article><h3 id="p95">P95 block delay</h3><p>The 95th-percentile delay. Ninety-five percent of measured deliveries were this fast or faster, so P95 exposes occasional stalls that the median may hide.</p></article>
+    <article><h3 id="availability">Availability</h3><p>Valid block-template deliveries divided by observations where the probe was connected and eligible to receive one. The dashboard shows the percentage directly; estimated mining loss carries the color bar.</p></article>
+    <article><h3 id="estimated-mining-loss">Estimated mining loss</h3><p>The unavailable share of eligible template deliveries plus median relative delay during available time, using Bitcoin’s 600-second target block interval. This estimates idle and stale-work time; it is not measured payout or revenue loss.</p></article>
+    <article><h3 id="tcp">TCP connection</h3><p>Time to establish the basic network connection to a pool, including local name lookup.</p></article>
+    <article><h3 id="tls">TLS handshake</h3><p>Time to establish an encrypted connection and verify the pool’s certificate, hostname, validity period, and trusted issuer.</p></article>
+    <article><h3 id="subscribe"><code>mining.subscribe</code></h3><p>The Stratum request that starts a mining session.</p></article>
+    <article><h3 id="authorize"><code>mining.authorize</code></h3><p>The Stratum request that asks the pool to accept the worker identity.</p></article>
+  </div>
+
+  <h2 id="overall-score">Overall score</h2>
+  <p>The 0–100 score weights availability at 40%, estimated mining loss at 25%, P95 block delay at 20%, connection and Stratum setup responsiveness at 10%, and observed fee stability at 5%. Mining loss below 0.1% receives the full component score and is displayed as <code>&lt;0.1%</code>. Availability is graded steeply near 100% because a missed eligible delivery means no valid new-block work was received.</p>
+  <p>A score requires recent median and P95 measurements, except that a solo pool whose worker wallet is not found receives a score of 0 immediately. Responsiveness and fee stability are included only when observed; their missing weights are redistributed across the measured components rather than counted as failures. Fee stability requires at least two matched solo-pool fee samples. A newly observed fee increase subtracts up to 15 additional points, tapering evenly to zero over 30 days. An observed fee above 2.5% subtracts 2.5 points per excess percentage point, capped at 10 points; fees through 2.5% receive no level penalty. An invalid TLS certificate subtracts 10 points. Shared-pool fees remain unobservable and do not affect their score.</p>
+
+  <section id="score-calculation" class="score-math" aria-labelledby="score-calculation-heading">
+    <h3 id="score-calculation-heading">The scoring math</h3>
+    <p>Each measured input becomes a component score from 0 to 100. Values between the listed points use straight-line interpolation; values beyond either end are clamped to the nearest endpoint.</p>
+    <div class="score-formulas">
+      <article>
+        <h4>1. Estimated mining loss</h4>
+        <code class="score-equation">delay_loss = median_ms ÷ 600,000 × 100</code>
+        <code class="score-equation">mining_loss = (100 − availability) + (availability ÷ 100 × delay_loss)</code>
+        <p>All values are percentages. This adds missed eligible deliveries to delay loss during the time a pool was available.</p>
+      </article>
+      <article>
+        <h4>2. Base weighted score</h4>
+        <code class="score-equation">base = (40A + 25L + 20P + 10R + 5F) ÷ W</code>
+        <p><strong>A</strong> is availability, <strong>L</strong> mining loss, <strong>P</strong> P95, <strong>R</strong> responsiveness, and <strong>F</strong> fee stability after each is converted to a 0–100 component score. <strong>W</strong> is the sum of included weights: 100 when every component is available, 95 without fee stability, 90 without responsiveness, or 85 without either.</p>
+      </article>
+      <article>
+        <h4>3. Score modifiers</h4>
+        <code class="score-equation">increase_penalty = 15 × (1 − age_days ÷ 30)</code>
+        <code class="score-equation">high_fee_penalty = min(10, 2.5 × max(0, fee_pct − 2.5))</code>
+        <code class="score-equation">tls_certificate_penalty = 10 if any certificate error, otherwise 0</code>
+        <p>The increase penalty applies only to an observed increase less than 30 days old; otherwise it is zero. The high-fee penalty applies only to an observed solo-pool fee above 2.5%.</p>
+      </article>
+      <article>
+        <h4>4. Published score</h4>
+        <code class="score-equation">score = round(clamp(base − increase_penalty − high_fee_penalty − tls_certificate_penalty, 0, 100))</code>
+        <code class="score-equation">score = 0 for a solo pool when its worker wallet is not found</code>
+        <p>The final score is a whole number. The worker-wallet rule overrides the weighted calculation because an absent or inconsistent worker payout means the tested solo configuration would not pay the miner. A missing optional component is omitted from both the weighted numerator and <strong>W</strong>, so missing evidence is not treated as failure.</p>
+      </article>
+    </div>
+
+    <h4>Component curves</h4>
+    <div class="score-curve-wrap">
+      <table class="score-curve-table">
+        <thead><tr><th>Component</th><th>Measurement → component score</th><th>Calculation detail</th></tr></thead>
+        <tbody>
+          <tr><td>Availability (A)</td><td><code>≤90%→0 · 95%→20 · 98%→60 · 99%→80 · 99.5%→90 · 100%→100</code></td><td>Uses cumulative eligible deliveries.</td></tr>
+          <tr><td>Mining loss (L)</td><td><code>≤0.1%→100 · 0.25%→90 · 0.5%→75 · 1%→50 · 2.5%→10 · ≥5%→0</code></td><td>Uses the combined mining-loss equation above.</td></tr>
+          <tr><td>P95 delay (P)</td><td><code>≤250ms→100 · 500ms→90 · 1,000ms→75 · 2,000ms→50 · 5,000ms→10 · ≥10,000ms→0</code></td><td>Uses the rolling 24-hour P95.</td></tr>
+          <tr><td>Responsiveness (R)</td><td><code>0ms→100 · 100ms→95 · 250ms→80 · 500ms→60 · 1,000ms→30 · ≥2,500ms→0</code></td><td>Average curve score of observed median TCP, TLS, subscribe, and authorize timings.</td></tr>
+          <tr><td>Fee stability (F)</td><td><code>clamp(100 × (1 − changes ÷ (samples − 1)), 0, 100)</code></td><td>Included for solo pools with at least two matched fee samples.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <h2>How pools are compared</h2>
+  <p>Block-template delay is compared only for the same Bitcoin block observed from the same region. This reduces differences caused by geography and clock timing. Median, P95, history, and Stratum response timings use a rolling 24-hour window; availability and payout verification remain cumulative.</p>
+  <p>A valid coinbase-only template counts as delivery because it lets miners stop working on the previous block immediately. Empty-first frequency is retained as raw evidence but is not displayed or scored.</p>
+
+  <h2>Coinbase payouts and fees</h2>
+  <p id="coinbase-payout">The probe reconstructs each valid coinbase transaction and checks whether an output matches its generated worker address. That address is discarded before data is published.</p>
+  <p>For a solo pool with a matched worker output, the observed effective fee is <code>100 × (total coinbase value − worker payout) ÷ total coinbase value</code>. Donations or configured payout splits may be included in that percentage.</p>
+  <p>Shared-pool miner fees cannot be measured from the block coinbase because participant balances and later payouts are handled separately. StratumStats therefore does not display a fee for shared pools.</p>
+  <p id="non-worker-destination">A <strong>non-worker destination</strong> is a positive-value coinbase output that did not match the probe worker script. It may be a pool fee, donation, witness commitment, payout split, or another participant; it does not prove ownership.</p>
+
+  <h2>Pool groups</h2>
+  <p><strong>Free solo pools</strong> have a consistently matched worker payout and a latest observed fee of 0%. <strong>Paid solo pools</strong> have a matched payout and either a nonzero or not-yet-measured fee. Pools whose worker wallet was absent from decoded coinbase payouts are shown separately from pools that simply need more payout evidence.</p>
+  <p id="pplns"><strong>PPLNS</strong> means Pay Per Last N Shares: rewards are based on work submitted during a recent share window. Other shared pools use different payout methods.</p>
+
+  <h2>What is excluded</h2>
+  <p>Pool size, popularity, sponsorship, paid placement, subjective reputation, operator-advertised fees, and unobservable shared-pool fees.</p>
+
+  <h2>Privacy and disclosures</h2>
+  <p>Operational details that could identify measurement traffic are intentionally withheld. Published results are aggregated to protect measurement integrity.</p>
+  <ul>{{range .Disclosure}}<li>{{.}}</li>{{end}}</ul>
+</main>
+<footer><span>StratumStats</span><span>Measurements with context.</span></footer>
+</body>
+</html>{{end}}

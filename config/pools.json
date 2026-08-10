@@ -1,0 +1,875 @@
+{
+  "pools": [
+    {
+      "id": "2miners_btc_solo",
+      "name": "2Miners Bitcoin SOLO",
+      "website": "https://2miners.com/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "asia-solo-btc.2miners.com",
+          "port": 12323,
+          "tls": true,
+          "region": "Asia"
+        },
+        {
+          "host": "asia-solo-btc.2miners.com",
+          "port": 2323,
+          "tls": false,
+          "region": "Asia"
+        },
+        {
+          "host": "solo-btc.2miners.com",
+          "port": 12323,
+          "tls": true,
+          "region": "Europe"
+        },
+        {
+          "host": "solo-btc.2miners.com",
+          "port": 2323,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "us-solo-btc.2miners.com",
+          "port": 12323,
+          "tls": true,
+          "region": "United States"
+        },
+        {
+          "host": "us-solo-btc.2miners.com",
+          "port": 2323,
+          "tls": false,
+          "region": "United States"
+        }
+      ],
+      "operator": "2Miners",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "atlaspool",
+      "name": "AtlasPool",
+      "website": "https://atlaspool.io/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "solo.atlaspool.io",
+          "port": 3333,
+          "tls": false
+        },
+        {
+          "host": "solo.atlaspool.io",
+          "port": 4333,
+          "tls": true
+        },
+        {
+          "host": "solo.atlaspool.io",
+          "port": 4334,
+          "tls": false
+        }
+      ],
+      "operator": "AtlasPool",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "bitcoinmerch",
+      "name": "Bitcoin Merch Lucky Pool",
+      "website": "https://pool.bitcoinmerch.com/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "pool.bitcoinmerch.com",
+          "port": 3333,
+          "tls": false
+        },
+        {
+          "host": "pool.bitcoinmerch.com",
+          "port": 4333,
+          "tls": true
+        }
+      ],
+      "operator": "Bitcoin Merch LLC",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "blitzpool",
+      "name": "Blitzpool — Solo",
+      "website": "https://blitzpool.yourdevice.ch/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 3333,
+          "tls": false
+        },
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 3339,
+          "tls": false
+        },
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 6666,
+          "tls": true
+        }
+      ],
+      "operator": "yourdevice.ch",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "blitzpool_pplns",
+      "name": "Blitzpool — PPLNS",
+      "website": "https://blitzpool.yourdevice.ch/",
+      "category": "shared",
+      "endpoints": [
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 3340,
+          "tls": false
+        },
+        {
+          "host": "blitzpool.yourdevice.ch",
+          "port": 6640,
+          "tls": true
+        }
+      ],
+      "operator": "yourdevice.ch",
+      "status": "active",
+      "products": [
+        "PPLNS"
+      ]
+    },
+    {
+      "id": "braiins_solo",
+      "name": "Braiins Solo",
+      "website": "https://solo.braiins.com/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "solo.stratum.braiins.com",
+          "port": 25,
+          "tls": false
+        },
+        {
+          "host": "solo.stratum.braiins.com",
+          "port": 3333,
+          "tls": false
+        },
+        {
+          "host": "solo.stratum.braiins.com",
+          "port": 443,
+          "tls": false
+        }
+      ],
+      "operator": "Braiins Mining Ltd.",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "ckpool",
+      "name": "Solo CKPool",
+      "website": "https://solo.ckpool.org/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "stratum.ckpool.org",
+          "port": 3333,
+          "tls": false
+        },
+        {
+          "host": "stratum.ckpool.org",
+          "port": 4334,
+          "tls": false
+        }
+      ],
+      "operator": "Solo CKPool",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "findmyblock_xyz",
+      "name": "FindMyBlock.xyz",
+      "website": "https://findmyblock.xyz/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "eu.findmyblock.xyz",
+          "port": 3335,
+          "tls": false,
+          "region": "Europe"
+        }
+      ],
+      "operator": "FindMyBlock.xyz",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "gobrrr_me",
+      "name": "Go Brrr Pool",
+      "website": "https://pool.gobrrr.me/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "pool.gobrrr.me",
+          "port": 3333,
+          "tls": false
+        }
+      ],
+      "operator": "Go Brrr",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "helios",
+      "name": "HeliosPool",
+      "website": "https://heliospool.com/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "btc.heliospool.asia",
+          "port": 3333,
+          "tls": false,
+          "region": "Asia Pacific"
+        },
+        {
+          "host": "btc.heliospool.asia",
+          "port": 4444,
+          "tls": false,
+          "region": "Asia Pacific"
+        },
+        {
+          "host": "btc.heliospool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "North America"
+        },
+        {
+          "host": "btc.heliospool.com",
+          "port": 4444,
+          "tls": false,
+          "region": "North America"
+        },
+        {
+          "host": "btc.heliospool.eu",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "btc.heliospool.eu",
+          "port": 4444,
+          "tls": false,
+          "region": "Europe"
+        }
+      ],
+      "operator": "HeliosPool",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "letsmineit",
+      "name": "LetsMine.it — Bitcoin Solo",
+      "website": "https://letsmine.it/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "de1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "Germany"
+        },
+        {
+          "host": "fr1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "France"
+        },
+        {
+          "host": "gb1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "United Kingdom"
+        },
+        {
+          "host": "pl1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "Poland"
+        },
+        {
+          "host": "sg1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "Singapore"
+        },
+        {
+          "host": "us1.letsmine.it",
+          "port": 3332,
+          "tls": false,
+          "region": "United States"
+        }
+      ],
+      "operator": "LetsMine.it",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "letsmineit_prop",
+      "name": "LetsMine.it — Bitcoin PROP",
+      "website": "https://letsmine.it/",
+      "category": "shared",
+      "endpoints": [
+        {
+          "host": "de1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "Germany"
+        },
+        {
+          "host": "fr1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "France"
+        },
+        {
+          "host": "gb1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "United Kingdom"
+        },
+        {
+          "host": "pl1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "Poland"
+        },
+        {
+          "host": "sg1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "Singapore"
+        },
+        {
+          "host": "us1.letsmine.it",
+          "port": 3432,
+          "tls": false,
+          "region": "United States"
+        }
+      ],
+      "operator": "LetsMine.it",
+      "status": "active",
+      "products": [
+        "PROP"
+      ]
+    },
+    {
+      "id": "m45core",
+      "name": "M45Core.com",
+      "website": "https://m45core.com/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "m45core.com",
+          "port": 3333,
+          "tls": false,
+          "region": "United States"
+        },
+        {
+          "host": "m45core.com",
+          "port": 4333,
+          "tls": true,
+          "region": "United States"
+        },
+        {
+          "host": "tinyminer.m45core.com",
+          "port": 3334,
+          "tls": false,
+          "region": "United States"
+        },
+        {
+          "host": "tinyminer.m45core.com",
+          "port": 4334,
+          "tls": true,
+          "region": "United States"
+        }
+      ],
+      "operator": "M45Core",
+      "status": "active",
+      "products": [
+        "SOLO",
+        "TinyMiner SOLO"
+      ]
+    },
+    {
+      "id": "mineshop",
+      "name": "Mineshop Solo Pool",
+      "website": "https://solo.mineshop.eu/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "solo.mineshop.eu",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "solo.mineshop.eu",
+          "port": 3335,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "stratum-de.solo.mineshop.eu",
+          "port": 3333,
+          "tls": false,
+          "region": "Germany"
+        },
+        {
+          "host": "stratum-de.solo.mineshop.eu",
+          "port": 3335,
+          "tls": false,
+          "region": "Germany"
+        }
+      ],
+      "operator": "Mineshop.eu",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "noderunners",
+      "name": "Noderunners Mining Pool",
+      "website": "https://noderunners.network/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "pool.noderunners.network",
+          "port": 1336,
+          "tls": true
+        },
+        {
+          "host": "pool.noderunners.network",
+          "port": 1337,
+          "tls": false
+        }
+      ],
+      "operator": "Noderunners",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "ocean",
+      "name": "OCEAN",
+      "website": "https://ocean.xyz/",
+      "category": "shared",
+      "endpoints": [
+        {
+          "host": "mine.ocean.xyz",
+          "port": 3334,
+          "tls": false
+        }
+      ],
+      "operator": "OCEAN",
+      "status": "active",
+      "products": [
+        "TIDES"
+      ]
+    },
+    {
+      "id": "parasite",
+      "name": "Parasite Pool",
+      "website": "https://parasite.space/",
+      "category": "hybrid",
+      "endpoints": [
+        {
+          "host": "parasite.wtf",
+          "port": 42069,
+          "tls": false
+        }
+      ],
+      "operator": "Parasite Pool",
+      "status": "active",
+      "products": [
+        "finder bonus",
+        "shared round"
+      ]
+    },
+    {
+      "id": "public_pool",
+      "name": "Public Pool — Solo",
+      "website": "https://web.public-pool.io/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "public-pool.io",
+          "port": 3333,
+          "tls": false
+        },
+        {
+          "host": "public-pool.io",
+          "port": 4333,
+          "tls": true
+        }
+      ],
+      "operator": "Public Pool",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "public_pool_pplns",
+      "name": "Public Pool — PPLNS",
+      "website": "https://web.public-pool.io/",
+      "category": "shared",
+      "endpoints": [
+        {
+          "host": "public-pool.io",
+          "port": 13333,
+          "tls": false
+        },
+        {
+          "host": "public-pool.io",
+          "port": 14333,
+          "tls": true
+        }
+      ],
+      "operator": "Public Pool",
+      "status": "active",
+      "products": [
+        "PPLNS"
+      ]
+    },
+    {
+      "id": "pyblock",
+      "name": "PyBLOCK",
+      "website": "https://pool.pyblock.xyz/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "pool.pyblock.xyz",
+          "port": 4444,
+          "tls": false
+        }
+      ],
+      "operator": "PyBLOCK",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "satoshiradio_solo",
+      "name": "Satoshi Radio Mining Pool",
+      "website": "https://pool.satoshiradio.nl/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "pool.satoshiradio.nl",
+          "port": 3333,
+          "tls": false
+        }
+      ],
+      "operator": "Satoshi Radio",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "solo_cat",
+      "name": "solo.cat",
+      "website": "https://solo.cat/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "solo.cat",
+          "port": 3333,
+          "tls": false
+        }
+      ],
+      "operator": "Solo Cat",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "solofury",
+      "name": "SoloFury",
+      "website": "https://solofury.com/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "afr-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Johannesburg, South Africa"
+        },
+        {
+          "host": "asia-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Singapore"
+        },
+        {
+          "host": "btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Atlanta, US"
+        },
+        {
+          "host": "eu-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Frankfurt, Germany"
+        },
+        {
+          "host": "jp-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Tokyo, Japan"
+        },
+        {
+          "host": "lat-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Sao Paulo, Brazil"
+        },
+        {
+          "host": "me-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Tel Aviv, Israel"
+        },
+        {
+          "host": "pnw-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "Seattle, US"
+        },
+        {
+          "host": "uk-btc.solofury.com",
+          "port": 6060,
+          "tls": false,
+          "region": "London, United Kingdom"
+        }
+      ],
+      "operator": "SoloFury",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "solohash_co_uk",
+      "name": "SoloHash Bitcoin Solo",
+      "website": "https://solohash.co.uk/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "solo-ca.solohash.co.uk",
+          "port": 3333,
+          "tls": false,
+          "region": "Canada"
+        },
+        {
+          "host": "solo-ca.solohash.co.uk",
+          "port": 3334,
+          "tls": false,
+          "region": "Canada"
+        },
+        {
+          "host": "solo-de.solohash.co.uk",
+          "port": 3333,
+          "tls": false,
+          "region": "Germany"
+        },
+        {
+          "host": "solo-de.solohash.co.uk",
+          "port": 3334,
+          "tls": false,
+          "region": "Germany"
+        },
+        {
+          "host": "solo.solohash.co.uk",
+          "port": 3333,
+          "tls": false,
+          "region": "United Kingdom"
+        },
+        {
+          "host": "solo.solohash.co.uk",
+          "port": 3334,
+          "tls": false,
+          "region": "United Kingdom"
+        }
+      ],
+      "operator": "SoloHash",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "solomining_de",
+      "name": "SoloMining.de",
+      "website": "https://pool.solomining.de/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "pool.solomining.de",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "pool.solomining.de",
+          "port": 4333,
+          "tls": true,
+          "region": "Europe"
+        }
+      ],
+      "operator": "SoloMining.de",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "solopool_com",
+      "name": "SoloPool.Com — Solo",
+      "website": "https://solopool.com/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "eu.solopool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "eu.solopool.com",
+          "port": 4444,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "stratum.solopool.com",
+          "port": 3333,
+          "tls": false,
+          "region": "United States"
+        },
+        {
+          "host": "stratum.solopool.com",
+          "port": 4444,
+          "tls": false,
+          "region": "United States"
+        }
+      ],
+      "operator": "SoloPool.Com",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "solopool_org_eu3",
+      "name": "SoloPool.org Bitcoin Solo",
+      "website": "https://btc.solopool.org/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "eu3.solopool.org",
+          "port": 7005,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "eu3.solopool.org",
+          "port": 8005,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "eu3.solopool.org",
+          "port": 9005,
+          "tls": false,
+          "region": "Europe"
+        },
+        {
+          "host": "us1.solopool.org",
+          "port": 7005,
+          "tls": false,
+          "region": "United States"
+        },
+        {
+          "host": "us1.solopool.org",
+          "port": 8005,
+          "tls": false,
+          "region": "United States"
+        },
+        {
+          "host": "us1.solopool.org",
+          "port": 9005,
+          "tls": false,
+          "region": "United States"
+        }
+      ],
+      "operator": "SoloPool.org",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
+      "id": "warppool",
+      "name": "WarpPool",
+      "website": "https://pool.warppool.org/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "pool.warppool.org",
+          "port": 3333,
+          "tls": false
+        },
+        {
+          "host": "pool.warppool.org",
+          "port": 3334,
+          "tls": true
+        }
+      ],
+      "operator": "dvb-Projekt",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    }
+  ]
+}
