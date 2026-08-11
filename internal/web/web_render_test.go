@@ -97,6 +97,27 @@ func TestDashboardShowsGroupSpecificUpdateTags(t *testing.T) {
 	}
 }
 
+func TestDashboardDisplaysWholeScoreButSortsByFractionalValue(t *testing.T) {
+	now := time.Now().UTC().Add(-time.Minute)
+	pool := model.Pool{ID: "fractional", Name: "Fractional", Category: "shared"}
+	observations := []model.Observation{
+		{ObservedAt: now.Add(-time.Minute), PoolID: pool.ID, Vantage: "unknown", BlockID: "one", Eligible: true, Arrived: true, OffsetMS: 80},
+		{ObservedAt: now, PoolID: pool.ID, Vantage: "unknown", BlockID: "two", Eligible: true, Arrived: true, OffsetMS: 500},
+	}
+	handler, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/", nil))
+	row := renderedPoolRow(t, response.Body.String(), pool.ID)
+	for _, want := range []string{`data-sort-score="97.647100"`, `aria-label="Overall performance score 98 out of 100"`, `>98</span>`} {
+		if !strings.Contains(row, want) {
+			t.Errorf("fractional score rendering missing %q: %s", want, row)
+		}
+	}
+}
+
 func TestMiningLossClassUsesLossScale(t *testing.T) {
 	tests := []struct {
 		value *float64

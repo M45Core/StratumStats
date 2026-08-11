@@ -68,9 +68,10 @@
       </article>
       <article>
         <h4>4. Published score</h4>
-        <code class="score-equation">score = round(clamp(base − increase_penalty − high_fee_penalty − tls_certificate_penalty, 0, 100))</code>
+        <code class="score-equation">score = round(clamp(base − increase_penalty − high_fee_penalty − tls_certificate_penalty, 0, 100), 4 decimals)</code>
+        <p>The API and ranking retain four decimal places to avoid artificial ties. The dashboard badge displays the result as a whole number.</p>
         <code class="score-equation">score = 0 for a solo pool when its worker wallet is not found</code>
-        <p>The final score is a whole number. The worker-wallet rule overrides the weighted calculation because an absent or inconsistent worker payout means the tested solo configuration would not pay the miner. A missing optional component is omitted from both the weighted numerator and <strong>W</strong>, so missing evidence is not treated as failure.</p>
+        <p>The worker-wallet rule overrides the weighted calculation because an absent or inconsistent worker payout means the tested solo configuration would not pay the miner. A missing optional component is omitted from both the weighted numerator and <strong>W</strong>, so missing evidence is not treated as failure.</p>
       </article>
     </div>
 

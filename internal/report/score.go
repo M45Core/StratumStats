@@ -92,7 +92,9 @@ func overallScore(report model.PoolReport, now time.Time) overallScoreResult {
 	if report.TLSTiming.CertificateErrors > 0 {
 		tlsCertificatePenalty = ScoreTLSCertificatePenalty
 	}
-	score := math.Round(clamp(weightedScore/weight-feeIncreasePenalty-highFeePenalty-tlsCertificatePenalty, 0, 100))
+	// Preserve fractional score differences for ranking and API consumers. The
+	// dashboard deliberately rounds only when rendering the visible badge.
+	score := round(clamp(weightedScore/weight-feeIncreasePenalty-highFeePenalty-tlsCertificatePenalty, 0, 100), 4)
 	return overallScoreResult{
 		Score: &score, RecentFeeIncreasePenalty: feeIncreasePenalty,
 		HighFeePenalty: highFeePenalty, TLSCertificatePenalty: tlsCertificatePenalty,

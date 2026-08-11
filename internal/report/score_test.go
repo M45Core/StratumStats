@@ -22,8 +22,8 @@ func TestOverallScoreRewardsExcellentCompleteMeasurements(t *testing.T) {
 		SubscribeTiming: model.TimingStats{MedianMS: ptr(60)},
 		AuthorizeTiming: model.TimingStats{MedianMS: ptr(70)},
 	}
-	if score := overallScore(report, time.Time{}).Score; score == nil || *score != 100 {
-		t.Fatalf("score=%v, want 100", score)
+	if score := overallScore(report, time.Time{}).Score; score == nil || *score != 99.7 {
+		t.Fatalf("score=%v, want fractional score 99.7", score)
 	}
 }
 
@@ -58,6 +58,14 @@ func TestOverallScoreMakesAvailabilityDominant(t *testing.T) {
 	availableScore := overallScore(slowerButAvailable, time.Time{}).Score
 	if fastScore == nil || availableScore == nil || *fastScore >= *availableScore {
 		t.Fatalf("fast/unavailable score=%v available score=%v, want availability to dominate", fastScore, availableScore)
+	}
+}
+
+func TestOverallScoreRetainsFractionalPrecision(t *testing.T) {
+	report := model.PoolReport{Blocks: 20, Availability: 100, MedianMS: ptr(500), P95MS: ptr(500)}
+	score := overallScore(report, time.Time{}).Score
+	if score == nil || *score != 97.6471 {
+		t.Fatalf("score=%v, want fractional score 97.6471", score)
 	}
 }
 
@@ -119,8 +127,8 @@ func TestOverallScorePenalizesFeesAboveTwoAndAHalfPercent(t *testing.T) {
 	if standardPenalty != 0 || thresholdPenalty != 0 || standardScore == nil || *standardScore != 100 {
 		t.Fatalf("standard fee score=%v penalties=%.1f/%.1f, want 100/0/0", standardScore, standardPenalty, thresholdPenalty)
 	}
-	if highPenalty != 6.3 || highScore == nil || *highScore != 94 {
-		t.Fatalf("5%% fee score=%v penalty=%.1f, want 94/6.3", highScore, highPenalty)
+	if highPenalty != 6.3 || highScore == nil || *highScore != 93.7 {
+		t.Fatalf("5%% fee score=%v penalty=%.1f, want 93.7/6.3", highScore, highPenalty)
 	}
 	if cappedPenalty != ScoreHighFeeMaxPenalty {
 		t.Fatalf("very high fee penalty=%.1f, want capped %.1f", cappedPenalty, ScoreHighFeeMaxPenalty)

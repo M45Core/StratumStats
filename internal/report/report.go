@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MethodologyVersion = "2026-08-11.28"
+	MethodologyVersion = "2026-08-11.29"
 	reportHistoryLimit = 12
 	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
 	LatencyWindow = 24 * time.Hour

@@ -90,6 +90,8 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 		RetentionWindowDays int      `json:"retention_window_days"`
 		Scoring             struct {
 			Scale                       string             `json:"scale"`
+			PrecisionDecimals           int                `json:"precision_decimals"`
+			DisplayDecimals             int                `json:"display_decimals"`
 			WeightsPct                  map[string]float64 `json:"weights_pct"`
 			MiningLossFullScoreBelowPct float64            `json:"mining_loss_full_score_below_pct"`
 			RecentFeeIncrease           struct {
@@ -116,7 +118,7 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	if !containsString(payload.Metrics, "subscribe_timing") || !containsString(payload.Metrics, "ping_timing") || !containsString(payload.Metrics, "estimated_mining_loss_pct") {
 		t.Fatalf("protocol metrics missing from API: %v", payload.Metrics)
 	}
-	if !containsString(payload.Metrics, "overall_score") || !containsString(payload.Metrics, "recent_fee_increase_penalty") || !containsString(payload.Metrics, "high_fee_penalty") || !containsString(payload.Metrics, "tls_certificate_penalty") || !containsString(payload.Metrics, "score_override_reason") || payload.Scoring.Scale != "0-100" || payload.Scoring.WeightsPct["availability"] != 40 || payload.Scoring.WeightsPct["mining_loss"] != 25 || payload.Scoring.MiningLossFullScoreBelowPct != 0.1 || payload.Scoring.RecentFeeIncrease.MaximumPenaltyPoints != 15 || payload.Scoring.RecentFeeIncrease.DecayDays != 30 || payload.Scoring.HighFee.ThresholdPct != 2.5 || payload.Scoring.HighFee.PenaltyPointsPerExcessPct != 2.5 || payload.Scoring.HighFee.MaximumPenaltyPoints != 10 || payload.Scoring.InvalidTLSCertificate.PenaltyPoints != 10 || payload.Scoring.SoloWorkerWalletNotFound.Score != 0 || !containsString(payload.Scoring.SoloWorkerWalletNotFound.Statuses, "not_observed") || !containsString(payload.Scoring.SoloWorkerWalletNotFound.Statuses, "varied") {
+	if !containsString(payload.Metrics, "overall_score") || !containsString(payload.Metrics, "recent_fee_increase_penalty") || !containsString(payload.Metrics, "high_fee_penalty") || !containsString(payload.Metrics, "tls_certificate_penalty") || !containsString(payload.Metrics, "score_override_reason") || payload.Scoring.Scale != "0-100" || payload.Scoring.PrecisionDecimals != 4 || payload.Scoring.DisplayDecimals != 0 || payload.Scoring.WeightsPct["availability"] != 40 || payload.Scoring.WeightsPct["mining_loss"] != 25 || payload.Scoring.MiningLossFullScoreBelowPct != 0.1 || payload.Scoring.RecentFeeIncrease.MaximumPenaltyPoints != 15 || payload.Scoring.RecentFeeIncrease.DecayDays != 30 || payload.Scoring.HighFee.ThresholdPct != 2.5 || payload.Scoring.HighFee.PenaltyPointsPerExcessPct != 2.5 || payload.Scoring.HighFee.MaximumPenaltyPoints != 10 || payload.Scoring.InvalidTLSCertificate.PenaltyPoints != 10 || payload.Scoring.SoloWorkerWalletNotFound.Score != 0 || !containsString(payload.Scoring.SoloWorkerWalletNotFound.Statuses, "not_observed") || !containsString(payload.Scoring.SoloWorkerWalletNotFound.Statuses, "varied") {
 		t.Fatalf("score methodology missing from API: %+v", payload.Scoring)
 	}
 	if payload.LatencyWindowHours != 24 {
