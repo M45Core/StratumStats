@@ -74,6 +74,18 @@ func TestDashboardShowsGroupSpecificUpdateTags(t *testing.T) {
 			t.Errorf("dashboard missing group update tag %q", want)
 		}
 	}
+	footnoteStart := strings.Index(body, `<p class="dashboard-footnote"`)
+	if footnoteStart < 0 {
+		t.Fatal("dashboard footnote missing")
+	}
+	footnoteEnd := strings.Index(body[footnoteStart:], `</p>`)
+	if footnoteEnd < 0 {
+		t.Fatal("dashboard footnote missing")
+	}
+	footnote := body[footnoteStart : footnoteStart+footnoteEnd]
+	if !strings.Contains(footnote, `Updated <time datetime="`+observedAt.Format(time.RFC3339)+`" data-relative-time`) {
+		t.Fatalf("dashboard footnote does not use the latest observation time: %s", footnote)
+	}
 }
 
 func TestMiningLossClassUsesLossScale(t *testing.T) {

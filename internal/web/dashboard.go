@@ -53,6 +53,7 @@ type latencyHistoryChart struct {
 
 type dashboardPage struct {
 	Snapshot                    model.Snapshot
+	DataUpdatedAt               *time.Time
 	Demo                        bool
 	FreePools                   []dashboardPool
 	NormalPools                 []dashboardPool
@@ -93,6 +94,7 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 	for _, pool := range pools {
 		websiteByPoolID[pool.ID] = pool.Website
 	}
+	displayedPools := make([]dashboardPool, 0, len(snapshot.Reports))
 	for _, report := range snapshot.Reports {
 		if report.EndpointTLS != (selectedTransport == "tls") {
 			continue
@@ -108,6 +110,7 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			IsSolo: isSolo, TLSConfigured: report.EndpointTLS, FeeSortValue: feeSortValue,
 			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
 		}
+		displayedPools = append(displayedPools, pool)
 		if report.MedianMS == nil {
 			page.NoRecentDataPools = append(page.NoRecentDataPools, pool)
 			continue
@@ -159,6 +162,7 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 	page.PPLNSPoolsUpdatedAt = latestPoolUpdate(page.PPLNSPools)
 	page.OtherPoolsUpdatedAt = latestPoolUpdate(page.OtherPools)
 	page.NoRecentDataPoolsUpdatedAt = latestPoolUpdate(page.NoRecentDataPools)
+	page.DataUpdatedAt = latestPoolUpdate(displayedPools)
 	return page
 }
 
