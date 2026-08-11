@@ -179,7 +179,7 @@ func TestDashboardShowsHighFeeScorePenalty(t *testing.T) {
 
 func renderedPoolRow(t *testing.T, body, poolID string) string {
 	t.Helper()
-	start := strings.Index(body, `data-pool-id="`+poolID+`"`)
+	start := strings.Index(body, `data-pool-base-id="`+poolID+`"`)
 	if start < 0 {
 		t.Fatalf("pool row %q not found", poolID)
 	}
@@ -231,7 +231,7 @@ func TestDashboardRendersExpandablePayoutAndMetricHistory(t *testing.T) {
 		"More details",
 		"details-toggle",
 		"Show payment and recent performance details",
-		"aria-controls=\"payout-history-detail\"",
+		"aria-controls=\"payout-history-detail-",
 		"Latest coinbase payout",
 		"Other payment",
 		"test miner address is kept private",

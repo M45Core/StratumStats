@@ -13,7 +13,7 @@ import (
 func TestAppendAndLoad(t *testing.T) {
 	directory := filepath.Join(t.TempDir(), "private-data")
 	path := filepath.Join(directory, "observations.jsonl")
-	want := []model.Observation{{Version: 1, ObservedAt: time.Unix(123, 0).UTC(), Vantage: "test", BlockID: "sample", PoolID: "pool", Eligible: true, Arrived: true, OffsetMS: 12.5}}
+	want := []model.Observation{{Version: model.ObservationVersion, ObservedAt: time.Unix(123, 0).UTC(), Vantage: "test", BlockID: "sample", PoolID: "pool", Eligible: true, Arrived: true, OffsetMS: 12.5}}
 	if err := Append(path, want); err != nil {
 		t.Fatal(err)
 	}
@@ -77,9 +77,9 @@ func TestLoadSinceDiscardsOlderObservations(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "observations.jsonl")
 	cutoff := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
 	observations := []model.Observation{
-		{ObservationID: "old", ObservedAt: cutoff.Add(-time.Nanosecond)},
-		{ObservationID: "boundary", ObservedAt: cutoff},
-		{ObservationID: "recent", ObservedAt: cutoff.Add(time.Hour)},
+		{Version: model.ObservationVersion, ObservationID: "old", ObservedAt: cutoff.Add(-time.Nanosecond)},
+		{Version: model.ObservationVersion, ObservationID: "boundary", ObservedAt: cutoff},
+		{Version: model.ObservationVersion, ObservationID: "recent", ObservedAt: cutoff.Add(time.Hour)},
 	}
 	if err := Append(path, observations); err != nil {
 		t.Fatal(err)
@@ -90,6 +90,24 @@ func TestLoadSinceDiscardsOlderObservations(t *testing.T) {
 	}
 	if len(got) != 2 || got[0].ObservationID != "boundary" || got[1].ObservationID != "recent" {
 		t.Fatalf("retained observations=%+v, want boundary and recent", got)
+	}
+}
+
+func TestLoadIgnoresOlderObservationVersions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "observations-v9.jsonl")
+	observations := []model.Observation{
+		{Version: model.ObservationVersion - 1, ObservationID: "old-schema", ObservedAt: time.Now()},
+		{Version: model.ObservationVersion, ObservationID: "current", ObservedAt: time.Now()},
+	}
+	if err := Append(path, observations); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ObservationID != "current" {
+		t.Fatalf("loaded observations = %+v, want current schema only", got)
 	}
 }
 

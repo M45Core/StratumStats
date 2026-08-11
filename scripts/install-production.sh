@@ -94,11 +94,11 @@ install -o root -g root -m 0755 "$binary" "$install_dir/stratumstats"
 install -o root -g root -m 0644 "$repo_dir/config/pools.json" "$install_dir/config/pools.json"
 install -o root -g root -m 0644 "$repo_dir/deploy/stratumstats.service" "$unit_file"
 
-if [[ ! -e "$data_dir/observations.jsonl" ]]; then
-  install -o "$service_user" -g "$service_user" -m 0640 /dev/null "$data_dir/observations.jsonl"
+if [[ ! -e "$data_dir/observations-v9.jsonl" ]]; then
+  install -o "$service_user" -g "$service_user" -m 0640 /dev/null "$data_dir/observations-v9.jsonl"
 else
-  chown "$service_user:$service_user" "$data_dir/observations.jsonl"
-  chmod 0640 "$data_dir/observations.jsonl"
+  chown "$service_user:$service_user" "$data_dir/observations-v9.jsonl"
+  chmod 0640 "$data_dir/observations-v9.jsonl"
 fi
 
 created_environment=false
@@ -123,7 +123,7 @@ if [[ "$start_service" == true ]]; then
 fi
 
 echo "Installed StratumStats in $install_dir"
-echo "Persistent observations: $data_dir/observations.jsonl"
+echo "Persistent observations: $data_dir/observations-v9.jsonl"
 if [[ "$created_environment" == true ]]; then
   echo "Created $environment_file; copy its key ID and secret into your probe's secret manager."
 fi

@@ -47,10 +47,16 @@ type event struct {
 	protocol                 *model.Observation
 }
 
+type endpointTarget struct {
+	poolID  string
+	address string
+	tls     bool
+}
+
 type activeBlock struct {
 	id       string
 	started  time.Time
-	eligible map[string]bool
+	eligible map[string]endpointTarget
 	arrivals map[string]time.Time
 	empty    map[string]bool
 	tls      map[string]bool
@@ -62,10 +68,13 @@ type activeBlock struct {
 // observations. It submits no shares and never stores randomized credentials.
 func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func([]model.Observation) error) error {
 	events := make(chan event, 256)
+	configured := make(map[string]endpointTarget)
 	var wg sync.WaitGroup
 	for _, p := range pools {
 		for _, endpoint := range p.Endpoints {
 			p, endpoint := p, endpoint
+			address := net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port))
+			configured[endpointConnectionID(p.ID, address, endpoint.TLS)] = endpointTarget{poolID: p.ID, address: address, tls: endpoint.TLS}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -77,7 +86,6 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 	}
 	go func() { wg.Wait(); close(events) }()
 
-	connected := map[string]map[string]bool{}
 	blocks := map[string]*activeBlock{}
 	completedBlocks := map[string]bool{}
 	ticker := time.NewTicker(time.Second)
@@ -99,8 +107,9 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 		sort.Strings(ids)
 		out := make([]model.Observation, 0, len(ids))
 		for _, id := range ids {
+			target := r.eligible[id]
 			at, ok := r.arrivals[id]
-			o := model.Observation{Version: model.ObservationVersion, ObservedAt: r.started.UTC(), Vantage: vantage, BlockID: r.id, PoolID: id, Eligible: true, Arrived: ok, EmptyFirst: r.empty[id], TLS: r.tls[id]}
+			o := model.Observation{Version: model.ObservationVersion, ObservedAt: r.started.UTC(), Vantage: vantage, BlockID: r.id, PoolID: target.poolID, Endpoint: target.address, Eligible: true, Arrived: ok, EmptyFirst: r.empty[id], TLS: target.tls}
 			payout := r.payout[id]
 			o.CoinbaseAnalyzed = payout.coinbaseAnalyzed
 			o.WorkerWalletInCoinbase = payout.workerWalletSeen
@@ -138,10 +147,9 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 				continue
 			}
 			if e.connected != nil {
-				recordConnectionState(connected, e)
 				continue
 			}
-			r := activeBlockForEvent(blocks, completedBlocks, connected, e)
+			r := activeBlockForEvent(blocks, completedBlocks, configured, e)
 			if r == nil {
 				continue
 			}
@@ -162,41 +170,19 @@ func Collect(ctx context.Context, pools []model.Pool, vantage string, emit func(
 
 // activeBlockForEvent prevents late jobs from reopening a measurement window
 // after that Bitcoin block has already been finalized.
-func activeBlockForEvent(blocks map[string]*activeBlock, completed map[string]bool, connected map[string]map[string]bool, e event) *activeBlock {
+func activeBlockForEvent(blocks map[string]*activeBlock, completed map[string]bool, configured map[string]endpointTarget, e event) *activeBlock {
 	if completed[e.prevHash] {
 		return nil
 	}
 	if block := blocks[e.prevHash]; block != nil {
 		return block
 	}
-	block := &activeBlock{id: e.prevHash, started: e.at, eligible: map[string]bool{}, arrivals: map[string]time.Time{}, empty: map[string]bool{}, tls: map[string]bool{}, invalid: map[string]bool{}, payout: map[string]event{}}
-	for id, endpoints := range connected {
-		if len(endpoints) > 0 {
-			block.eligible[id] = true
-		}
+	block := &activeBlock{id: e.prevHash, started: e.at, eligible: map[string]endpointTarget{}, arrivals: map[string]time.Time{}, empty: map[string]bool{}, tls: map[string]bool{}, invalid: map[string]bool{}, payout: map[string]event{}}
+	for id, target := range configured {
+		block.eligible[id] = target
 	}
-	block.eligible[e.poolID] = true
 	blocks[e.prevHash] = block
 	return block
-}
-
-func recordConnectionState(connected map[string]map[string]bool, e event) {
-	if e.connected == nil || e.connectionID == "" {
-		return
-	}
-	endpoints := connected[e.poolID]
-	if *e.connected {
-		if endpoints == nil {
-			endpoints = map[string]bool{}
-			connected[e.poolID] = endpoints
-		}
-		endpoints[e.connectionID] = true
-		return
-	}
-	delete(endpoints, e.connectionID)
-	if len(endpoints) == 0 {
-		delete(connected, e.poolID)
-	}
 }
 
 func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, out chan<- event) error {
@@ -298,7 +284,7 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 	}
 
 	online := true
-	connectionID := address + "/tls=" + strconv.FormatBool(endpoint.TLS)
+	connectionID := endpointConnectionID(poolID, address, endpoint.TLS)
 	select {
 	case out <- event{poolID: poolID, connectionID: connectionID, connected: &online}:
 	case <-ctx.Done():
@@ -429,7 +415,7 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		job.Bits, _ = msg.Params[6].(string)
 		job.NTime, _ = msg.Params[7].(string)
 		verification := VerifyJob(job)
-		e := event{poolID: poolID, prevHash: prev, at: time.Now(), hasTransactions: len(branches) > 0, tls: endpoint.TLS, verified: verification.Valid, coinbaseAnalyzed: verification.CoinbaseAnalyzed, workerWalletSeen: verification.WorkerWalletSeen, coinbaseTotalSats: verification.CoinbaseTotalSats, workerPayoutSats: verification.WorkerPayoutSats, coinbaseOutputs: verification.CoinbaseOutputs, coinbaseOutputCount: verification.CoinbaseOutputCount, coinbaseOutputsTruncated: verification.CoinbaseOutputsTruncated, coinbaseOmittedSats: verification.CoinbaseOmittedSats, estimatedPoolFeePct: verification.EstimatedPoolFeePct}
+		e := event{poolID: poolID, connectionID: endpointConnectionID(poolID, address, endpoint.TLS), prevHash: prev, at: time.Now(), hasTransactions: len(branches) > 0, tls: endpoint.TLS, verified: verification.Valid, coinbaseAnalyzed: verification.CoinbaseAnalyzed, workerWalletSeen: verification.WorkerWalletSeen, coinbaseTotalSats: verification.CoinbaseTotalSats, workerPayoutSats: verification.WorkerPayoutSats, coinbaseOutputs: verification.CoinbaseOutputs, coinbaseOutputCount: verification.CoinbaseOutputCount, coinbaseOutputsTruncated: verification.CoinbaseOutputsTruncated, coinbaseOmittedSats: verification.CoinbaseOmittedSats, estimatedPoolFeePct: verification.EstimatedPoolFeePct}
 		select {
 		case out <- e:
 		case <-ctx.Done():
@@ -470,21 +456,29 @@ func (window *notifyWindow) accept(previousHash string, clean, hasTransactions b
 	return true
 }
 
-// recordBlockEvent keeps the earliest structurally valid template for a pool.
+// recordBlockEvent keeps the earliest structurally valid template for an endpoint.
 // A coinbase-only template is useful work and counts immediately; the presence
 // of transaction branches is retained only as raw empty-first evidence.
 func recordBlockEvent(block *activeBlock, e event) {
+	id := e.connectionID
+	if id == "" {
+		id = e.poolID
+	}
 	if !e.hasTransactions {
-		block.empty[e.poolID] = true
+		block.empty[id] = true
 	}
 	if !e.verified {
-		block.invalid[e.poolID] = true
+		block.invalid[id] = true
 		return
 	}
-	if old, exists := block.arrivals[e.poolID]; !exists || e.at.Before(old) {
-		block.arrivals[e.poolID], block.tls[e.poolID] = e.at, e.tls
-		block.payout[e.poolID] = e
+	if old, exists := block.arrivals[id]; !exists || e.at.Before(old) {
+		block.arrivals[id], block.tls[id] = e.at, e.tls
+		block.payout[id] = e
 	}
+}
+
+func endpointConnectionID(poolID, address string, tls bool) string {
+	return poolID + "/" + address + "/tls=" + strconv.FormatBool(tls)
 }
 
 func publishProtocol(ctx context.Context, out chan<- event, poolID string, endpoint model.Endpoint, method string, started time.Time, status, errorCategory string) error {

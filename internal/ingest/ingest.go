@@ -344,7 +344,8 @@ func validateObservation(observation model.Observation, pools map[string]bool, e
 		}
 	case "":
 		if !pools[observation.PoolID] || observation.BlockID == "" || !observation.Eligible ||
-			(!observation.Arrived && observation.OffsetMS != 0) {
+			(!observation.Arrived && observation.OffsetMS != 0) || observation.Endpoint == "" ||
+			!endpoints[endpointIdentity{poolID: observation.PoolID, address: observation.Endpoint, tls: observation.TLS}] {
 			return errors.New("invalid block observation")
 		}
 	default:

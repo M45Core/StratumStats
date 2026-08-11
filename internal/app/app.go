@@ -11,10 +11,12 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -57,7 +59,7 @@ func serve(args []string, demo bool) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	addr := fs.String("addr", "127.0.0.1:8080", "HTTP listen address")
 	configPath := fs.String("config", "config/pools.json", "pool configuration")
-	dataPath := fs.String("data", "data/observations.jsonl", "JSONL observations")
+	dataPath := fs.String("data", "data/observations-v9.jsonl", "v9 endpoint JSONL observations")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -130,7 +132,7 @@ func serve(args []string, demo bool) error {
 func collect(args []string) error {
 	fs := flag.NewFlagSet("collect", flag.ContinueOnError)
 	configPath := fs.String("config", "config/pools.json", "pool configuration")
-	dataPath := fs.String("data", "data/observations.jsonl", "append-only JSONL output")
+	dataPath := fs.String("data", "data/observations-v9.jsonl", "append-only v9 endpoint JSONL output")
 	vantage := fs.String("vantage", "unknown", "coarse public region, e.g. us-west")
 	filterContinent := fs.Bool("filter-continent", false, "skip endpoints on known different continents")
 	duration := fs.Duration("duration", 0, "stop after this duration (0 runs until interrupted)")
@@ -285,43 +287,45 @@ func demoData(pools []model.Pool) []model.Observation {
 	demoVantages := [...]string{"us-west", "us-central", "us-east", "europe"}
 	for i := 0; i < 120; i++ {
 		for p, pool := range pools {
-			target := demoLatencyTarget(p, len(pools))
-			jitter := 0.7 + 0.6*float64((i*37+p*11)%120)/119
-			offset := math.Max(10, math.Min(10_000, target*jitter))
-			arrived := true
-			switch p {
-			case 12:
-				arrived = i != 37 // one missed eligible delivery
-			case 24:
-				arrived = i%30 != 0 // four missed eligible deliveries
-			}
-			observation := model.Observation{Version: model.ObservationVersion, ObservedAt: now.Add(-time.Duration(120-i) * 10 * time.Minute), Vantage: demoVantages[i%len(demoVantages)], BlockID: fmt.Sprintf("demo-%03d", i), PoolID: pool.ID, Eligible: true, Arrived: arrived, OffsetMS: offset, EmptyFirst: rng.Float64() < float64(p)*.018, TLS: p%2 == 0, CoinbaseAnalyzed: arrived}
-			if pool.Category == "solo" && arrived {
-				fee := float64((p % 4)) * 0.5
-				total := uint64(312_500_000)
-				poolShare := uint64(float64(total) * fee / 100)
-				observation.WorkerWalletInCoinbase = true
-				observation.CoinbaseTotalSats = total
-				observation.WorkerPayoutSats = total - poolShare
-				observation.EstimatedPoolFeePct = &fee
-				observation.CoinbaseOutputs = nil
-				observation.CoinbaseOutputCount = 2 // private worker destination plus a zero-value commitment
-				if poolShare > 0 {
-					observation.CoinbaseOutputs = append(observation.CoinbaseOutputs, model.CoinbaseOutput{ValueSats: poolShare, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"})
-					observation.CoinbaseOutputCount++
+			for endpointIndex, endpoint := range pool.Endpoints {
+				target := demoLatencyTarget(p, len(pools)) * (1 + float64(endpointIndex)*0.08)
+				jitter := 0.7 + 0.6*float64((i*37+p*11+endpointIndex*7)%120)/119
+				offset := math.Max(10, math.Min(10_000, target*jitter))
+				arrived := true
+				switch p {
+				case 12:
+					arrived = i != 37 || endpointIndex != 0 // one missed delivery on one endpoint
+				case 24:
+					arrived = i%30 != 0 || endpointIndex != 0 // four missed deliveries on one endpoint
 				}
-			} else if arrived {
-				total := uint64(312_500_000)
-				first, second := total*60/100, total*25/100
-				observation.CoinbaseTotalSats = total
-				observation.CoinbaseOutputs = []model.CoinbaseOutput{
-					{ValueSats: first, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"},
-					{ValueSats: second, ScriptPubKey: "512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", Address: "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", ScriptType: "p2tr"},
-					{ValueSats: total - first - second, ScriptPubKey: "a914111111111111111111111111111111111111111187", ScriptType: "p2sh"},
+				observation := model.Observation{Version: model.ObservationVersion, ObservedAt: now.Add(-time.Duration(120-i) * 10 * time.Minute), Vantage: demoVantages[i%len(demoVantages)], BlockID: fmt.Sprintf("demo-%03d", i), PoolID: pool.ID, Endpoint: net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port)), Eligible: true, Arrived: arrived, OffsetMS: offset, EmptyFirst: rng.Float64() < float64(p)*.018, TLS: endpoint.TLS, CoinbaseAnalyzed: arrived}
+				if pool.Category == "solo" && arrived {
+					fee := float64((p % 4)) * 0.5
+					total := uint64(312_500_000)
+					poolShare := uint64(float64(total) * fee / 100)
+					observation.WorkerWalletInCoinbase = true
+					observation.CoinbaseTotalSats = total
+					observation.WorkerPayoutSats = total - poolShare
+					observation.EstimatedPoolFeePct = &fee
+					observation.CoinbaseOutputs = nil
+					observation.CoinbaseOutputCount = 2 // private worker destination plus a zero-value commitment
+					if poolShare > 0 {
+						observation.CoinbaseOutputs = append(observation.CoinbaseOutputs, model.CoinbaseOutput{ValueSats: poolShare, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"})
+						observation.CoinbaseOutputCount++
+					}
+				} else if arrived {
+					total := uint64(312_500_000)
+					first, second := total*60/100, total*25/100
+					observation.CoinbaseTotalSats = total
+					observation.CoinbaseOutputs = []model.CoinbaseOutput{
+						{ValueSats: first, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"},
+						{ValueSats: second, ScriptPubKey: "512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", Address: "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", ScriptType: "p2tr"},
+						{ValueSats: total - first - second, ScriptPubKey: "a914111111111111111111111111111111111111111187", ScriptType: "p2sh"},
+					}
+					observation.CoinbaseOutputCount = len(observation.CoinbaseOutputs) + 1
 				}
-				observation.CoinbaseOutputCount = len(observation.CoinbaseOutputs) + 1
+				out = append(out, observation)
 			}
-			out = append(out, observation)
 		}
 	}
 	return appendDemoProtocolData(out, pools, rng, now)

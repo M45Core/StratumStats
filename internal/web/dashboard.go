@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"hash/fnv"
 	"math"
 	"sort"
 	"strings"
@@ -13,6 +14,8 @@ import (
 type dashboardPool struct {
 	model.PoolReport
 	Website          string
+	RowID            string
+	SortName         string
 	LatencyClass     string
 	MiningLossClass  string
 	UnsafeReason     string
@@ -67,43 +70,42 @@ type dashboardPage struct {
 	NoRecentDataPoolsUpdatedAt  *time.Time
 	SelectedVantage             string
 	SelectedLabel               string
+	SelectedTransport           string
 	VantageStatus               *vantageStatus
 	AvailableVantages           map[string]bool
 	ShowUSCombined              bool
 }
 
-func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, selectedVantage string, status *vantageStatus) dashboardPage {
+func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, selectedVantage string, status *vantageStatus, selectedTransport string) dashboardPage {
 	selectedLabel := "All measurements"
 	if label := vantageLabels[selectedVantage]; label != "" {
 		selectedLabel = label
 	}
 	page := dashboardPage{
-		Snapshot:        snapshot,
-		Demo:            demo,
-		SelectedVantage: selectedVantage,
-		SelectedLabel:   selectedLabel,
-		VantageStatus:   status,
+		Snapshot:          snapshot,
+		Demo:              demo,
+		SelectedVantage:   selectedVantage,
+		SelectedLabel:     selectedLabel,
+		SelectedTransport: selectedTransport,
+		VantageStatus:     status,
 	}
-	tlsConfigured := make(map[string]bool, len(pools))
 	websiteByPoolID := make(map[string]string, len(pools))
 	for _, pool := range pools {
 		websiteByPoolID[pool.ID] = pool.Website
-		for _, endpoint := range pool.Endpoints {
-			if endpoint.TLS {
-				tlsConfigured[pool.ID] = true
-				break
-			}
-		}
 	}
 	for _, report := range snapshot.Reports {
+		if report.EndpointTLS != (selectedTransport == "tls") {
+			continue
+		}
 		isSolo := report.Category == "solo"
 		var feeSortValue *float64
 		if isSolo {
 			feeSortValue = report.LatestPoolFeePct
 		}
 		pool := dashboardPool{
-			PoolReport: report, Website: websiteByPoolID[report.PoolID], LatencyClass: latencyClass(report.MedianMS), MiningLossClass: miningLossClass(report.EstimatedMiningLossPct),
-			IsSolo: isSolo, TLSConfigured: tlsConfigured[report.PoolID], FeeSortValue: feeSortValue,
+			PoolReport: report, Website: websiteByPoolID[report.PoolID], RowID: endpointRowID(report), SortName: report.PoolName + " " + report.Endpoint,
+			LatencyClass: latencyClass(report.MedianMS), MiningLossClass: miningLossClass(report.EstimatedMiningLossPct),
+			IsSolo: isSolo, TLSConfigured: report.EndpointTLS, FeeSortValue: feeSortValue,
 			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
 		}
 		if report.MedianMS == nil {
@@ -160,6 +162,12 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 	return page
 }
 
+func endpointRowID(report model.PoolReport) string {
+	hash := fnv.New64a()
+	_, _ = fmt.Fprintf(hash, "%s\x00%s\x00%t", report.PoolID, report.Endpoint, report.EndpointTLS)
+	return fmt.Sprintf("%s-%x", report.PoolID, hash.Sum64())
+}
+
 func latestPoolUpdate(pools []dashboardPool) *time.Time {
 	var latest time.Time
 	for _, pool := range pools {
@@ -178,12 +186,12 @@ func sortByOverallScore(pools []dashboardPool) {
 		left, right := pools[i], pools[j]
 		if left.OverallScore == nil || right.OverallScore == nil {
 			if left.OverallScore == nil && right.OverallScore == nil {
-				return left.PoolName < right.PoolName
+				return left.SortName < right.SortName
 			}
 			return left.OverallScore != nil
 		}
 		if *left.OverallScore == *right.OverallScore {
-			return left.PoolName < right.PoolName
+			return left.SortName < right.SortName
 		}
 		return *left.OverallScore > *right.OverallScore
 	})
@@ -203,12 +211,12 @@ func sortByTemplateLatency(pools []dashboardPool) {
 		left, right := pools[i], pools[j]
 		if left.MedianMS == nil || right.MedianMS == nil {
 			if left.MedianMS == nil && right.MedianMS == nil {
-				return left.PoolName < right.PoolName
+				return left.SortName < right.SortName
 			}
 			return left.MedianMS != nil
 		}
 		if *left.MedianMS == *right.MedianMS {
-			return left.PoolName < right.PoolName
+			return left.SortName < right.SortName
 		}
 		return *left.MedianMS < *right.MedianMS
 	})

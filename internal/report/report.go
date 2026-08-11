@@ -1,17 +1,19 @@
-// Package report computes deterministic pool telemetry reports and their
+// Package report computes deterministic endpoint telemetry reports and their
 // measurement-based performance score.
 package report
 
 import (
 	"math"
+	"net"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
 const (
-	MethodologyVersion = "2026-08-10.26"
+	MethodologyVersion = "2026-08-10.27"
 	reportHistoryLimit = 12
 	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
 	LatencyWindow = 24 * time.Hour
@@ -32,12 +34,59 @@ type coinbaseSample struct {
 
 type accumulator struct {
 	pool           model.Pool
+	endpoint       model.Endpoint
+	address        string
 	lastObservedAt time.Time
 	blocks         map[string]bool
 	offsets        map[string]metricSample
 	tls            bool
 	coinbase       map[string]coinbaseSample
 	timings        map[string]*timingAccumulator
+}
+
+func newAccumulator(pool model.Pool, endpoint model.Endpoint) *accumulator {
+	return &accumulator{
+		pool: pool, endpoint: endpoint, address: endpointAddress(endpoint),
+		blocks: map[string]bool{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{},
+	}
+}
+
+func endpointAddress(endpoint model.Endpoint) string {
+	if endpoint.Host == "" || endpoint.Port == 0 {
+		return ""
+	}
+	return net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port))
+}
+
+func endpointReportKey(poolID, address string, tls bool) string {
+	return poolID + "\x00" + address + "\x00" + strconv.FormatBool(tls)
+}
+
+func reportKey(report model.PoolReport) string {
+	return endpointReportKey(report.PoolID, report.Endpoint, report.EndpointTLS)
+}
+
+func observationAccumulator(acc map[string]*accumulator, pools map[string]model.Pool, observation model.Observation) (*accumulator, bool) {
+	if observation.Endpoint != "" {
+		a := acc[endpointReportKey(observation.PoolID, observation.Endpoint, observation.TLS)]
+		return a, a != nil
+	}
+	pool, ok := pools[observation.PoolID]
+	if !ok {
+		return nil, false
+	}
+	// Pool-only observations predate endpoint attribution. They are safe only
+	// when there is exactly one possible endpoint (or in endpoint-free tests).
+	if len(pool.Endpoints) == 1 {
+		endpoint := pool.Endpoints[0]
+		a := acc[endpointReportKey(pool.ID, endpointAddress(endpoint), endpoint.TLS)]
+		return a, a != nil
+	}
+	if len(pool.Endpoints) == 0 {
+		a := acc[endpointReportKey(pool.ID, "", false)]
+		return a, a != nil
+	}
+	return nil, false
 }
 
 // Compute applies only objective probe measurements. Operator size, fees,
@@ -47,16 +96,25 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 	observations = RetainObservations(observations, now)
 	observations = uniqueObservations(observations)
 	completedRemoteRuns := completedScheduledRuns(observations)
-	acc := make(map[string]*accumulator, len(pools))
+	acc := make(map[string]*accumulator)
+	poolsByID := make(map[string]model.Pool, len(pools))
 	observedBlocks := make(map[string]bool)
-	eligiblePoolSamples := make(map[string]bool)
+	eligibleEndpointSamples := make(map[string]bool)
 	templateDeliveries := make(map[string]bool)
 	canonicalWindows := make(map[string]time.Time)
 	for _, p := range pools {
-		acc[p.ID] = &accumulator{pool: p, blocks: map[string]bool{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{}}
+		poolsByID[p.ID] = p
+		if len(p.Endpoints) == 0 {
+			acc[endpointReportKey(p.ID, "", false)] = newAccumulator(p, model.Endpoint{})
+			continue
+		}
+		for _, endpoint := range p.Endpoints {
+			address := endpointAddress(endpoint)
+			acc[endpointReportKey(p.ID, address, endpoint.TLS)] = newAccumulator(p, endpoint)
+		}
 	}
 	for _, o := range observations {
-		if acc[o.PoolID] == nil || o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != "" || !o.Eligible || o.BlockID == "" || !scoreableBlockObservation(o, completedRemoteRuns) {
+		if _, ok := observationAccumulator(acc, poolsByID, o); !ok || o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != "" || !o.Eligible || o.BlockID == "" || !scoreableBlockObservation(o, completedRemoteRuns) {
 			continue
 		}
 		key := blockWindowKey(o)
@@ -69,8 +127,8 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		if !protocolRecord && o.BlockID != "" && scoreableBlockObservation(o, completedRemoteRuns) {
 			observedBlocks[o.BlockID] = true
 		}
-		a := acc[o.PoolID]
-		if a == nil {
+		a, ok := observationAccumulator(acc, poolsByID, o)
+		if !ok {
 			continue
 		}
 		if protocolRecord {
@@ -88,8 +146,8 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		}
 		recordLatestObservation(a, o.ObservedAt)
 		key := observationKey(o)
-		globalKey := o.PoolID + "\x00" + key
-		eligiblePoolSamples[globalKey] = true
+		globalKey := endpointReportKey(o.PoolID, a.address, a.endpoint.TLS) + "\x00" + key
+		eligibleEndpointSamples[globalKey] = true
 		a.blocks[key] = true
 		if o.Arrived && o.OffsetMS >= 0 {
 			templateDeliveries[globalKey] = true
@@ -113,19 +171,25 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		reports = append(reports, build(a, now))
 	}
 	sort.SliceStable(reports, func(i, j int) bool {
-		return reports[i].PoolName < reports[j].PoolName
+		if reports[i].PoolName != reports[j].PoolName {
+			return reports[i].PoolName < reports[j].PoolName
+		}
+		if reports[i].Endpoint != reports[j].Endpoint {
+			return reports[i].Endpoint < reports[j].Endpoint
+		}
+		return !reports[i].EndpointTLS && reports[j].EndpointTLS
 	})
 	return model.Snapshot{
-		GeneratedAt:         now.UTC(),
-		Methodology:         MethodologyVersion,
-		LatencyWindowHours:  int(LatencyWindow / time.Hour),
-		RetentionWindowDays: int(RetentionWindow / (24 * time.Hour)),
-		BlocksObserved:      len(observedBlocks),
-		EligiblePoolSamples: len(eligiblePoolSamples),
-		TemplateDeliveries:  len(templateDeliveries),
-		Reports:             reports,
+		GeneratedAt:             now.UTC(),
+		Methodology:             MethodologyVersion,
+		LatencyWindowHours:      int(LatencyWindow / time.Hour),
+		RetentionWindowDays:     int(RetentionWindow / (24 * time.Hour)),
+		BlocksObserved:          len(observedBlocks),
+		EligibleEndpointSamples: len(eligibleEndpointSamples),
+		TemplateDeliveries:      len(templateDeliveries),
+		Reports:                 reports,
 		Disclosure: []string{
-			"Reports use automated observations only; no pool pays or applies for placement.",
+			"Reports use automated endpoint observations only; no pool pays or applies for placement.",
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
 			"No observation older than 30 days is used; block-template latency, latency history, and protocol timing use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
@@ -160,7 +224,7 @@ func scoreableBlockObservation(observation model.Observation, completedRemoteRun
 }
 
 // ComputeVantage filters telemetry to one coarse vantage while retaining
-// global coinbase evidence for pool safety classification and fee history.
+// global coinbase evidence for endpoint safety classification and fee history.
 func ComputeVantage(pools []model.Pool, observations []model.Observation, vantage string, now time.Time) model.Snapshot {
 	return ComputeVantages(pools, observations, map[string]bool{vantage: true}, now)
 }
@@ -178,10 +242,10 @@ func ComputeVantages(pools []model.Pool, observations []model.Observation, vanta
 	global := Compute(pools, observations, now)
 	globalReports := make(map[string]model.PoolReport, len(global.Reports))
 	for _, poolReport := range global.Reports {
-		globalReports[poolReport.PoolID] = poolReport
+		globalReports[reportKey(poolReport)] = poolReport
 	}
 	for index := range regional.Reports {
-		evidence := globalReports[regional.Reports[index].PoolID]
+		evidence := globalReports[reportKey(regional.Reports[index])]
 		regional.Reports[index].CoinbaseSamples = evidence.CoinbaseSamples
 		regional.Reports[index].WorkerAddressObservedPct = evidence.WorkerAddressObservedPct
 		regional.Reports[index].WorkerAddressStatus = evidence.WorkerAddressStatus
@@ -202,7 +266,7 @@ func ComputeVantages(pools []model.Pool, observations []model.Observation, vanta
 	}
 	regional.Disclosure = append(regional.Disclosure,
 		"Regional views contain scheduled samples only; availability is not continuous uptime.",
-		"Solo-pool safety and fee evidence remain global when latency and protocol metrics are filtered by vantage.",
+		"Solo-pool safety and fee evidence remain global across vantages but are kept separate per endpoint.",
 	)
 	return regional
 }
@@ -373,6 +437,7 @@ func build(a *accumulator, now time.Time) model.PoolReport {
 	}
 	report := model.PoolReport{
 		PoolID: a.pool.ID, PoolName: a.pool.Name, Category: a.pool.Category, Products: a.pool.Products,
+		Endpoint: a.address, EndpointTLS: a.endpoint.TLS, EndpointRegion: a.endpoint.Region,
 		LastObservedAt: lastObservedAt,
 		Blocks:         blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median, availability, blocks),
 		Availability: round(availability, 1), TLSObserved: a.tls,

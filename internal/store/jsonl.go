@@ -18,8 +18,8 @@ func Load(path string) ([]model.Observation, error) {
 	return LoadSince(path, time.Time{})
 }
 
-// LoadSince retains only observations at or after cutoff. JSONL is sequential,
-// so old lines are still scanned and decoded, but they are not kept in memory.
+// LoadSince retains only current-schema observations at or after cutoff. JSONL
+// is sequential, so discarded lines are scanned and decoded but not kept.
 func LoadSince(path string, cutoff time.Time) ([]model.Observation, error) {
 	f, err := os.Open(path) // #nosec G304 -- the local operator selects the telemetry path.
 	if errors.Is(err, os.ErrNotExist) {
@@ -36,6 +36,9 @@ func LoadSince(path string, cutoff time.Time) ([]model.Observation, error) {
 		var o model.Observation
 		if err := json.Unmarshal(s.Bytes(), &o); err != nil {
 			return nil, err
+		}
+		if o.Version != model.ObservationVersion {
+			continue
 		}
 		if !cutoff.IsZero() && o.ObservedAt.Before(cutoff) {
 			continue

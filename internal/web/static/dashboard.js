@@ -3,6 +3,7 @@
 
   const refreshEveryMS = 10000;
   const vantageStorageKey = "stratumstats.selectedVantage";
+  const transportStorageKey = "stratumstats.selectedTransport";
   let refreshing = false;
   const sortStates = new Map();
 
@@ -55,26 +56,56 @@
     }
   }
 
-  function restoreVantage() {
-    const links = [...document.querySelectorAll(".vantage-selector a[data-vantage]")];
-    if (links.length === 0) return;
-    links.forEach((link) => link.addEventListener("click", () => storeVantage(link.dataset.vantage)));
+  function restoreSelections() {
+    const vantageLinks = [...document.querySelectorAll(".vantage-selector a[data-vantage]")];
+    const transportLinks = [...document.querySelectorAll(".transport-selector a[data-transport]")];
+    vantageLinks.forEach((link) => link.addEventListener("click", () => storeVantage(link.dataset.vantage)));
+    transportLinks.forEach((link) => link.addEventListener("click", () => {
+      try {
+        window.localStorage.setItem(transportStorageKey, link.dataset.transport);
+      } catch (_) {
+        // Storage may be unavailable in private or restricted browser contexts.
+      }
+    }));
 
-    const explicit = new URLSearchParams(window.location.search).get("vantage");
-    const current = links.find((link) => link.getAttribute("aria-current") === "page")?.dataset.vantage || "";
-    if (explicit) {
-      if (links.some((link) => link.dataset.vantage === explicit)) storeVantage(explicit);
-      return;
+    const params = new URLSearchParams(window.location.search);
+    const explicitVantage = params.get("vantage") || "";
+    const currentVantage = vantageLinks.find((link) => link.getAttribute("aria-current") === "page")?.dataset.vantage || "";
+    let targetVantage = currentVantage;
+    if (explicitVantage && vantageLinks.some((link) => link.dataset.vantage === explicitVantage)) {
+      targetVantage = explicitVantage;
+      storeVantage(explicitVantage);
+    } else if (!explicitVantage) {
+      const saved = storedVantage();
+      if (vantageLinks.some((link) => link.dataset.vantage === saved)) targetVantage = saved;
+      else if (saved) storeVantage("");
     }
 
-    const saved = storedVantage();
-    if (!saved) return;
-    const target = links.find((link) => link.dataset.vantage === saved);
-    if (!target) {
-      storeVantage("");
-      return;
+    const explicitTransport = params.get("transport") || "";
+    const currentTransport = transportLinks.find((link) => link.getAttribute("aria-current") === "page")?.dataset.transport || "plain";
+    let targetTransport = currentTransport;
+    if (explicitTransport && transportLinks.some((link) => link.dataset.transport === explicitTransport)) {
+      targetTransport = explicitTransport;
+      try {
+        window.localStorage.setItem(transportStorageKey, explicitTransport);
+      } catch (_) {
+        // Storage may be unavailable in private or restricted browser contexts.
+      }
+    } else if (!explicitTransport) {
+      try {
+        const saved = window.localStorage.getItem(transportStorageKey) || "";
+        if (transportLinks.some((link) => link.dataset.transport === saved)) targetTransport = saved;
+      } catch (_) {
+        // Storage may be unavailable in private or restricted browser contexts.
+      }
     }
-    if (saved !== current) window.location.replace(target.href);
+
+    if (targetVantage !== currentVantage || targetTransport !== currentTransport) {
+      const target = new URL(window.location.href);
+      if (targetVantage) target.searchParams.set("vantage", targetVantage);
+      target.searchParams.set("transport", targetTransport);
+      window.location.replace(target.href);
+    }
   }
 
   function placeRows(list, rows) {
@@ -260,7 +291,7 @@
       }
       orderedRows.push(row);
       if (changed) {
-        updatedPools.push(row.querySelector(".measurement-pool strong")?.textContent.trim() || poolID);
+        updatedPools.push(row.dataset.updateLabel || row.querySelector(".measurement-pool strong")?.textContent.trim() || poolID);
         changedRows.push(row);
       }
     }
@@ -329,7 +360,7 @@
     }
   }
 
-  restoreVantage();
+  restoreSelections();
   bindSorting();
   bindDetails();
   updateRelativeTimes();

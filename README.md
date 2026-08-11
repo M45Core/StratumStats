@@ -33,7 +33,7 @@ go run .
 # Collect real observations until interrupted.
 go run . collect -vantage us-west
 
-# Serve reports from data/observations.jsonl.
+# Serve endpoint reports from data/observations-v9.jsonl.
 go run . serve
 ```
 
@@ -52,11 +52,13 @@ continent; global and unlocated endpoints remain enabled.
 
 ## Measurement model
 
-StratumStats records observations rather than pool claims. Template latency is
-relative to the earliest structurally valid template observed for the same block
-and vantage. Median, P95, history, and protocol timings use a rolling 24-hour
-window. No report, score, count, payout, or fee evidence uses observations older
-than 30 days.
+StratumStats records observations rather than pool claims. Each report represents
+one configured pool endpoint and transport (`pool + host:port + TLS mode`).
+Template latency is relative to the earliest structurally valid template observed
+for the same block and vantage. Every configured endpoint is eligible for that
+block, so an endpoint that is down records a missed delivery and mining loss.
+Median, P95, history, and protocol timings use a rolling 24-hour window. No report,
+score, count, payout, or fee evidence uses observations older than 30 days.
 
 Protocol measurements include TCP connect, TLS handshake, `mining.subscribe`,
 `mining.authorize`, and optional `mining.ping`. Coinbase reconstruction checks
@@ -89,14 +91,14 @@ sudo ./scripts/install-production.sh --binary .dist/stratumstats
 ```
 
 The service listens on `127.0.0.1:8081` and stores observations in
-`/var/lib/stratumstats/observations.jsonl`. Review the
+`/var/lib/stratumstats/observations-v9.jsonl`. Review the
 [systemd unit](deploy/stratumstats.service) and
 [environment example](deploy/stratumstats.env.example) before installing. Use
 `--no-start` to install without starting the service.
 
 ## HTTP API
 
-- `GET /api/v1/reports` — pool reports
+- `GET /api/v1/reports` — per-endpoint reports
 - `GET /api/v1/vantages` — regional sample counts and health
 - `GET /api/v1/probe-config` — probe-compatible endpoint configuration
 - `GET /api/v1/pools` — configured pool information

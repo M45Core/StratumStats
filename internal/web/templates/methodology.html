@@ -30,9 +30,9 @@
 
   <h2>Dashboard metrics</h2>
   <div class="method-grid">
-    <article><h3 id="block-template-latency">Median block delay</h3><p>The median delay until a pool sends its first valid block template, compared with the earliest valid template seen for the same Bitcoin block and region. Lower is better. The dashboard uses the latest 24 hours.</p></article>
+    <article><h3 id="block-template-latency">Median block delay</h3><p>The median delay until one configured endpoint sends its first valid block template, compared with the earliest valid template seen for the same Bitcoin block and region. Lower is better. The dashboard uses the latest 24 hours.</p></article>
     <article><h3 id="p95">P95 block delay</h3><p>The 95th-percentile delay. Ninety-five percent of measured deliveries were this fast or faster, so P95 exposes occasional stalls that the median may hide.</p></article>
-    <article><h3 id="availability">Availability</h3><p>Valid block-template deliveries divided by observations where the probe was connected and eligible to receive one during the latest 30 days. Scheduled observations enter this calculation only after their complete, lossless probe run is received, so an interrupted upload cannot lower availability. The dashboard shows the percentage directly; estimated mining loss carries the color bar.</p></article>
+    <article><h3 id="availability">Availability</h3><p>Valid block-template deliveries divided by eligible block observations for that configured endpoint during the latest 30 days. Every configured endpoint is eligible once a block window is confirmed, even if it is disconnected, because a down server cannot provide mining work. Scheduled observations enter this calculation only after their complete, lossless probe run is received, so an interrupted upload cannot lower availability. The dashboard shows the percentage directly; estimated mining loss carries the color bar.</p></article>
     <article><h3 id="estimated-mining-loss">Estimated mining loss</h3><p>The unavailable share of eligible template deliveries plus median relative delay during available time, using Bitcoin’s 600-second target block interval. This estimates idle and stale-work time; it is not measured payout or revenue loss.</p></article>
     <article><h3 id="tcp">TCP connection</h3><p>Time to establish the basic network connection to a pool, including local name lookup.</p></article>
     <article><h3 id="tls">TLS handshake</h3><p>Time to establish an encrypted connection and verify the pool’s certificate, hostname, validity period, and trusted issuer.</p></article>
@@ -52,7 +52,7 @@
         <h4>1. Estimated mining loss</h4>
         <code class="score-equation">delay_loss = median_ms ÷ 600,000 × 100</code>
         <code class="score-equation">mining_loss = (100 − availability) + (availability ÷ 100 × delay_loss)</code>
-        <p>All values are percentages. This adds missed eligible deliveries to delay loss during the time a pool was available.</p>
+        <p>All values are percentages. This adds missed eligible endpoint deliveries—including periods when that endpoint was down—to delay loss during available time.</p>
       </article>
       <article>
         <h4>2. Base weighted score</h4>
@@ -89,7 +89,7 @@
     </div>
   </section>
 
-  <h2>How pools are compared</h2>
+  <h2>How endpoints are compared</h2>
   <p>Block-template delay is compared only for the same Bitcoin block observed from the same region. This reduces differences caused by geography and clock timing. Median, P95, history, and Stratum response timings use a rolling 24-hour window. Every other report value is also bounded: observations older than 30 days are excluded from availability, payout verification, fee evidence, counts, and scores.</p>
   <p>A valid coinbase-only template counts as delivery because it lets miners stop working on the previous block immediately. Empty-first frequency is retained as raw evidence but is not displayed or scored.</p>
 

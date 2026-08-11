@@ -36,8 +36,8 @@ func TestComputeReportsAvailabilityAndLatency(t *testing.T) {
 	if s.Reports[0].Blocks != 40 {
 		t.Fatalf("eligible blocks = %d", s.Reports[0].Blocks)
 	}
-	if s.BlocksObserved != 40 || s.EligiblePoolSamples != 80 || s.TemplateDeliveries != 70 {
-		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 40/80/70", s.BlocksObserved, s.EligiblePoolSamples, s.TemplateDeliveries)
+	if s.BlocksObserved != 40 || s.EligibleEndpointSamples != 80 || s.TemplateDeliveries != 70 {
+		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 40/80/70", s.BlocksObserved, s.EligibleEndpointSamples, s.TemplateDeliveries)
 	}
 }
 
@@ -66,8 +66,8 @@ func TestComputeDeduplicatesArrivalsByVantageAndBlock(t *testing.T) {
 	if report.MedianMS == nil || *report.MedianMS != 10 {
 		t.Fatalf("median=%v, want earliest deduplicated offsets [10,20]", report.MedianMS)
 	}
-	if snapshot.BlocksObserved != 4 || snapshot.EligiblePoolSamples != 3 || snapshot.TemplateDeliveries != 2 {
-		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 4/3/2", snapshot.BlocksObserved, snapshot.EligiblePoolSamples, snapshot.TemplateDeliveries)
+	if snapshot.BlocksObserved != 4 || snapshot.EligibleEndpointSamples != 3 || snapshot.TemplateDeliveries != 2 {
+		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 4/3/2", snapshot.BlocksObserved, snapshot.EligibleEndpointSamples, snapshot.TemplateDeliveries)
 	}
 }
 
@@ -118,8 +118,8 @@ func TestComputeScoresOnlyCompletedLosslessScheduledRuns(t *testing.T) {
 	}
 
 	snapshot := Compute(pools, observations, now)
-	if snapshot.BlocksObserved != 2 || snapshot.EligiblePoolSamples != 4 || snapshot.TemplateDeliveries != 3 {
-		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 2/4/3", snapshot.BlocksObserved, snapshot.EligiblePoolSamples, snapshot.TemplateDeliveries)
+	if snapshot.BlocksObserved != 2 || snapshot.EligibleEndpointSamples != 4 || snapshot.TemplateDeliveries != 3 {
+		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 2/4/3", snapshot.BlocksObserved, snapshot.EligibleEndpointSamples, snapshot.TemplateDeliveries)
 	}
 	if snapshot.Reports[0].Blocks != 2 || snapshot.Reports[0].Availability != 100 {
 		t.Fatalf("fast report included an incomplete run: %+v", snapshot.Reports[0])
@@ -159,8 +159,8 @@ func TestComputeIgnoresReopenedWindowsForSameBlock(t *testing.T) {
 		{PoolID: "late", Vantage: "west", BlockID: "block", ObservedAt: started.Add(20 * time.Second), Eligible: true, Arrived: true, OffsetMS: 0},
 	}
 	snapshot := Compute(pools, observations, started.Add(time.Hour))
-	if snapshot.BlocksObserved != 1 || snapshot.EligiblePoolSamples != 2 || snapshot.TemplateDeliveries != 2 {
-		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 1/2/2", snapshot.BlocksObserved, snapshot.EligiblePoolSamples, snapshot.TemplateDeliveries)
+	if snapshot.BlocksObserved != 1 || snapshot.EligibleEndpointSamples != 2 || snapshot.TemplateDeliveries != 2 {
+		t.Fatalf("snapshot counts = blocks:%d eligible:%d delivered:%d, want 1/2/2", snapshot.BlocksObserved, snapshot.EligibleEndpointSamples, snapshot.TemplateDeliveries)
 	}
 	if snapshot.Reports[0].MedianMS == nil || *snapshot.Reports[0].MedianMS != 0 {
 		t.Fatalf("first median = %v, want 0", snapshot.Reports[0].MedianMS)
