@@ -63,9 +63,13 @@ func (s Server) Handler() (http.Handler, error) {
 		}
 		available := availableVantages(observations)
 		statuses := buildVantageStatuses(observations, now)
-		hideStaleRegionalVantages(available, statuses)
+		if !s.Demo {
+			hideStaleRegionalVantages(available, statuses)
+		}
 		vantage := r.URL.Query().Get("vantage")
-		if vantage == "" && !s.Demo {
+		if vantage == "" && s.Demo && (available["us-west"] || available["us-central"] || available["us-east"] || available["europe"]) {
+			vantage = "us-all"
+		} else if vantage == "" && !s.Demo {
 			if available["us-west"] || available["us-central"] || available["us-east"] {
 				vantage = "us-all"
 			} else if available["unknown"] {

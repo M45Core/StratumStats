@@ -126,7 +126,7 @@
   {{if .Demo}}<div class="notice dashboard-notice compact-notice">Preview only — these numbers are examples, not live results.</div>{{end}}
 
   <div class="dashboard-controls">
-    {{if and (not .Demo) (or (index .AvailableVantages "unknown") .ShowUSCombined (index .AvailableVantages "us-west") (index .AvailableVantages "us-central") (index .AvailableVantages "us-east") (index .AvailableVantages "europe"))}}<section class="vantage-bar" aria-label="Measurement region">
+    {{if or (index .AvailableVantages "unknown") .ShowUSCombined (index .AvailableVantages "us-west") (index .AvailableVantages "us-central") (index .AvailableVantages "us-east") (index .AvailableVantages "europe")}}<section class="vantage-bar" aria-label="Measurement region">
       <span class="control-label">Region</span>
       <div class="vantage-selector">
         {{if index .AvailableVantages "unknown"}}<a href="/?vantage=unknown" data-vantage="unknown" {{if eq .SelectedVantage "unknown"}}aria-current="page"{{end}}>Local</a>{{end}}
@@ -136,7 +136,6 @@
         {{if index .AvailableVantages "us-east"}}<a href="/?vantage=us-east" data-vantage="us-east" {{if eq .SelectedVantage "us-east"}}aria-current="page"{{end}}>East</a>{{end}}
         {{if index .AvailableVantages "europe"}}<a href="/?vantage=europe" data-vantage="europe" {{if eq .SelectedVantage "europe"}}aria-current="page"{{end}}>Europe</a>{{end}}
       </div>
-      <p><strong>{{.SelectedLabel}}</strong>{{with .VantageStatus}}{{if .LastObservationAt}} · checked <time datetime="{{.LastObservationAt.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{.LastObservationAt.Format "02 Jan 15:04 UTC"}}</time>{{end}}{{if .Stale}} · <span class="vantage-stale">out of date</span>{{end}}{{else}}{{if eq .SelectedVantage "unknown"}} · locally collected data{{else}} · combined regional results{{end}}{{end}}</p>
     </section>{{end}}
     <nav class="section-jump" aria-label="Jump to pool group" {{if not (or .FreePools .NormalPools .PPLNSPools .OtherPools .NoRecentDataPools .MissingWalletPools .PendingWalletPools)}}hidden{{end}}><span class="control-label">Jump to</span><a href="#free-solo-pools" {{if not .FreePools}}hidden{{end}}>Free solo</a><a href="#non-free-solo-pools" {{if not .NormalPools}}hidden{{end}}>Paid solo</a><a href="#pplns-share-pools" {{if not .PPLNSPools}}hidden{{end}}>PPLNS shared</a><a href="#other-non-solo-pools" {{if not .OtherPools}}hidden{{end}}>Other shared</a><a href="#no-recent-data-pools" {{if not .NoRecentDataPools}}hidden{{end}}>No recent data</a><a href="#missing-worker-wallet-pools" {{if not .MissingWalletPools}}hidden{{end}}>Worker wallet missing</a><a href="#pending-worker-wallet-pools" {{if not .PendingWalletPools}}hidden{{end}}>Verification pending</a></nav>
   </div>

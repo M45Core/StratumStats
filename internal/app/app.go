@@ -282,6 +282,7 @@ func demoData(pools []model.Pool) []model.Observation {
 	rng := rand.New(rand.NewSource(81)) // #nosec G404 -- reproducible synthetic demo data is intentional.
 	out := make([]model.Observation, 0, len(pools)*120)
 	now := time.Now().UTC()
+	demoVantages := [...]string{"us-west", "us-central", "us-east", "europe"}
 	for i := 0; i < 120; i++ {
 		for p, pool := range pools {
 			target := demoLatencyTarget(p, len(pools))
@@ -294,7 +295,7 @@ func demoData(pools []model.Pool) []model.Observation {
 			case 24:
 				arrived = i%30 != 0 // four missed eligible deliveries
 			}
-			observation := model.Observation{Version: model.ObservationVersion, ObservedAt: now.Add(-time.Duration(120-i) * 10 * time.Minute), Vantage: "demo", BlockID: fmt.Sprintf("demo-%03d", i), PoolID: pool.ID, Eligible: true, Arrived: arrived, OffsetMS: offset, EmptyFirst: rng.Float64() < float64(p)*.018, TLS: p%2 == 0, CoinbaseAnalyzed: arrived}
+			observation := model.Observation{Version: model.ObservationVersion, ObservedAt: now.Add(-time.Duration(120-i) * 10 * time.Minute), Vantage: demoVantages[i%len(demoVantages)], BlockID: fmt.Sprintf("demo-%03d", i), PoolID: pool.ID, Eligible: true, Arrived: arrived, OffsetMS: offset, EmptyFirst: rng.Float64() < float64(p)*.018, TLS: p%2 == 0, CoinbaseAnalyzed: arrived}
 			if pool.Category == "solo" && arrived {
 				fee := float64((p % 4)) * 0.5
 				total := uint64(312_500_000)
