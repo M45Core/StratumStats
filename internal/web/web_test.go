@@ -48,6 +48,9 @@ func TestDashboardRenders(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control=%q, want no-store", got)
+	}
 }
 
 func TestSecurityHeaders(t *testing.T) {

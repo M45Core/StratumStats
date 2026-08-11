@@ -99,6 +99,7 @@ func (s Server) Handler() (http.Handler, error) {
 		page.AvailableVantages = available
 		page.ShowUSCombined = available["us-west"] || available["us-central"] || available["us-east"]
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
 		_ = t.ExecuteTemplate(w, "index.html", page)
 	})
 	mux.HandleFunc("GET /coinbase", func(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +112,7 @@ func (s Server) Handler() (http.Handler, error) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
 		_ = t.ExecuteTemplate(w, "methodology.html", data)
 	})
 	mux.HandleFunc("GET /api/v1/pools", func(w http.ResponseWriter, r *http.Request) {

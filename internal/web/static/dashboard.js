@@ -146,10 +146,8 @@
       } else {
         comparison = leftRaw.localeCompare(rightRaw, undefined, { sensitivity: "base" });
       }
-      if (comparison === 0) {
-        comparison = (left.dataset.sortPool || "").localeCompare(right.dataset.sortPool || "", undefined, { sensitivity: "base" });
-      }
-      return direction === "ascending" ? comparison : -comparison;
+      if (comparison !== 0) return direction === "ascending" ? comparison : -comparison;
+      return (left.dataset.sortPool || "").localeCompare(right.dataset.sortPool || "", undefined, { sensitivity: "base" });
     });
     placeRows(list, rows);
     sortStates.set(wrapper.id, { key, type, direction });

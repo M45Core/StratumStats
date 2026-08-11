@@ -90,6 +90,9 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	if !strings.Contains(script.Body.String(), "window.scrollTo(viewport.scrollX, viewport.scrollY)") {
 		t.Fatal("dashboard updater does not restore the user's fixed scroll position")
 	}
+	if !strings.Contains(script.Body.String(), `if (comparison !== 0) return direction === "ascending" ? comparison : -comparison;`) {
+		t.Fatal("dashboard updater does not keep pool-name tie breaks stable across sort directions")
+	}
 
 	stylesheet := httptest.NewRecorder()
 	h.ServeHTTP(stylesheet, httptest.NewRequest("GET", "/static/style.css", nil))
