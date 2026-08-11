@@ -54,7 +54,7 @@ func (s Server) Handler() (http.Handler, error) {
 	snapshot := func(vantage string) (model.Snapshot, error) {
 		return cache.snapshot(vantage, time.Now().UTC())
 	}
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UTC()
 		observations, err := cache.records(now)
 		if err != nil {
@@ -88,10 +88,6 @@ func (s Server) Handler() (http.Handler, error) {
 		page.ShowUSCombined = available["us-west"] || available["us-central"] || available["us-east"]
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = t.ExecuteTemplate(w, "index.html", page)
-	})
-	mux.HandleFunc("GET /pools", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = t.ExecuteTemplate(w, "pools.html", struct{ Pools []model.Pool }{s.Pools})
 	})
 	mux.HandleFunc("GET /coinbase", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusMovedPermanently)
@@ -128,6 +124,10 @@ func (s Server) Handler() (http.Handler, error) {
 				cache.invalidate()
 			}
 		})
+	} else {
+		mux.HandleFunc("POST /api/v1/ingest", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "ingest disabled", http.StatusMethodNotAllowed)
+		})
 	}
 	mux.HandleFunc("GET /api/v1/reports", func(w http.ResponseWriter, r *http.Request) {
 		vantage := r.URL.Query().Get("vantage")
@@ -152,7 +152,7 @@ func (s Server) Handler() (http.Handler, error) {
 		writeJSON(w, buildVantageStatuses(observations, now))
 	})
 	mux.HandleFunc("GET /api/v1/methodology", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": map[string]any{"scale": "0-100", "weights_pct": map[string]float64{"availability": report.ScoreAvailabilityWeight, "mining_loss": report.ScoreMiningLossWeight, "p95_delay": report.ScoreP95Weight, "responsiveness": report.ScoreResponsivenessWeight, "fee_stability": report.ScoreFeeStabilityWeight}, "mining_loss_full_score_below_pct": 0.1, "recent_fee_increase": map[string]any{"maximum_penalty_points": report.ScoreFeeIncreaseMaxPenalty, "decay_days": int(report.ScoreFeeIncreaseWindow / (24 * time.Hour))}, "high_fee": map[string]any{"threshold_pct": report.ScoreHighFeeThreshold, "penalty_points_per_excess_pct": report.ScoreHighFeePenaltyPerPct, "maximum_penalty_points": report.ScoreHighFeeMaxPenalty}, "invalid_tls_certificate": map[string]any{"penalty_points": report.ScoreTLSCertificatePenalty}, "solo_worker_wallet_not_found": map[string]any{"score": 0, "statuses": []string{"not_observed", "varied"}}, "missing_optional_components": "reweighted", "fee_stability_minimum_samples": 2}, "latency_window_hours": int(report.LatencyWindow / time.Hour), "measurement_modes": []string{"continuous", "scheduled"}, "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "estimated_mining_loss_pct", "overall_score", "recent_fee_increase_penalty", "high_fee_penalty", "tls_certificate_penalty", "score_override_reason", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "latest_pool_fee_pct", "previous_pool_fee_pct", "pool_fee_changed", "pool_fee_changes", "pool_fee_samples", "pool_fee_last_changed_at", "latest_coinbase_observed_at", "latest_coinbase_total_sats", "latest_coinbase_output_count", "latest_payout_destinations", "latest_payout_destinations_truncated", "latest_payout_omitted_sats", "template_latency_history", "pool_fee_history", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
+		writeJSON(w, map[string]any{"version": report.MethodologyVersion, "scoring": map[string]any{"scale": "0-100", "weights_pct": map[string]float64{"availability": report.ScoreAvailabilityWeight, "mining_loss": report.ScoreMiningLossWeight, "p95_delay": report.ScoreP95Weight, "responsiveness": report.ScoreResponsivenessWeight, "fee_stability": report.ScoreFeeStabilityWeight}, "mining_loss_full_score_below_pct": 0.1, "recent_fee_increase": map[string]any{"maximum_penalty_points": report.ScoreFeeIncreaseMaxPenalty, "decay_days": int(report.ScoreFeeIncreaseWindow / (24 * time.Hour))}, "high_fee": map[string]any{"threshold_pct": report.ScoreHighFeeThreshold, "penalty_points_per_excess_pct": report.ScoreHighFeePenaltyPerPct, "maximum_penalty_points": report.ScoreHighFeeMaxPenalty}, "invalid_tls_certificate": map[string]any{"penalty_points": report.ScoreTLSCertificatePenalty}, "solo_worker_wallet_not_found": map[string]any{"score": 0, "statuses": []string{"not_observed", "varied"}}, "missing_optional_components": "reweighted", "fee_stability_minimum_samples": 2}, "latency_window_hours": int(report.LatencyWindow / time.Hour), "retention_window_days": int(report.RetentionWindow / (24 * time.Hour)), "measurement_modes": []string{"continuous", "scheduled"}, "metrics": []string{"blocks", "arrivals", "availability_pct", "median_ms", "p95_ms", "estimated_mining_loss_pct", "overall_score", "recent_fee_increase_penalty", "high_fee_penalty", "tls_certificate_penalty", "score_override_reason", "coinbase_samples", "worker_address_observed_pct", "worker_address_status", "latest_pool_fee_pct", "previous_pool_fee_pct", "pool_fee_changed", "pool_fee_changes", "pool_fee_samples", "pool_fee_last_changed_at", "latest_coinbase_observed_at", "latest_coinbase_total_sats", "latest_coinbase_output_count", "latest_payout_destinations", "latest_payout_destinations_truncated", "latest_payout_omitted_sats", "template_latency_history", "pool_fee_history", "tls_observed", "connect_timing", "tls_handshake_timing", "subscribe_timing", "authorize_timing", "ping_timing"}})
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /static/", http.FileServer(http.FS(assets)))

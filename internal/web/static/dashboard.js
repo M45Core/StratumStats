@@ -2,8 +2,80 @@
   "use strict";
 
   const refreshEveryMS = 10000;
+  const vantageStorageKey = "stratumstats.selectedVantage";
   let refreshing = false;
   const sortStates = new Map();
+
+  function relativeAge(timestamp, now = Date.now()) {
+    const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+    if (elapsedSeconds < 60) return "just now";
+
+    const units = [
+      ["day", 86400],
+      ["hour", 3600],
+      ["min", 60],
+    ];
+    let remaining = elapsedSeconds;
+    const parts = [];
+    for (const [name, seconds] of units) {
+      const value = Math.floor(remaining / seconds);
+      if (value === 0) continue;
+      parts.push(`${value} ${name}${value === 1 || name === "min" ? "" : "s"}`);
+      remaining %= seconds;
+      if (parts.length === 2) break;
+    }
+    return `${parts.join(" ")} ago`;
+  }
+
+  function updateRelativeTimes() {
+    const now = Date.now();
+    document.querySelectorAll("time[data-relative-time]").forEach((element) => {
+      const timestamp = Date.parse(element.dateTime);
+      if (!Number.isFinite(timestamp)) return;
+      const date = new Date(timestamp);
+      element.textContent = relativeAge(timestamp, now);
+      element.title = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "long" });
+    });
+  }
+
+  function storedVantage() {
+    try {
+      return window.localStorage.getItem(vantageStorageKey) || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function storeVantage(vantage) {
+    try {
+      if (vantage) window.localStorage.setItem(vantageStorageKey, vantage);
+      else window.localStorage.removeItem(vantageStorageKey);
+    } catch (_) {
+      // Storage may be unavailable in private or restricted browser contexts.
+    }
+  }
+
+  function restoreVantage() {
+    const links = [...document.querySelectorAll(".vantage-selector a[data-vantage]")];
+    if (links.length === 0) return;
+    links.forEach((link) => link.addEventListener("click", () => storeVantage(link.dataset.vantage)));
+
+    const explicit = new URLSearchParams(window.location.search).get("vantage");
+    const current = links.find((link) => link.getAttribute("aria-current") === "page")?.dataset.vantage || "";
+    if (explicit) {
+      if (links.some((link) => link.dataset.vantage === explicit)) storeVantage(explicit);
+      return;
+    }
+
+    const saved = storedVantage();
+    if (!saved) return;
+    const target = links.find((link) => link.dataset.vantage === saved);
+    if (!target) {
+      storeVantage("");
+      return;
+    }
+    if (saved !== current) window.location.replace(target.href);
+  }
 
   function placeRows(list, rows) {
     let previous = list.querySelector(".measurement-head");
@@ -116,6 +188,10 @@
   function comparableRowHTML(row) {
     const clone = row.cloneNode(true);
     setDetailsState(clone, false);
+    clone.querySelectorAll("time[data-relative-time]").forEach((element) => {
+      element.textContent = element.dateTime;
+      element.removeAttribute("title");
+    });
     return clone.innerHTML;
   }
 
@@ -141,6 +217,9 @@
     const jump = document.querySelector(".section-jump");
     const nextJump = nextDocument.querySelector(".section-jump");
     if (jump && nextJump) jump.hidden = nextJump.hidden;
+    const meta = section.querySelector("[data-section-meta]");
+    const nextMeta = nextSection.querySelector("[data-section-meta]");
+    if (meta && nextMeta && meta.innerHTML !== nextMeta.innerHTML) meta.innerHTML = nextMeta.innerHTML;
   }
 
   function syncList(id, nextDocument, updatedPools) {
@@ -228,16 +307,12 @@
         syncList("other-pools-list", nextDocument, updatedPools);
         syncList("no-recent-data-pools-list", nextDocument, updatedPools);
 
-        const summary = document.querySelector("[data-live-summary]");
-        const nextSummary = nextDocument.querySelector("[data-live-summary]");
-        if (summary && nextSummary && summary.innerHTML !== nextSummary.innerHTML) {
-          summary.innerHTML = nextSummary.innerHTML;
-        }
         const footnote = document.querySelector("[data-live-footnote]");
         const nextFootnote = nextDocument.querySelector("[data-live-footnote]");
         if (footnote && nextFootnote && footnote.innerHTML !== nextFootnote.innerHTML) {
           footnote.innerHTML = nextFootnote.innerHTML;
         }
+        updateRelativeTimes();
       } finally {
         restoreViewport(viewport);
         root.style.overflowAnchor = previousOverflowAnchor;
@@ -254,8 +329,11 @@
     }
   }
 
+  restoreVantage();
   bindSorting();
   bindDetails();
+  updateRelativeTimes();
+  window.setInterval(updateRelativeTimes, 30000);
   window.setInterval(refresh, refreshEveryMS);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) refresh();

@@ -10,7 +10,7 @@
 <body>
 <header>
   <a class="brand" href="/"><img class="mark" src="/static/brand/stratumstats-logo.svg" alt="">StratumStats</a>
-  <nav><a href="/">Reports</a><a href="/pools">Pool registry</a><a href="https://m45core.com/" target="_blank" rel="noopener noreferrer">Powered by M45Core</a><a href="https://discord.gg/WWemsuTktk" target="_blank" rel="noopener noreferrer">Discord</a></nav>
+  <nav><a href="/">Reports</a><a href="https://m45core.com/" target="_blank" rel="noopener noreferrer">Powered by M45Core</a><a href="https://discord.gg/WWemsuTktk" target="_blank" rel="noopener noreferrer">Discord</a></nav>
 </header>
 <aside class="donation-banner" aria-label="Support StratumStats">
   <div class="donation-copy">
@@ -32,7 +32,7 @@
   <div class="method-grid">
     <article><h3 id="block-template-latency">Median block delay</h3><p>The median delay until a pool sends its first valid block template, compared with the earliest valid template seen for the same Bitcoin block and region. Lower is better. The dashboard uses the latest 24 hours.</p></article>
     <article><h3 id="p95">P95 block delay</h3><p>The 95th-percentile delay. Ninety-five percent of measured deliveries were this fast or faster, so P95 exposes occasional stalls that the median may hide.</p></article>
-    <article><h3 id="availability">Availability</h3><p>Valid block-template deliveries divided by observations where the probe was connected and eligible to receive one. Scheduled observations enter this calculation only after their complete, lossless probe run is received, so an interrupted upload cannot lower availability. The dashboard shows the percentage directly; estimated mining loss carries the color bar.</p></article>
+    <article><h3 id="availability">Availability</h3><p>Valid block-template deliveries divided by observations where the probe was connected and eligible to receive one during the latest 30 days. Scheduled observations enter this calculation only after their complete, lossless probe run is received, so an interrupted upload cannot lower availability. The dashboard shows the percentage directly; estimated mining loss carries the color bar.</p></article>
     <article><h3 id="estimated-mining-loss">Estimated mining loss</h3><p>The unavailable share of eligible template deliveries plus median relative delay during available time, using Bitcoin’s 600-second target block interval. This estimates idle and stale-work time; it is not measured payout or revenue loss.</p></article>
     <article><h3 id="tcp">TCP connection</h3><p>Time to establish the basic network connection to a pool, including local name lookup.</p></article>
     <article><h3 id="tls">TLS handshake</h3><p>Time to establish an encrypted connection and verify the pool’s certificate, hostname, validity period, and trusted issuer.</p></article>
@@ -79,7 +79,7 @@
       <table class="score-curve-table">
         <thead><tr><th>Component</th><th>Measurement → component score</th><th>Calculation detail</th></tr></thead>
         <tbody>
-          <tr><td>Availability (A)</td><td><code>≤90%→0 · 95%→20 · 98%→60 · 99%→80 · 99.5%→90 · 100%→100</code></td><td>Uses cumulative eligible deliveries.</td></tr>
+          <tr><td>Availability (A)</td><td><code>≤90%→0 · 95%→20 · 98%→60 · 99%→80 · 99.5%→90 · 100%→100</code></td><td>Uses eligible deliveries from the latest 30 days.</td></tr>
           <tr><td>Mining loss (L)</td><td><code>≤0.1%→100 · 0.25%→90 · 0.5%→75 · 1%→50 · 2.5%→10 · ≥5%→0</code></td><td>Uses the combined mining-loss equation above.</td></tr>
           <tr><td>P95 delay (P)</td><td><code>≤250ms→100 · 500ms→90 · 1,000ms→75 · 2,000ms→50 · 5,000ms→10 · ≥10,000ms→0</code></td><td>Uses the rolling 24-hour P95.</td></tr>
           <tr><td>Responsiveness (R)</td><td><code>0ms→100 · 100ms→95 · 250ms→80 · 500ms→60 · 1,000ms→30 · ≥2,500ms→0</code></td><td>Average curve score of observed median TCP, TLS, subscribe, and authorize timings.</td></tr>
@@ -90,7 +90,7 @@
   </section>
 
   <h2>How pools are compared</h2>
-  <p>Block-template delay is compared only for the same Bitcoin block observed from the same region. This reduces differences caused by geography and clock timing. Median, P95, history, and Stratum response timings use a rolling 24-hour window; availability and payout verification remain cumulative.</p>
+  <p>Block-template delay is compared only for the same Bitcoin block observed from the same region. This reduces differences caused by geography and clock timing. Median, P95, history, and Stratum response timings use a rolling 24-hour window. Every other report value is also bounded: observations older than 30 days are excluded from availability, payout verification, fee evidence, counts, and scores.</p>
   <p>A valid coinbase-only template counts as delivery because it lets miners stop working on the previous block immediately. Empty-first frequency is retained as raw evidence but is not displayed or scored.</p>
 
   <h2>Coinbase payouts and fees</h2>

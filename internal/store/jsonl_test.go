@@ -73,6 +73,26 @@ func TestLoadMissingFile(t *testing.T) {
 	}
 }
 
+func TestLoadSinceDiscardsOlderObservations(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "observations.jsonl")
+	cutoff := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
+	observations := []model.Observation{
+		{ObservationID: "old", ObservedAt: cutoff.Add(-time.Nanosecond)},
+		{ObservationID: "boundary", ObservedAt: cutoff},
+		{ObservationID: "recent", ObservedAt: cutoff.Add(time.Hour)},
+	}
+	if err := Append(path, observations); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadSince(path, cutoff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ObservationID != "boundary" || got[1].ObservationID != "recent" {
+		t.Fatalf("retained observations=%+v, want boundary and recent", got)
+	}
+}
+
 func TestAppenderSerializesConcurrentBatches(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "observations.jsonl")
 	appender := &Appender{Path: path}

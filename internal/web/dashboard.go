@@ -5,12 +5,14 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
 type dashboardPool struct {
 	model.PoolReport
+	Website          string
 	LatencyClass     string
 	MiningLossClass  string
 	UnsafeReason     string
@@ -47,24 +49,27 @@ type latencyHistoryChart struct {
 }
 
 type dashboardPage struct {
-	Snapshot           model.Snapshot
-	Demo               bool
-	FreePools          []dashboardPool
-	NormalPools        []dashboardPool
-	MissingWalletPools []dashboardPool
-	PendingWalletPools []dashboardPool
-	PPLNSPools         []dashboardPool
-	OtherPools         []dashboardPool
-	NoRecentDataPools  []dashboardPool
-	PoolCount          int
-	BlocksObserved     int
-	PoolsWithBlockData int
-	UnsafeCount        int
-	SelectedVantage    string
-	SelectedLabel      string
-	VantageStatus      *vantageStatus
-	AvailableVantages  map[string]bool
-	ShowUSCombined     bool
+	Snapshot                    model.Snapshot
+	Demo                        bool
+	FreePools                   []dashboardPool
+	NormalPools                 []dashboardPool
+	MissingWalletPools          []dashboardPool
+	PendingWalletPools          []dashboardPool
+	PPLNSPools                  []dashboardPool
+	OtherPools                  []dashboardPool
+	NoRecentDataPools           []dashboardPool
+	FreePoolsUpdatedAt          *time.Time
+	NormalPoolsUpdatedAt        *time.Time
+	MissingWalletPoolsUpdatedAt *time.Time
+	PendingWalletPoolsUpdatedAt *time.Time
+	PPLNSPoolsUpdatedAt         *time.Time
+	OtherPoolsUpdatedAt         *time.Time
+	NoRecentDataPoolsUpdatedAt  *time.Time
+	SelectedVantage             string
+	SelectedLabel               string
+	VantageStatus               *vantageStatus
+	AvailableVantages           map[string]bool
+	ShowUSCombined              bool
 }
 
 func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, selectedVantage string, status *vantageStatus) dashboardPage {
@@ -75,14 +80,14 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 	page := dashboardPage{
 		Snapshot:        snapshot,
 		Demo:            demo,
-		PoolCount:       len(snapshot.Reports),
-		BlocksObserved:  snapshot.BlocksObserved,
 		SelectedVantage: selectedVantage,
 		SelectedLabel:   selectedLabel,
 		VantageStatus:   status,
 	}
 	tlsConfigured := make(map[string]bool, len(pools))
+	websiteByPoolID := make(map[string]string, len(pools))
 	for _, pool := range pools {
+		websiteByPoolID[pool.ID] = pool.Website
 		for _, endpoint := range pool.Endpoints {
 			if endpoint.TLS {
 				tlsConfigured[pool.ID] = true
@@ -97,7 +102,7 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			feeSortValue = report.LatestPoolFeePct
 		}
 		pool := dashboardPool{
-			PoolReport: report, LatencyClass: latencyClass(report.MedianMS), MiningLossClass: miningLossClass(report.EstimatedMiningLossPct),
+			PoolReport: report, Website: websiteByPoolID[report.PoolID], LatencyClass: latencyClass(report.MedianMS), MiningLossClass: miningLossClass(report.EstimatedMiningLossPct),
 			IsSolo: isSolo, TLSConfigured: tlsConfigured[report.PoolID], FeeSortValue: feeSortValue,
 			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
 		}
@@ -105,7 +110,6 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			page.NoRecentDataPools = append(page.NoRecentDataPools, pool)
 			continue
 		}
-		page.PoolsWithBlockData++
 		if report.Category != "solo" {
 			if offersPPLNS(report.Products) {
 				page.PPLNSPools = append(page.PPLNSPools, pool)
@@ -128,9 +132,6 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			pool.WalletEvidence = "pending"
 		}
 		if pool.UnsafeReason != "" {
-			page.UnsafeCount++
-		}
-		if pool.UnsafeReason != "" {
 			if pool.WalletEvidence == "missing" {
 				page.MissingWalletPools = append(page.MissingWalletPools, pool)
 			} else {
@@ -149,7 +150,27 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 	sortByOverallScore(page.PPLNSPools)
 	sortByOverallScore(page.OtherPools)
 	sortByTemplateLatency(page.NoRecentDataPools)
+	page.FreePoolsUpdatedAt = latestPoolUpdate(page.FreePools)
+	page.NormalPoolsUpdatedAt = latestPoolUpdate(page.NormalPools)
+	page.MissingWalletPoolsUpdatedAt = latestPoolUpdate(page.MissingWalletPools)
+	page.PendingWalletPoolsUpdatedAt = latestPoolUpdate(page.PendingWalletPools)
+	page.PPLNSPoolsUpdatedAt = latestPoolUpdate(page.PPLNSPools)
+	page.OtherPoolsUpdatedAt = latestPoolUpdate(page.OtherPools)
+	page.NoRecentDataPoolsUpdatedAt = latestPoolUpdate(page.NoRecentDataPools)
 	return page
+}
+
+func latestPoolUpdate(pools []dashboardPool) *time.Time {
+	var latest time.Time
+	for _, pool := range pools {
+		if pool.LastObservedAt != nil && pool.LastObservedAt.After(latest) {
+			latest = pool.LastObservedAt.UTC()
+		}
+	}
+	if latest.IsZero() {
+		return nil
+	}
+	return &latest
 }
 
 func sortByOverallScore(pools []dashboardPool) {

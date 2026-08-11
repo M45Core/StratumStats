@@ -9,7 +9,7 @@ import (
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
-func TestPoolRegistryPageAndAPI(t *testing.T) {
+func TestRemovedPoolRegistryPageReturnsNotFoundAndAPIRemains(t *testing.T) {
 	pool := model.Pool{
 		ID:       "example",
 		Name:     "Example Pool",
@@ -32,35 +32,20 @@ func TestPoolRegistryPageAndAPI(t *testing.T) {
 
 	page := httptest.NewRecorder()
 	h.ServeHTTP(page, httptest.NewRequest("GET", "/pools", nil))
-	if page.Code != 200 {
+	if page.Code != 404 {
 		t.Fatalf("page status=%d body=%s", page.Code, page.Body.String())
 	}
-	for _, want := range []string{
-		"Example Pool",
-		"Know a pool that should be added, removed, or corrected?",
-		"hybrid",
-		`href="` + pool.Website + `"`,
-		"Visit website",
-	} {
-		if !strings.Contains(page.Body.String(), want) {
-			t.Errorf("registry page missing %q", want)
+
+	dashboard := httptest.NewRecorder()
+	h.ServeHTTP(dashboard, httptest.NewRequest("GET", "/", nil))
+	for _, want := range []string{`href="` + pool.Website + `"`, `aria-label="Visit the website for Example Pool"`, `target="_blank" rel="noopener noreferrer"`} {
+		if !strings.Contains(dashboard.Body.String(), want) {
+			t.Errorf("dashboard pool link missing %q", want)
 		}
 	}
-	for _, hidden := range []string{
-		"pool.example.com",
-		"3333",
-		"Connection addresses",
-		"data-copy-value",
-		"/static/copy.js",
-		">Sources<",
-		"Account needed?",
-		"No account needed",
-		"Published fee",
-		"Checked ",
-		"2026-08-01",
-	} {
-		if strings.Contains(page.Body.String(), hidden) {
-			t.Errorf("registry page exposes hidden connection detail %q", hidden)
+	for _, unwanted := range []string{"/pools#example", "pool-info-link", ">Pool registry<"} {
+		if strings.Contains(dashboard.Body.String(), unwanted) {
+			t.Errorf("dashboard still contains removed registry link %q", unwanted)
 		}
 	}
 

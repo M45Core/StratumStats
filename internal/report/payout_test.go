@@ -19,7 +19,7 @@ func TestComputeWorkerAddressObservationAndPoolFeeChanges(t *testing.T) {
 		fee := fees[i]
 		observations = append(observations, model.Observation{ObservedAt: started.Add(time.Duration(i) * time.Hour), PoolID: pool.ID, BlockID: string(rune('a' + i)), Eligible: true, Arrived: true, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee})
 	}
-	report := Compute([]model.Pool{pool}, observations, time.Now()).Reports[0]
+	report := Compute([]model.Pool{pool}, observations, started.Add(2*time.Hour)).Reports[0]
 	if report.WorkerAddressStatus != "always_observed" || report.CoinbaseSamples != 3 {
 		t.Fatalf("report=%+v", report)
 	}
@@ -43,7 +43,7 @@ func TestComputeVariedWorkerAddressObservations(t *testing.T) {
 		{PoolID: pool.ID, BlockID: "a", Eligible: true, Arrived: true, CoinbaseAnalyzed: true},
 		{PoolID: pool.ID, BlockID: "b", Eligible: true, Arrived: true, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true},
 	}
-	report := Compute([]model.Pool{pool}, observations, time.Now()).Reports[0]
+	report := Compute([]model.Pool{pool}, observations, time.Time{}).Reports[0]
 	if report.WorkerAddressStatus != "varied" || report.WorkerAddressObservedPct == nil || *report.WorkerAddressObservedPct != 50 {
 		t.Fatalf("report=%+v", report)
 	}
@@ -55,7 +55,7 @@ func TestComputeDoesNotPublishSharedPoolFee(t *testing.T) {
 	report := Compute([]model.Pool{pool}, []model.Observation{{
 		PoolID: pool.ID, BlockID: "a", Eligible: true, Arrived: true,
 		CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee,
-	}}, time.Now()).Reports[0]
+	}}, time.Time{}).Reports[0]
 	if report.LatestPoolFeePct != nil || report.PoolFeeSamples != 0 || len(report.PoolFeeHistory) != 0 {
 		t.Fatalf("shared-pool report exposes a fee: %+v", report)
 	}
@@ -64,11 +64,12 @@ func TestComputeDoesNotPublishSharedPoolFee(t *testing.T) {
 func TestComputePoolFeeIgnoresSubHundredthNoise(t *testing.T) {
 	pool := model.Pool{ID: "solo", Name: "Solo", Category: "solo"}
 	first, second := 68.050, 68.052
+	now := time.Unix(3, 0)
 	observations := []model.Observation{
 		{ObservedAt: time.Unix(1, 0), PoolID: pool.ID, BlockID: "a", Eligible: true, Arrived: true, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &first},
 		{ObservedAt: time.Unix(2, 0), PoolID: pool.ID, BlockID: "b", Eligible: true, Arrived: true, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &second},
 	}
-	report := Compute([]model.Pool{pool}, observations, time.Now()).Reports[0]
+	report := Compute([]model.Pool{pool}, observations, now).Reports[0]
 	if report.PoolFeeChanged || report.PoolFeeChanges != 0 || report.LatestPoolFeePct == nil || *report.LatestPoolFeePct != 68.05 {
 		t.Fatalf("sub-hundredth noise was treated as a change: %+v", report)
 	}

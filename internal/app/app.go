@@ -22,6 +22,7 @@ import (
 	"github.com/M45Core/StratumStats/internal/ingest"
 	"github.com/M45Core/StratumStats/internal/model"
 	"github.com/M45Core/StratumStats/internal/probe"
+	"github.com/M45Core/StratumStats/internal/report"
 	"github.com/M45Core/StratumStats/internal/store"
 	webapp "github.com/M45Core/StratumStats/internal/web"
 )
@@ -72,7 +73,7 @@ func serve(args []string, demo bool) error {
 		if demo {
 			return demoData(pools), nil
 		}
-		return store.Load(*dataPath)
+		return store.LoadSince(*dataPath, time.Now().UTC().Add(-report.RetentionWindow))
 	}
 	var ingestHandler http.Handler
 	keyID, secret := os.Getenv("STRATUMSTATS_INGEST_KEY_ID"), os.Getenv("STRATUMSTATS_INGEST_SECRET")

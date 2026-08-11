@@ -23,14 +23,17 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	body := w.Body.String()
 	for _, want := range []string{
 		"Bitcoin pool performance.",
-		"Bitcoin blocks observed",
-		"Pools with recent latency data",
 		"Preview only — these numbers are examples, not live results.",
 		"/static/dashboard.js",
 		"latest 24 hours",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
+		}
+	}
+	for _, unwanted := range []string{"Pools monitored", "Bitcoin blocks observed", "Pools with recent latency data", "Worker payout alerts", "data-live-summary"} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("homepage still contains removed summary metric %q", unwanted)
 		}
 	}
 	for _, unwanted := range []string{
@@ -71,7 +74,7 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	if script.Code != 200 {
 		t.Fatalf("dashboard updater status=%d", script.Code)
 	}
-	for _, want := range []string{"fetch(window.location.pathname + window.location.search", "data-pool-id", "row-updated", "sortStates", "applySort", "placeRows", "captureViewport", "restoreViewport"} {
+	for _, want := range []string{"fetch(window.location.pathname + window.location.search", "data-pool-id", "row-updated", "sortStates", "applySort", "placeRows", "captureViewport", "restoreViewport", "stratumstats.selectedVantage", "localStorage", "restoreVantage", "window.location.replace", "data-relative-time", "relativeAge", "toLocaleString", `clone.querySelectorAll("time[data-relative-time]")`} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("dashboard updater missing %q", want)
 		}
@@ -90,14 +93,11 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	if !strings.Contains(stylesheet.Body.String(), ".sort-button[data-sort-key=\"loss\"],.sort-button[data-sort-key=\"p95\"]{white-space:nowrap}") {
 		t.Fatal("estimated mining loss or P95 sort header is allowed to wrap")
 	}
-	if !strings.Contains(stylesheet.Body.String(), ".pool-info-link{position:absolute;right:0;top:1px}") {
-		t.Fatal("pool info icons are not pinned to a fixed column")
-	}
 	for _, want := range []string{
 		"/* Phone layouts keep every measurement visible without a desktop-width scroller. */",
 		".measurement-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-width:0",
 		".measurement-list{display:block;min-width:0;overflow:visible",
-		"header nav{display:grid;width:100%;grid-template-columns:repeat(2,minmax(0,1fr))",
+		"header nav{display:grid;width:100%;grid-template-columns:repeat(3,minmax(0,1fr))",
 		".score-curve-table,.score-curve-table tbody,.score-curve-table tr,.score-curve-table td{display:block",
 	} {
 		if !strings.Contains(stylesheet.Body.String(), want) {
@@ -115,7 +115,7 @@ func TestDonationBannerAppearsOnEveryPublicPage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, path := range []string{"/", "/pools", "/methodology"} {
+	for _, path := range []string{"/", "/methodology"} {
 		t.Run(path, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))

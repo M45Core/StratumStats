@@ -83,9 +83,10 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	methodology := httptest.NewRecorder()
 	h.ServeHTTP(methodology, httptest.NewRequest("GET", "/api/v1/methodology", nil))
 	var payload struct {
-		Metrics            []string `json:"metrics"`
-		LatencyWindowHours int      `json:"latency_window_hours"`
-		Scoring            struct {
+		Metrics             []string `json:"metrics"`
+		LatencyWindowHours  int      `json:"latency_window_hours"`
+		RetentionWindowDays int      `json:"retention_window_days"`
+		Scoring             struct {
 			Scale                       string             `json:"scale"`
 			WeightsPct                  map[string]float64 `json:"weights_pct"`
 			MiningLossFullScoreBelowPct float64            `json:"mining_loss_full_score_below_pct"`
@@ -118,6 +119,9 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	}
 	if payload.LatencyWindowHours != 24 {
 		t.Fatalf("latency window=%d hours, want 24", payload.LatencyWindowHours)
+	}
+	if payload.RetentionWindowDays != 30 {
+		t.Fatalf("retention window=%d days, want 30", payload.RetentionWindowDays)
 	}
 	if strings.Contains(methodology.Body.String(), "minimum_blocks") || strings.Contains(methodology.Body.String(), "confidence") {
 		t.Fatalf("methodology API contains qualitative confidence metadata: %s", methodology.Body.String())

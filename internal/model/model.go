@@ -112,6 +112,7 @@ type Observation struct {
 type PoolReport struct {
 	PoolID                            string               `json:"pool_id"`
 	PoolName                          string               `json:"pool_name"`
+	LastObservedAt                    *time.Time           `json:"last_observed_at,omitempty"`
 	Category                          string               `json:"category,omitempty"`
 	Products                          []string             `json:"products,omitempty"`
 	Blocks                            int                  `json:"blocks"`
@@ -154,6 +155,7 @@ type Snapshot struct {
 	GeneratedAt         time.Time    `json:"generated_at"`
 	Methodology         string       `json:"methodology_version"`
 	LatencyWindowHours  int          `json:"latency_window_hours"`
+	RetentionWindowDays int          `json:"retention_window_days"`
 	BlocksObserved      int          `json:"blocks_observed"`
 	EligiblePoolSamples int          `json:"eligible_pool_samples"`
 	TemplateDeliveries  int          `json:"template_deliveries"`

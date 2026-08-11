@@ -202,8 +202,8 @@ func TestComputeLatencyUsesRolling24Hours(t *testing.T) {
 	if got.ConnectTiming.Attempts != 1 || got.ConnectTiming.MedianMS == nil || *got.ConnectTiming.MedianMS != 20 {
 		t.Fatalf("24-hour protocol timing=%+v", got.ConnectTiming)
 	}
-	if got.Blocks != 5 || got.Arrivals != 5 || got.Availability != 100 {
-		t.Fatalf("cumulative availability changed: blocks=%d arrivals=%d availability=%.1f", got.Blocks, got.Arrivals, got.Availability)
+	if got.Blocks != 4 || got.Arrivals != 4 || got.Availability != 100 {
+		t.Fatalf("30-day availability included future data: blocks=%d arrivals=%d availability=%.1f", got.Blocks, got.Arrivals, got.Availability)
 	}
 	if got.WorkerAddressStatus != "always_observed" || got.LatestPoolFeePct == nil || *got.LatestPoolFeePct != fee {
 		t.Fatalf("older payout evidence was discarded: %+v", got)
@@ -217,6 +217,31 @@ func TestComputeLatencyUsesRolling24Hours(t *testing.T) {
 	}
 }
 
+func TestComputeDropsAllObservationsAfterThirtyDays(t *testing.T) {
+	now := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	duration := 20.0
+	fee := 1.0
+	old := now.Add(-RetentionWindow - time.Nanosecond)
+	boundary := now.Add(-RetentionWindow)
+	observations := []model.Observation{
+		{ObservationID: "old-block", ObservedAt: old, PoolID: "pool", BlockID: "old", Eligible: true, Arrived: true, OffsetMS: 10, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
+		{ObservationID: "old-protocol", ObservedAt: old, PoolID: "pool", RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolConnect, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration},
+		{ObservationID: "boundary-block", ObservedAt: boundary, PoolID: "pool", BlockID: "boundary", Eligible: true, Arrived: true, OffsetMS: 20, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
+		{ObservationID: "future", ObservedAt: now.Add(time.Nanosecond), PoolID: "pool", BlockID: "future", Eligible: true, Arrived: true},
+	}
+	snapshot := Compute([]model.Pool{{ID: "pool", Name: "Pool", Category: "solo"}}, observations, now)
+	got := snapshot.Reports[0]
+	if snapshot.RetentionWindowDays != 30 || snapshot.BlocksObserved != 1 || got.Blocks != 1 || got.CoinbaseSamples != 1 {
+		t.Fatalf("retained snapshot/report=%+v/%+v, want only 30-day boundary observation", snapshot, got)
+	}
+	if got.LastObservedAt == nil || !got.LastObservedAt.Equal(boundary) {
+		t.Fatalf("last observed at=%v, want retained boundary %v", got.LastObservedAt, boundary)
+	}
+	if got.ConnectTiming.Attempts != 0 || got.MedianMS != nil {
+		t.Fatalf("old protocol or 30-day latency leaked into 24-hour metrics: %+v", got)
+	}
+}
+
 func TestReportsSortByPoolName(t *testing.T) {
 	pools := []model.Pool{{ID: "new", Name: "Zulu"}, {ID: "known", Name: "Alpha"}}
 	var obs []model.Observation
@@ -224,7 +249,7 @@ func TestReportsSortByPoolName(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		obs = append(obs, model.Observation{PoolID: "known", BlockID: string(rune(i + 1)), Eligible: true, Arrived: true, OffsetMS: 1000})
 	}
-	s := Compute(pools, obs, time.Now())
+	s := Compute(pools, obs, time.Time{})
 	if s.Reports[0].PoolID != "known" {
 		t.Fatalf("reports not sorted by pool name: %+v", s.Reports)
 	}

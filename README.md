@@ -55,7 +55,8 @@ continent; global and unlocated endpoints remain enabled.
 StratumStats records observations rather than pool claims. Template latency is
 relative to the earliest structurally valid template observed for the same block
 and vantage. Median, P95, history, and protocol timings use a rolling 24-hour
-window; availability and payout verification remain cumulative.
+window. No report, score, count, payout, or fee evidence uses observations older
+than 30 days.
 
 Protocol measurements include TCP connect, TLS handshake, `mining.subscribe`,
 `mining.authorize`, and optional `mining.ping`. Coinbase reconstruction checks

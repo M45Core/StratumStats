@@ -11,10 +11,12 @@ import (
 )
 
 const (
-	MethodologyVersion = "2026-08-09.25"
+	MethodologyVersion = "2026-08-10.26"
 	reportHistoryLimit = 12
 	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
 	LatencyWindow = 24 * time.Hour
+	// RetentionWindow is the maximum age of any observation used in a report.
+	RetentionWindow = 30 * 24 * time.Hour
 )
 
 type metricSample struct {
@@ -29,18 +31,20 @@ type coinbaseSample struct {
 }
 
 type accumulator struct {
-	pool     model.Pool
-	blocks   map[string]bool
-	offsets  map[string]metricSample
-	tls      bool
-	coinbase map[string]coinbaseSample
-	timings  map[string]*timingAccumulator
+	pool           model.Pool
+	lastObservedAt time.Time
+	blocks         map[string]bool
+	offsets        map[string]metricSample
+	tls            bool
+	coinbase       map[string]coinbaseSample
+	timings        map[string]*timingAccumulator
 }
 
 // Compute applies only objective probe measurements. Operator size, fees,
 // sponsorships, and subjective reputation are deliberately excluded.
 func Compute(pools []model.Pool, observations []model.Observation, now time.Time) model.Snapshot {
 	now = now.UTC()
+	observations = RetainObservations(observations, now)
 	observations = uniqueObservations(observations)
 	completedRemoteRuns := completedScheduledRuns(observations)
 	acc := make(map[string]*accumulator, len(pools))
@@ -70,6 +74,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 			continue
 		}
 		if protocolRecord {
+			recordLatestObservation(a, o.ObservedAt)
 			if withinLatencyWindow(o.ObservedAt, now) {
 				addProtocolObservation(a, o)
 			}
@@ -81,6 +86,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		if start := canonicalWindows[blockWindowKey(o)]; !o.ObservedAt.Equal(start) {
 			continue
 		}
+		recordLatestObservation(a, o.ObservedAt)
 		key := observationKey(o)
 		globalKey := o.PoolID + "\x00" + key
 		eligiblePoolSamples[globalKey] = true
@@ -113,6 +119,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		GeneratedAt:         now.UTC(),
 		Methodology:         MethodologyVersion,
 		LatencyWindowHours:  int(LatencyWindow / time.Hour),
+		RetentionWindowDays: int(RetentionWindow / (24 * time.Hour)),
 		BlocksObserved:      len(observedBlocks),
 		EligiblePoolSamples: len(eligiblePoolSamples),
 		TemplateDeliveries:  len(templateDeliveries),
@@ -120,7 +127,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		Disclosure: []string{
 			"Reports use automated observations only; no pool pays or applies for placement.",
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
-			"Block-template latency, latency history, and protocol timing statistics use a rolling 24-hour window.",
+			"No observation older than 30 days is used; block-template latency, latency history, and protocol timing use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
 			"Scheduled block observations affect scores only after their probe run completes successfully without dropped observations.",
 			"The probe uses pseudonymous miner credentials, but a pool can still observe its source IP.",
@@ -213,6 +220,20 @@ func uniqueObservations(observations []model.Observation) []model.Observation {
 		unique = append(unique, observation)
 	}
 	return unique
+}
+
+// RetainObservations applies the hard report horizon before observations enter
+// counts, regional health, aggregation, or scoring.
+func RetainObservations(observations []model.Observation, now time.Time) []model.Observation {
+	cutoff := now.Add(-RetentionWindow)
+	retained := make([]model.Observation, 0, len(observations))
+	for _, observation := range observations {
+		if observation.ObservedAt.Before(cutoff) || observation.ObservedAt.After(now) {
+			continue
+		}
+		retained = append(retained, observation)
+	}
+	return retained
 }
 
 func build(a *accumulator, now time.Time) model.PoolReport {
@@ -345,9 +366,15 @@ func build(a *accumulator, now time.Time) model.PoolReport {
 		}
 	}
 
+	var lastObservedAt *time.Time
+	if !a.lastObservedAt.IsZero() {
+		value := a.lastObservedAt.UTC()
+		lastObservedAt = &value
+	}
 	report := model.PoolReport{
 		PoolID: a.pool.ID, PoolName: a.pool.Name, Category: a.pool.Category, Products: a.pool.Products,
-		Blocks: blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median, availability, blocks),
+		LastObservedAt: lastObservedAt,
+		Blocks:         blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median, availability, blocks),
 		Availability: round(availability, 1), TLSObserved: a.tls,
 		ConnectTiming: timingStats(a, model.ProtocolConnect), TLSTiming: timingStats(a, model.ProtocolTLSHandshake),
 		SubscribeTiming: timingStats(a, model.ProtocolSubscribe), AuthorizeTiming: timingStats(a, model.ProtocolAuthorize), PingTiming: timingStats(a, model.ProtocolPing),
@@ -361,6 +388,12 @@ func build(a *accumulator, now time.Time) model.PoolReport {
 	}
 	applyOverallScore(&report, now)
 	return report
+}
+
+func recordLatestObservation(a *accumulator, observedAt time.Time) {
+	if !observedAt.IsZero() && observedAt.After(a.lastObservedAt) {
+		a.lastObservedAt = observedAt
+	}
 }
 
 func recentMetricHistory(samples []metricSample, places int) []model.MetricHistoryPoint {

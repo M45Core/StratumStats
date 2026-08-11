@@ -73,6 +73,7 @@ func (cache *snapshotCache) refresh(now time.Time) error {
 	if err != nil {
 		return err
 	}
+	observations = report.RetainObservations(observations, now.UTC())
 	cache.loadedAt = now
 	cache.observations = observations
 	cache.snapshots = make(map[string]model.Snapshot)

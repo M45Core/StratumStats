@@ -1,4 +1,5 @@
 {{define "timing-compact"}}{{if .Attempts}}{{$failed := failedChecks .}}{{if .CertificateErrors}}<strong class="timing-cert-error" title="The pool security certificate could not be verified">SECURITY ERROR</strong><small><span class="timing-failures" role="img" aria-label="{{failureSummary .}}" title="{{failureSummary .}}">{{$failed}} ❌</span></small>{{else if .MedianMS}}<strong>{{printf "%.0f ms" (metric .MedianMS)}}</strong><small>P95 {{printf "%.0f" (metric .P95MS)}}{{if $failed}} · <span class="timing-failures" role="img" aria-label="{{failureSummary .}}" title="{{failureSummary .}}">{{$failed}} ❌</span>{{end}}{{if .Unsupported}} · unsupported {{.Unsupported}}{{end}}</small>{{else}}<strong>—</strong><small>{{if $failed}}<span class="timing-failures" role="img" aria-label="{{failureSummary .}}" title="{{failureSummary .}}">{{$failed}} ❌</span>{{end}}{{if .Unsupported}}{{if $failed}} · {{end}}unsupported {{.Unsupported}}{{end}}</small>{{end}}{{else}}<strong>—</strong><small>unchecked</small>{{end}}{{end}}
+{{define "section-update"}}<span class="section-update-tag">{{with .}}Updated <time datetime="{{.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{.Format "02 Jan 15:04 UTC"}}</time>{{else}}No updates in 30 days{{end}}</span>{{end}}
 {{define "pool-list"}}
 <div class="measurement-list">
   <div class="measurement-head">
@@ -8,7 +9,7 @@
   <article class="measurement-row" data-pool-id="{{.PoolID}}" data-sort-score="{{if .OverallScore}}{{printf "%.6f" (metric .OverallScore)}}{{end}}" data-sort-pool="{{.PoolName}}" data-sort-median="{{if .MedianMS}}{{printf "%.6f" (metric .MedianMS)}}{{end}}" data-sort-p95="{{if .P95MS}}{{printf "%.6f" (metric .P95MS)}}{{end}}" data-sort-loss="{{if .EstimatedMiningLossPct}}{{printf "%.6f" (metric .EstimatedMiningLossPct)}}{{end}}" data-sort-availability="{{printf "%.6f" .Availability}}" data-sort-connection="{{if .ConnectTiming.MedianMS}}{{printf "%.6f" (metric .ConnectTiming.MedianMS)}}{{end}}" data-sort-setup="{{if .SubscribeTiming.MedianMS}}{{printf "%.6f" (metric .SubscribeTiming.MedianMS)}}{{end}}" data-sort-fee="{{if .FeeSortValue}}{{printf "%.6f" (metric .FeeSortValue)}}{{end}}">
     <div class="score-compact">{{if .OverallScore}}<span class="score-popover" tabindex="0" aria-label="Overall performance score {{printf "%.0f" (metric .OverallScore)}} out of 100" aria-describedby="score-factors-{{.PoolID}}"><span class="score-circle {{scoreGrade (metric .OverallScore)}}">{{printf "%.0f" (metric .OverallScore)}}</span><span id="score-factors-{{.PoolID}}" class="score-tooltip" role="tooltip">{{if .ScoreOverrideReason}}<strong>Score override</strong><span class="score-penalty"><b>Worker wallet not found</b><em>Score forced to 0</em></span>{{else}}<strong>Top score factors</strong>{{if .RecentFeeIncreasePenalty}}<span class="score-penalty"><b>Recent fee increase</b><em>{{feePct (metric .PreviousPoolFeePct)}} → {{feePct (metric .LatestPoolFeePct)}} · −{{printf "%.1f" .RecentFeeIncreasePenalty}} pts</em></span>{{end}}{{if .HighFeePenalty}}<span class="score-penalty"><b>Fee above 2.5%</b><em>{{feePct (metric .LatestPoolFeePct)}} · −{{printf "%.1f" .HighFeePenalty}} pts</em></span>{{end}}{{if .TLSCertificatePenalty}}<span class="score-penalty"><b>Invalid TLS certificate</b><em>−{{printf "%.1f" .TLSCertificatePenalty}} pts</em></span>{{end}}{{if not (and .RecentFeeIncreasePenalty .HighFeePenalty .TLSCertificatePenalty)}}<span><b>Availability</b><em>{{printf "%.1f%%" .Availability}} · 40% weight</em></span>{{end}}{{if not (or (and .RecentFeeIncreasePenalty .HighFeePenalty) (and .RecentFeeIncreasePenalty .TLSCertificatePenalty) (and .HighFeePenalty .TLSCertificatePenalty))}}<span><b>Mining loss</b><em>{{miningLoss (metric .EstimatedMiningLossPct)}} · 25% weight</em></span>{{end}}{{if and (not .RecentFeeIncreasePenalty) (not .HighFeePenalty) (not .TLSCertificatePenalty)}}<span><b>P95 delay</b><em>{{printf "%.0f ms" (metric .P95MS)}} · 20% weight</em></span>{{end}}{{end}}</span></span>{{else}}<span class="score-circle score-unavailable" aria-label="Overall performance score unavailable" title="Score needs recent median and P95 block-delay data">—</span>{{end}}</div>
     <div class="measurement-pool">
-      <strong><a href="/pools#{{.PoolID}}">{{.PoolName}}</a><a class="pool-info-link" href="/pools#{{.PoolID}}" aria-label="More information about {{.PoolName}}" title="Click for more information"><span aria-hidden="true">i</span></a></strong>
+      <strong>{{if .Website}}<a href="{{.Website}}" target="_blank" rel="noopener noreferrer" aria-label="Visit the website for {{.PoolName}}">{{.PoolName}}</a>{{else}}{{.PoolName}}{{end}}</strong>
       {{if .TLSTiming.CertificateErrors}}<small><span class="tls-error-label" title="The pool security certificate could not be verified">Security error</span></small>{{else if .TLSTiming.Errors}}<small><span class="tls-error-label" title="A secure connection failed">Secure connection failed</span></small>{{end}}{{if .UnsafeReason}}<small class="worker-wallet-status worker-wallet-{{.WalletEvidence}}">{{.UnsafeReason}}</small>{{end}}
       <button type="button" class="details-toggle" aria-expanded="false" aria-controls="payout-history-{{.PoolID}}" aria-label="Show details for {{.PoolName}}" title="Show payment and recent performance details"><span>More details</span><span class="details-plus" aria-hidden="true">+</span></button>
     </div>
@@ -26,7 +27,7 @@
         <section class="payout-details" aria-label="Latest coinbase payout">
           <div class="detail-heading">
             <div><p>Latest coinbase payout</p>{{if $r.LatestCoinbaseTotalSats}}<h3>{{btc $r.LatestCoinbaseTotalSats}}</h3>{{else}}<h3>Payment details not available</h3>{{end}}</div>
-            <div class="detail-meta">{{if $r.LatestCoinbaseObservedAt}}<time datetime="{{$r.LatestCoinbaseObservedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{historyTime ($r.LatestCoinbaseObservedAt)}}</time>{{end}}<span>{{$r.LatestCoinbaseOutputCount}} payments</span><span>{{$r.CoinbaseSamples}} block checks</span></div>
+            <div class="detail-meta">{{if $r.LatestCoinbaseObservedAt}}<time datetime="{{$r.LatestCoinbaseObservedAt.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{historyTime ($r.LatestCoinbaseObservedAt)}}</time>{{end}}<span>{{$r.LatestCoinbaseOutputCount}} payments</span><span>{{$r.CoinbaseSamples}} block checks</span></div>
           </div>
           {{if $r.LatestPayoutDestinations}}
           <ol class="payout-destinations">
@@ -62,7 +63,7 @@
                 <g class="latency-chart-point" tabindex="0" aria-label="{{.ObservedAt.Format "02 Jan 2006 15:04:05 UTC"}}, {{printf "%.0f ms" .Value}}"><title>{{.ObservedAt.Format "02 Jan 2006 15:04:05 UTC"}} — {{printf "%.0f ms" .Value}}</title><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y}}" r="6"></circle><text x="{{printf "%.1f" .LabelX}}" y="{{printf "%.1f" .LabelY}}" text-anchor="{{.TextAnchor}}">{{printf "%.0f ms" .Value}}</text></g>
                 {{end}}
               </svg>
-              <div class="latency-chart-times"><time datetime="{{.LatencyChart.Start.ObservedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{historyTime .LatencyChart.Start.ObservedAt}}</time><span>time</span><time datetime="{{.LatencyChart.End.ObservedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{historyTime .LatencyChart.End.ObservedAt}}</time></div>
+              <div class="latency-chart-times"><time datetime="{{.LatencyChart.Start.ObservedAt.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{historyTime .LatencyChart.Start.ObservedAt}}</time><span>time</span><time datetime="{{.LatencyChart.End.ObservedAt.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{historyTime .LatencyChart.End.ObservedAt}}</time></div>
             </div>
             <ol class="visually-hidden latency-chart-data">
               {{range .TemplateLatencyHistory}}<li>{{.ObservedAt.Format "02 Jan 2006 15:04:05 UTC"}}: {{printf "%.0f ms" .Value}}</li>{{end}}
@@ -76,7 +77,7 @@
             {{if $r.FeeChangeHistory}}
             <ol class="fee-change-list">
               {{range $r.FeeChangeHistory}}
-              <li><time datetime="{{.ObservedAt.Format "2006-01-02T15:04:05Z07:00"}}" title="{{.ObservedAt.Format "02 Jan 2006 15:04:05 UTC"}}">{{historyTime .ObservedAt}}</time><span class="fee-change-values"><span>{{feePct .Previous}}</span><span class="fee-change-arrow" aria-hidden="true">→</span><strong>{{feePct .Value}}</strong></span></li>
+              <li><time datetime="{{.ObservedAt.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{historyTime .ObservedAt}}</time><span class="fee-change-values"><span>{{feePct .Previous}}</span><span class="fee-change-arrow" aria-hidden="true">→</span><strong>{{feePct .Value}}</strong></span></li>
               {{end}}
             </ol>
             <p>Only fee changes are shown.</p>
@@ -105,7 +106,7 @@
 <body>
 <header>
   <a class="brand" href="/"><img class="mark" src="/static/brand/stratumstats-logo.svg" alt="">StratumStats</a>
-  <nav><a href="/pools">Pool registry</a><a href="/methodology">Methodology</a><a href="https://m45core.com/" target="_blank" rel="noopener noreferrer">Powered by M45Core</a><a href="https://discord.gg/WWemsuTktk" target="_blank" rel="noopener noreferrer">Discord</a></nav>
+  <nav><a href="/methodology">Methodology</a><a href="https://m45core.com/" target="_blank" rel="noopener noreferrer">Powered by M45Core</a><a href="https://discord.gg/WWemsuTktk" target="_blank" rel="noopener noreferrer">Discord</a></nav>
 </header>
 <aside class="donation-banner" aria-label="Support StratumStats">
   <div class="donation-copy">
@@ -124,63 +125,58 @@
   </section>
   {{if .Demo}}<div class="notice dashboard-notice compact-notice">Preview only — these numbers are examples, not live results.</div>{{end}}
 
-  {{if and (not .Demo) (or (index .AvailableVantages "unknown") .ShowUSCombined (index .AvailableVantages "us-west") (index .AvailableVantages "us-central") (index .AvailableVantages "us-east") (index .AvailableVantages "europe"))}}<section class="vantage-bar" aria-label="Measurement region">
-    <div class="vantage-selector">
-      {{if index .AvailableVantages "unknown"}}<a href="/?vantage=unknown" {{if eq .SelectedVantage "unknown"}}aria-current="page"{{end}}>Local</a>{{end}}
-      {{if .ShowUSCombined}}<a href="/" {{if eq .SelectedVantage "us-all"}}aria-current="page"{{end}}>US combined</a>{{end}}
-      {{if index .AvailableVantages "us-west"}}<a href="/?vantage=us-west" {{if eq .SelectedVantage "us-west"}}aria-current="page"{{end}}>West</a>{{end}}
-      {{if index .AvailableVantages "us-central"}}<a href="/?vantage=us-central" {{if eq .SelectedVantage "us-central"}}aria-current="page"{{end}}>Central</a>{{end}}
-      {{if index .AvailableVantages "us-east"}}<a href="/?vantage=us-east" {{if eq .SelectedVantage "us-east"}}aria-current="page"{{end}}>East</a>{{end}}
-      {{if index .AvailableVantages "europe"}}<a href="/?vantage=europe" {{if eq .SelectedVantage "europe"}}aria-current="page"{{end}}>Europe</a>{{end}}
-    </div>
-    <p><strong>{{.SelectedLabel}}</strong>{{with .VantageStatus}}{{if .LastObservationAt}} · last checked {{.LastObservationAt.Format "02 Jan 15:04 UTC"}}{{end}}{{if .Stale}} · <span class="vantage-stale">out of date</span>{{end}}{{else}}{{if eq .SelectedVantage "unknown"}} · locally collected data{{else}} · combined regional results{{end}}{{end}}</p>
-  </section>{{end}}
-
-  <section class="summary-stats compact-summary" aria-label="Measurement summary" data-live-summary>
-    <article><span>Pools monitored</span><strong>{{.PoolCount}}</strong></article>
-    <article><span>Bitcoin blocks observed</span><strong>{{.BlocksObserved}}</strong></article>
-    <article><span>Pools with recent latency data</span><strong>{{.PoolsWithBlockData}}</strong></article>
-    <article class="summary-unsafe"><span>Worker payout alerts</span><strong>{{.UnsafeCount}}</strong></article>
-  </section>
-
-  <nav class="section-jump" aria-label="Jump to pool group" {{if not (or .FreePools .NormalPools .PPLNSPools .OtherPools .NoRecentDataPools .MissingWalletPools .PendingWalletPools)}}hidden{{end}}><span>Jump to</span><a href="#free-solo-pools" {{if not .FreePools}}hidden{{end}}>Free solo</a><a href="#non-free-solo-pools" {{if not .NormalPools}}hidden{{end}}>Paid solo</a><a href="#pplns-share-pools" {{if not .PPLNSPools}}hidden{{end}}>PPLNS shared</a><a href="#other-non-solo-pools" {{if not .OtherPools}}hidden{{end}}>Other shared</a><a href="#no-recent-data-pools" {{if not .NoRecentDataPools}}hidden{{end}}>No recent data</a><a href="#missing-worker-wallet-pools" {{if not .MissingWalletPools}}hidden{{end}}>Worker wallet missing</a><a href="#pending-worker-wallet-pools" {{if not .PendingWalletPools}}hidden{{end}}>Verification pending</a></nav>
+  <div class="dashboard-controls">
+    {{if and (not .Demo) (or (index .AvailableVantages "unknown") .ShowUSCombined (index .AvailableVantages "us-west") (index .AvailableVantages "us-central") (index .AvailableVantages "us-east") (index .AvailableVantages "europe"))}}<section class="vantage-bar" aria-label="Measurement region">
+      <span class="control-label">Region</span>
+      <div class="vantage-selector">
+        {{if index .AvailableVantages "unknown"}}<a href="/?vantage=unknown" data-vantage="unknown" {{if eq .SelectedVantage "unknown"}}aria-current="page"{{end}}>Local</a>{{end}}
+        {{if .ShowUSCombined}}<a href="/" data-vantage="us-all" {{if eq .SelectedVantage "us-all"}}aria-current="page"{{end}}>US combined</a>{{end}}
+        {{if index .AvailableVantages "us-west"}}<a href="/?vantage=us-west" data-vantage="us-west" {{if eq .SelectedVantage "us-west"}}aria-current="page"{{end}}>West</a>{{end}}
+        {{if index .AvailableVantages "us-central"}}<a href="/?vantage=us-central" data-vantage="us-central" {{if eq .SelectedVantage "us-central"}}aria-current="page"{{end}}>Central</a>{{end}}
+        {{if index .AvailableVantages "us-east"}}<a href="/?vantage=us-east" data-vantage="us-east" {{if eq .SelectedVantage "us-east"}}aria-current="page"{{end}}>East</a>{{end}}
+        {{if index .AvailableVantages "europe"}}<a href="/?vantage=europe" data-vantage="europe" {{if eq .SelectedVantage "europe"}}aria-current="page"{{end}}>Europe</a>{{end}}
+      </div>
+      <p><strong>{{.SelectedLabel}}</strong>{{with .VantageStatus}}{{if .LastObservationAt}} · checked <time datetime="{{.LastObservationAt.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{.LastObservationAt.Format "02 Jan 15:04 UTC"}}</time>{{end}}{{if .Stale}} · <span class="vantage-stale">out of date</span>{{end}}{{else}}{{if eq .SelectedVantage "unknown"}} · locally collected data{{else}} · combined regional results{{end}}{{end}}</p>
+    </section>{{end}}
+    <nav class="section-jump" aria-label="Jump to pool group" {{if not (or .FreePools .NormalPools .PPLNSPools .OtherPools .NoRecentDataPools .MissingWalletPools .PendingWalletPools)}}hidden{{end}}><span class="control-label">Jump to</span><a href="#free-solo-pools" {{if not .FreePools}}hidden{{end}}>Free solo</a><a href="#non-free-solo-pools" {{if not .NormalPools}}hidden{{end}}>Paid solo</a><a href="#pplns-share-pools" {{if not .PPLNSPools}}hidden{{end}}>PPLNS shared</a><a href="#other-non-solo-pools" {{if not .OtherPools}}hidden{{end}}>Other shared</a><a href="#no-recent-data-pools" {{if not .NoRecentDataPools}}hidden{{end}}>No recent data</a><a href="#missing-worker-wallet-pools" {{if not .MissingWalletPools}}hidden{{end}}>Worker wallet missing</a><a href="#pending-worker-wallet-pools" {{if not .PendingWalletPools}}hidden{{end}}>Verification pending</a></nav>
+  </div>
 
   <section id="free-solo-pools" class="pool-section compact-section free-section" data-pool-section="free" {{if not .FreePools}}hidden{{end}}>
-    <div class="section-head list-section-head"><div><p class="eyebrow free-eyebrow">Solo mining · measured fee is 0%</p><h2>Free solo pools</h2></div><p>Overall score: highest first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow free-eyebrow">Solo mining · measured fee is 0%</p><h2>Free solo pools</h2></div><div class="section-meta" data-section-meta>{{template "section-update" .FreePoolsUpdatedAt}}<p>Overall score: highest first</p></div></div>
     <div id="free-pools-list">{{template "pool-list" .FreePools}}</div>
   </section>
 
   <section id="non-free-solo-pools" class="pool-section compact-section" data-pool-section="normal" {{if not .NormalPools}}hidden{{end}}>
-    <div class="section-head list-section-head"><div><p class="eyebrow">Solo mining · fee applies or is not known yet</p><h2>Paid solo pools</h2></div><p>Overall score: highest first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow">Solo mining · fee applies or is not known yet</p><h2>Paid solo pools</h2></div><div class="section-meta" data-section-meta>{{template "section-update" .NormalPoolsUpdatedAt}}<p>Overall score: highest first</p></div></div>
     <div id="normal-pools-list">{{template "pool-list" .NormalPools}}</div>
   </section>
 
   <section id="pplns-share-pools" class="pool-section compact-section category-section pplns-section" data-pool-section="pplns" {{if not .PPLNSPools}}hidden{{end}}>
-    <div class="section-head list-section-head"><div><p class="eyebrow pplns-eyebrow">Shared mining · rewards based on recent work</p><h2>PPLNS shared pools</h2></div><p>Overall score: highest first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow pplns-eyebrow">Shared mining · rewards based on recent work</p><h2>PPLNS shared pools</h2></div><div class="section-meta" data-section-meta>{{template "section-update" .PPLNSPoolsUpdatedAt}}<p>Overall score: highest first</p></div></div>
     <div id="pplns-pools-list">{{template "pool-list" .PPLNSPools}}</div>
   </section>
 
   <section id="other-non-solo-pools" class="pool-section compact-section category-section other-section" data-pool-section="other" {{if not .OtherPools}}hidden{{end}}>
-    <div class="section-head list-section-head"><div><p class="eyebrow other-eyebrow">Other shared reward methods</p><h2>Other shared pools</h2></div><p>Overall score: highest first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow other-eyebrow">Other shared reward methods</p><h2>Other shared pools</h2></div><div class="section-meta" data-section-meta>{{template "section-update" .OtherPoolsUpdatedAt}}<p>Overall score: highest first</p></div></div>
     <div id="other-pools-list">{{template "pool-list" .OtherPools}}</div>
   </section>
 
   <section id="no-recent-data-pools" class="pool-section compact-section incomplete-section" data-pool-section="no-recent-data" {{if not .NoRecentDataPools}}hidden{{end}}>
-    <div class="section-head list-section-head"><div><p class="eyebrow incomplete-eyebrow">Active pools · no comparable block-template delivery in the last 24 hours</p><h2>Pools without recent latency data</h2></div><p>Alphabetical</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow incomplete-eyebrow">Active pools · no comparable block-template delivery in the last 24 hours</p><h2>Pools without recent latency data</h2></div><div class="section-meta" data-section-meta>{{template "section-update" .NoRecentDataPoolsUpdatedAt}}<p>Alphabetical</p></div></div>
     <div id="no-recent-data-pools-list">{{template "pool-list" .NoRecentDataPools}}</div>
   </section>
 
   <section id="missing-worker-wallet-pools" class="pool-section compact-section unsafe-section" data-pool-section="wallet-missing" {{if not .MissingWalletPools}}hidden{{end}}>
-    <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Solo mining · the test worker wallet was absent from decoded coinbase payout(s)</p><h2>Worker wallet not found</h2></div><p>Overall score: highest first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow unsafe-eyebrow">Solo mining · the test worker wallet was absent from decoded coinbase payout(s)</p><h2>Worker wallet not found</h2></div><div class="section-meta" data-section-meta>{{template "section-update" .MissingWalletPoolsUpdatedAt}}<p>Overall score: highest first</p></div></div>
     <div id="missing-wallet-pools-list">{{template "pool-list" .MissingWalletPools}}</div>
   </section>
 
   <section id="pending-worker-wallet-pools" class="pool-section compact-section pending-wallet-section" data-pool-section="wallet-pending" {{if not .PendingWalletPools}}hidden{{end}}>
-    <div class="section-head list-section-head"><div><p class="eyebrow">Solo mining · more decoded coinbase evidence is needed</p><h2>Worker wallet verification pending</h2></div><p>Overall score: highest first</p></div>
+    <div class="section-head list-section-head"><div><p class="eyebrow">Solo mining · more decoded coinbase evidence is needed</p><h2>Worker wallet verification pending</h2></div><div class="section-meta" data-section-meta>{{template "section-update" .PendingWalletPoolsUpdatedAt}}<p>Overall score: highest first</p></div></div>
     <div id="pending-wallet-pools-list">{{template "pool-list" .PendingWalletPools}}</div>
   </section>
 
-  <p class="dashboard-footnote" data-live-footnote>Updated {{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}} · {{.SelectedLabel}}. Median, P95, history, and Stratum timings use the latest {{.Snapshot.LatencyWindowHours}} hours. Availability uses all eligible block observations. Estimated mining loss combines missed eligible deliveries with median relative delay during available time; values below 0.1% display as &lt;0.1% and receive full mining-loss score. It is not measured revenue loss. Score weights: availability 40%, mining loss 25%, P95 20%, connection/setup responsiveness 10%, and observed fee stability 5% when available. A recent fee increase subtracts up to 15 additional points over 30 days; observed fees above 2.5% subtract up to 10 more points; an invalid TLS certificate subtracts 10 points. A solo pool whose worker wallet is not found receives a score of 0.</p>
+  <p class="dashboard-footnote" data-live-footnote>Updated <time datetime="{{.Snapshot.GeneratedAt.Format "2006-01-02T15:04:05Z07:00"}}" data-relative-time>{{.Snapshot.GeneratedAt.Format "02 Jan 2006 15:04 UTC"}}</time> · {{.SelectedLabel}}. Median, P95, history, and Stratum timings use the latest {{.Snapshot.LatencyWindowHours}} hours. No observation older than {{.Snapshot.RetentionWindowDays}} days is used; availability uses eligible block observations within that window. Estimated mining loss combines missed eligible deliveries with median relative delay during available time; values below 0.1% display as &lt;0.1% and receive full mining-loss score. It is not measured revenue loss. Score weights: availability 40%, mining loss 25%, P95 20%, connection/setup responsiveness 10%, and observed fee stability 5% when available. A recent fee increase subtracts up to 15 additional points over 30 days; observed fees above 2.5% subtract up to 10 more points; an invalid TLS certificate subtracts 10 points. A solo pool whose worker wallet is not found receives a score of 0.</p>
   <p class="visually-hidden" role="status" aria-live="polite" data-live-status></p>
 </main>
 <footer><span>StratumStats</span><span>Independent Bitcoin pool checks.</span></footer>

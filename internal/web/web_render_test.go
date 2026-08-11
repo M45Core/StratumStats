@@ -47,6 +47,35 @@ func TestDashboardFormatsLatencyValues(t *testing.T) {
 	}
 }
 
+func TestDashboardShowsGroupSpecificUpdateTags(t *testing.T) {
+	observedAt := time.Now().UTC().Add(-time.Minute).Truncate(time.Second)
+	pools := []model.Pool{
+		{ID: "pplns", Name: "PPLNS", Category: "shared", Products: []string{"PPLNS"}},
+		{ID: "unchecked", Name: "Unchecked", Category: "shared"},
+	}
+	observations := []model.Observation{{
+		ObservedAt: observedAt, PoolID: "pplns", Vantage: "unknown", BlockID: "block",
+		Eligible: true, Arrived: true, OffsetMS: 10,
+	}}
+	handler, err := (Server{Pools: pools, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/", nil))
+	body := response.Body.String()
+	for _, want := range []string{
+		`class="section-update-tag"`,
+		`Updated <time datetime="` + observedAt.Format(time.RFC3339) + `" data-relative-time`,
+		observedAt.Format("02 Jan 15:04 UTC"),
+		"No updates in 30 days",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("dashboard missing group update tag %q", want)
+		}
+	}
+}
+
 func TestMiningLossClassUsesLossScale(t *testing.T) {
 	tests := []struct {
 		value *float64

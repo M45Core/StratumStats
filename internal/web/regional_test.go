@@ -118,6 +118,30 @@ func TestSnapshotCacheLoadsOnceWithinTTL(t *testing.T) {
 	}
 }
 
+func TestVantageAPIExcludesObservationsOlderThanRetentionWindow(t *testing.T) {
+	now := time.Now().UTC()
+	old := model.Observation{
+		Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west",
+		RecordType: model.RecordTypeProtocol, ObservedAt: now.Add(-31 * 24 * time.Hour),
+	}
+	handler, err := (Server{
+		Pools: []model.Pool{{ID: "pool", Name: "Pool"}},
+		Load:  func() ([]model.Observation, error) { return []model.Observation{old}, nil },
+	}).Handler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/vantages", nil))
+	var payload vantageStatusResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Vantages[0].ProtocolAttempts != 0 || payload.Vantages[0].LastObservationAt != nil {
+		t.Fatalf("old observation leaked into vantage API: %+v", payload.Vantages[0])
+	}
+}
+
 func TestDashboardRendersRegionalSelectionAndStatus(t *testing.T) {
 	now := time.Now().UTC()
 	started := now.Add(-time.Minute)
@@ -135,7 +159,7 @@ func TestDashboardRendersRegionalSelectionAndStatus(t *testing.T) {
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest("GET", "/?vantage=us-west", nil))
 	body := response.Body.String()
-	for _, expected := range []string{`aria-current="page">West`, "US West", "last checked", "last checked"} {
+	for _, expected := range []string{`aria-current="page">West`, "US West", "checked <time", "data-relative-time"} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("dashboard missing %q", expected)
 		}
@@ -168,7 +192,7 @@ func TestDashboardDefaultsToUSCombined(t *testing.T) {
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest("GET", "/", nil))
 	body := response.Body.String()
-	for _, expected := range []string{`aria-current="page">US combined`, "US combined", "vantage=europe", "Bitcoin blocks observed</span><strong>2</strong>"} {
+	for _, expected := range []string{`aria-current="page">US combined`, "US combined", "vantage=europe", `class="dashboard-controls"`, `class="control-label">Region`} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("dashboard missing %q", expected)
 		}
@@ -191,7 +215,7 @@ func TestDashboardDefaultsToLocalWithoutRegionalProbeData(t *testing.T) {
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest("GET", "/", nil))
 	body := response.Body.String()
-	for _, expected := range []string{`aria-current="page">Local`, "locally collected data", "Bitcoin blocks observed</span><strong>1</strong>"} {
+	for _, expected := range []string{`aria-current="page">Local`, "locally collected data", `class="dashboard-controls"`, `class="control-label">Region`} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("dashboard missing %q", expected)
 		}
