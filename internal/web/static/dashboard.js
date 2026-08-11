@@ -118,30 +118,16 @@
   }
 
   function captureViewport() {
-    const focusedRow = document.activeElement?.closest?.(".measurement-row");
-    const visibleRow = [...document.querySelectorAll(".measurement-row")].find((row) => {
-      const bounds = row.getBoundingClientRect();
-      return bounds.bottom > 0 && bounds.top < window.innerHeight;
-    });
-    const fallback = [...document.querySelectorAll("[data-live-footnote], footer, .pool-section")].find((element) => {
-      const bounds = element.getBoundingClientRect();
-      return bounds.bottom > 0 && bounds.top < window.innerHeight;
-    });
-    const anchor = focusedRow?.isConnected ? focusedRow : (visibleRow || fallback);
     return {
-      anchor,
-      anchorTop: anchor?.getBoundingClientRect().top,
+      scrollX: window.scrollX,
       scrollY: window.scrollY,
     };
   }
 
   function restoreViewport(viewport) {
-    if (viewport.anchor?.isConnected) {
-      const shift = viewport.anchor.getBoundingClientRect().top - viewport.anchorTop;
-      if (Math.abs(shift) > 0.5) window.scrollBy(0, shift);
-      return;
+    if (window.scrollX !== viewport.scrollX || window.scrollY !== viewport.scrollY) {
+      window.scrollTo(viewport.scrollX, viewport.scrollY);
     }
-    if (window.scrollY !== viewport.scrollY) window.scrollTo(window.scrollX, viewport.scrollY);
   }
 
   function applySort(wrapper, key, type, direction) {

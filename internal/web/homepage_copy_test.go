@@ -82,10 +82,13 @@ func TestHomepageUsesConciseTelemetryCopy(t *testing.T) {
 	if strings.Contains(script.Body.String(), "location.reload") {
 		t.Fatal("dashboard updater performs a full page reload")
 	}
-	for _, unwanted := range []string{"rows.forEach((row) => list.append(row))", "if (footnote && nextFootnote) footnote.innerHTML"} {
+	for _, unwanted := range []string{"rows.forEach((row) => list.append(row))", "if (footnote && nextFootnote) footnote.innerHTML", "window.scrollBy"} {
 		if strings.Contains(script.Body.String(), unwanted) {
 			t.Errorf("dashboard updater still contains scroll-disrupting refresh logic %q", unwanted)
 		}
+	}
+	if !strings.Contains(script.Body.String(), "window.scrollTo(viewport.scrollX, viewport.scrollY)") {
+		t.Fatal("dashboard updater does not restore the user's fixed scroll position")
 	}
 
 	stylesheet := httptest.NewRecorder()
