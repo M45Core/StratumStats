@@ -39,7 +39,7 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	home := httptest.NewRecorder()
 	h.ServeHTTP(home, httptest.NewRequest("GET", "/?transport=tls", nil))
 	body := home.Body.String()
-	for _, want := range []string{"Median block delay", "43 ms", "13 ms", "Security error", "tls-timing-error", "SECURITY ERROR", "The pool security certificate could not be verified", "1 ❌", "1 failed check (1 timed out)", "Invalid TLS certificate", "−10.0 pts"} {
+	for _, want := range []string{"Median block delay", "43 ms", "13 ms", "Security error", "tls-timing-error", "SECURITY ERROR", "The pool security certificate could not be verified", "1 ❌", "Invalid TLS certificate", "−10.0 pts"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("homepage does not contain %q", want)
 		}
@@ -50,12 +50,12 @@ func TestProtocolTimingsRenderAndAppearInMethodologyAPI(t *testing.T) {
 	if strings.Contains(body, "· Secure connection") {
 		t.Fatal("healthy TLS connection is labeled redundantly")
 	}
-	mutedTLSDash := `<span class="tls-unavailable"><a class="jargon-link" href="/methodology#tls" title="Encrypted connection and certificate check">TLS</a> <strong>—</strong></span>`
+	mutedTLSDash := `connection-tls tls-unavailable"><span><strong>—</strong></span>`
 	plainHome := httptest.NewRecorder()
 	h.ServeHTTP(plainHome, httptest.NewRequest("GET", "/", nil))
 	plaintextRow := renderedPoolRow(t, plainHome.Body.String(), "plaintext")
-	if !strings.Contains(plaintextRow, mutedTLSDash) || strings.Contains(plaintextRow, "not offered") {
-		t.Fatalf("plaintext pool TLS state is unclear: %s", plaintextRow)
+	if !strings.Contains(plaintextRow, `connection-tcp`) || strings.Contains(plaintextRow, `connection-tls`) {
+		t.Fatalf("plaintext view does not show only TCP connection timing: %s", plaintextRow)
 	}
 	awaitingRow := renderedPoolRow(t, body, "awaiting")
 	if !strings.Contains(awaitingRow, mutedTLSDash) || strings.Contains(awaitingRow, "not offered") {

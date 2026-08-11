@@ -29,11 +29,19 @@ func TestDashboardDefaultsToPlainEndpointsAndCanSelectTLS(t *testing.T) {
 	if !strings.Contains(plain.Body.String(), "plain.example:3333") || strings.Contains(plain.Body.String(), "secure.example:443") || !strings.Contains(plain.Body.String(), `data-transport="plain" aria-current="page"`) {
 		t.Fatalf("plain endpoint view is incorrect: %s", plain.Body.String())
 	}
+	plainRow := renderedPoolRow(t, plain.Body.String(), pool.ID)
+	if !strings.Contains(plainRow, `connection-tcp`) || strings.Contains(plainRow, `connection-tls`) {
+		t.Fatalf("plain endpoint row does not show only TCP connection timing: %s", plainRow)
+	}
 
 	secure := httptest.NewRecorder()
 	handler.ServeHTTP(secure, httptest.NewRequest(http.MethodGet, "/?vantage=us-west&transport=tls", nil))
 	if !strings.Contains(secure.Body.String(), "secure.example:443") || strings.Contains(secure.Body.String(), "plain.example:3333") || !strings.Contains(secure.Body.String(), `data-transport="tls" aria-current="page"`) {
 		t.Fatalf("TLS endpoint view is incorrect: %s", secure.Body.String())
+	}
+	secureRow := renderedPoolRow(t, secure.Body.String(), pool.ID)
+	if !strings.Contains(secureRow, `connection-tls`) || strings.Contains(secureRow, `connection-tcp`) {
+		t.Fatalf("TLS endpoint row does not show only TLS connection timing: %s", secureRow)
 	}
 
 	invalid := httptest.NewRecorder()

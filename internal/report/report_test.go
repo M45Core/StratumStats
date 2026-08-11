@@ -71,6 +71,22 @@ func TestComputeDeduplicatesArrivalsByVantageAndBlock(t *testing.T) {
 	}
 }
 
+func TestComputePublishesLatestEligibleBlockID(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	pool := model.Pool{ID: "pool", Name: "Pool"}
+	observations := []model.Observation{
+		{PoolID: pool.ID, Vantage: "west", BlockID: "older-block", ObservedAt: now.Add(-time.Minute), Eligible: true, Arrived: true},
+		{PoolID: pool.ID, Vantage: "west", BlockID: "latest-block", ObservedAt: now, Eligible: true},
+		{PoolID: pool.ID, Vantage: "west", BlockID: "ineligible-block", ObservedAt: now.Add(time.Minute)},
+		{PoolID: "removed", Vantage: "west", BlockID: "unknown-pool-block", ObservedAt: now.Add(2 * time.Minute), Eligible: true},
+	}
+
+	snapshot := Compute([]model.Pool{pool}, observations, now.Add(3*time.Minute))
+	if snapshot.LatestBlockID != "latest-block" {
+		t.Fatalf("latest block ID=%q, want latest-block", snapshot.LatestBlockID)
+	}
+}
+
 func TestComputeDeduplicatesRetriedObservationIDs(t *testing.T) {
 	pools := []model.Pool{{ID: "pool", Name: "Pool"}}
 	duration := 12.0
@@ -146,6 +162,47 @@ func TestComputeVantageFiltersTimingButRetainsGlobalCoinbaseEvidence(t *testing.
 	}
 	if got.WorkerAddressStatus != "always_observed" || got.LatestPoolFeePct == nil || *got.LatestPoolFeePct != fee {
 		t.Fatalf("global evidence not retained: %+v", got)
+	}
+}
+
+func TestComputeVantagesAggregatesRegionalLatencyPerBlock(t *testing.T) {
+	now := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
+	pool := model.Pool{ID: "pool", Name: "Pool"}
+	block := func(vantage, blockID string, at time.Time, arrived bool, offset float64) model.Observation {
+		return model.Observation{
+			PoolID: pool.ID, Vantage: vantage, BlockID: blockID, ObservedAt: at,
+			Eligible: true, Arrived: arrived, OffsetMS: offset,
+		}
+	}
+	observations := []model.Observation{
+		block("us-west", "one", now.Add(-3*time.Hour), true, 10),
+		block("us-central", "one", now.Add(-3*time.Hour+time.Millisecond), true, 100),
+		block("us-east", "one", now.Add(-3*time.Hour+2*time.Millisecond), true, 1000),
+		block("us-west", "two", now.Add(-2*time.Hour), true, 20),
+		block("us-central", "two", now.Add(-2*time.Hour+time.Millisecond), true, 200),
+		block("us-east", "two", now.Add(-2*time.Hour+2*time.Millisecond), true, 2000),
+		block("us-west", "three", now.Add(-time.Hour), true, 30),
+		block("us-central", "three", now.Add(-time.Hour+time.Millisecond), false, 0),
+	}
+	vantages := map[string]bool{"us-west": true, "us-central": true, "us-east": true}
+
+	combined := ComputeVantages([]model.Pool{pool}, observations, vantages, now).Reports[0]
+	if combined.Blocks != 3 || combined.Arrivals != 3 || combined.EligibleChecks != 8 || combined.DeliveryChecks != 7 {
+		t.Fatalf("combined blocks=%d arrivals=%d eligible checks=%d delivery checks=%d, want 3/3/8/7", combined.Blocks, combined.Arrivals, combined.EligibleChecks, combined.DeliveryChecks)
+	}
+	if combined.Availability != 88.9 {
+		t.Fatalf("combined availability=%.1f, want equally weighted regional rate 88.9", combined.Availability)
+	}
+	if combined.MedianMS == nil || *combined.MedianMS != 100 || combined.P95MS == nil || *combined.P95MS != 200 {
+		t.Fatalf("combined median/p95=%v/%v, want 100/200 from per-block medians", combined.MedianMS, combined.P95MS)
+	}
+	if got := combined.TemplateLatencyHistory; len(got) != 3 || got[0].Value != 100 || got[1].Value != 200 || got[2].Value != 30 {
+		t.Fatalf("combined history=%+v, want one median point per block", got)
+	}
+
+	west := ComputeVantage([]model.Pool{pool}, observations, "us-west", now).Reports[0]
+	if west.Blocks != 3 || west.EligibleChecks != 3 || west.MedianMS == nil || *west.MedianMS != 20 || len(west.TemplateLatencyHistory) != 3 {
+		t.Fatalf("individual vantage changed: %+v", west)
 	}
 }
 

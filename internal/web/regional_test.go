@@ -64,6 +64,27 @@ func TestReportsFilterByVantageAndRejectUnknownValues(t *testing.T) {
 	}
 }
 
+func TestCombinedDashboardLabelsOneHistoryPointPerBlock(t *testing.T) {
+	now := time.Now().UTC().Add(-time.Minute)
+	pool := model.Pool{ID: "pool", Name: "Pool"}
+	observations := []model.Observation{
+		{PoolID: pool.ID, Vantage: "us-west", BlockID: "same-block", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 10},
+		{PoolID: pool.ID, Vantage: "us-east", BlockID: "same-block", ObservedAt: now.Add(time.Millisecond), Eligible: true, Arrived: true, OffsetMS: 90},
+	}
+	handler, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/?vantage=us-all", nil))
+	body := response.Body.String()
+	for _, want := range []string{"last 24 hours · 1 blocks", "Each point is the median across US regions for one Bitcoin block", "Median regional delay for each Bitcoin block"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("combined dashboard missing %q", want)
+		}
+	}
+}
+
 func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 	now := time.Now().UTC()
 	started := now.Add(-time.Minute)

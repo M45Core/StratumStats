@@ -54,7 +54,7 @@ func TestDashboardShowsGroupSpecificUpdateTags(t *testing.T) {
 		{ID: "unchecked", Name: "Unchecked", Category: "shared"},
 	}
 	observations := []model.Observation{{
-		ObservedAt: observedAt, PoolID: "pplns", Vantage: "unknown", BlockID: "block",
+		ObservedAt: observedAt, PoolID: "pplns", Vantage: "unknown", BlockID: "000000000000000000000000000000000000000000000000000000000000abcd",
 		Eligible: true, Arrived: true, OffsetMS: 10,
 	}}
 	handler, err := (Server{Pools: pools, Load: func() ([]model.Observation, error) { return observations, nil }}).Handler()
@@ -85,6 +85,15 @@ func TestDashboardShowsGroupSpecificUpdateTags(t *testing.T) {
 	footnote := body[footnoteStart : footnoteStart+footnoteEnd]
 	if !strings.Contains(footnote, `Updated <time datetime="`+observedAt.Format(time.RFC3339)+`" data-relative-time`) {
 		t.Fatalf("dashboard footnote does not use the latest observation time: %s", footnote)
+	}
+	for _, want := range []string{
+		"Latest block",
+		"0000000000…000000abcd",
+		`title="000000000000000000000000000000000000000000000000000000000000abcd"`,
+	} {
+		if !strings.Contains(footnote, want) {
+			t.Fatalf("dashboard footnote does not show latest block %q: %s", want, footnote)
+		}
 	}
 }
 

@@ -7,13 +7,14 @@ import (
 	"net"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
 const (
-	MethodologyVersion = "2026-08-10.27"
+	MethodologyVersion = "2026-08-11.28"
 	reportHistoryLimit = 12
 	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
 	LatencyWindow = 24 * time.Hour
@@ -22,9 +23,10 @@ const (
 )
 
 type metricSample struct {
-	at    time.Time
-	order int
-	value float64
+	at      time.Time
+	order   int
+	value   float64
+	blockID string
 }
 
 type coinbaseSample struct {
@@ -92,6 +94,10 @@ func observationAccumulator(acc map[string]*accumulator, pools map[string]model.
 // Compute applies only objective probe measurements. Operator size, fees,
 // sponsorships, and subjective reputation are deliberately excluded.
 func Compute(pools []model.Pool, observations []model.Observation, now time.Time) model.Snapshot {
+	return compute(pools, observations, now, false)
+}
+
+func compute(pools []model.Pool, observations []model.Observation, now time.Time, combineVantages bool) model.Snapshot {
 	now = now.UTC()
 	observations = RetainObservations(observations, now)
 	observations = uniqueObservations(observations)
@@ -102,6 +108,8 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 	eligibleEndpointSamples := make(map[string]bool)
 	templateDeliveries := make(map[string]bool)
 	canonicalWindows := make(map[string]time.Time)
+	latestBlockID := ""
+	var latestBlockObservedAt time.Time
 	for _, p := range pools {
 		poolsByID[p.ID] = p
 		if len(p.Endpoints) == 0 {
@@ -144,6 +152,10 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		if start := canonicalWindows[blockWindowKey(o)]; !o.ObservedAt.Equal(start) {
 			continue
 		}
+		if o.ObservedAt.After(latestBlockObservedAt) || (o.ObservedAt.Equal(latestBlockObservedAt) && o.BlockID > latestBlockID) {
+			latestBlockID = o.BlockID
+			latestBlockObservedAt = o.ObservedAt
+		}
 		recordLatestObservation(a, o.ObservedAt)
 		key := observationKey(o)
 		globalKey := endpointReportKey(o.PoolID, a.address, a.endpoint.TLS) + "\x00" + key
@@ -152,7 +164,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		if o.Arrived && o.OffsetMS >= 0 {
 			templateDeliveries[globalKey] = true
 			if old, exists := a.offsets[key]; !exists || o.OffsetMS < old.value {
-				a.offsets[key] = metricSample{at: o.ObservedAt, order: order, value: o.OffsetMS}
+				a.offsets[key] = metricSample{at: o.ObservedAt, order: order, value: o.OffsetMS, blockID: o.BlockID}
 			}
 		}
 		if o.Arrived && o.CoinbaseAnalyzed {
@@ -168,7 +180,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 
 	reports := make([]model.PoolReport, 0, len(acc))
 	for _, a := range acc {
-		reports = append(reports, build(a, now))
+		reports = append(reports, build(a, now, combineVantages))
 	}
 	sort.SliceStable(reports, func(i, j int) bool {
 		if reports[i].PoolName != reports[j].PoolName {
@@ -184,6 +196,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		Methodology:             MethodologyVersion,
 		LatencyWindowHours:      int(LatencyWindow / time.Hour),
 		RetentionWindowDays:     int(RetentionWindow / (24 * time.Hour)),
+		LatestBlockID:           latestBlockID,
 		BlocksObserved:          len(observedBlocks),
 		EligibleEndpointSamples: len(eligibleEndpointSamples),
 		TemplateDeliveries:      len(templateDeliveries),
@@ -191,6 +204,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 		Disclosure: []string{
 			"Reports use automated endpoint observations only; no pool pays or applies for placement.",
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
+			"Combined-vantage reports reduce regional latency observations to one median per Bitcoin block before computing history, median, and P95.",
 			"No observation older than 30 days is used; block-template latency, latency history, and protocol timing use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
 			"Scheduled block observations affect scores only after their probe run completes successfully without dropped observations.",
@@ -233,12 +247,18 @@ func ComputeVantage(pools []model.Pool, observations []model.Observation, vantag
 // the same global evidence behavior as a single-vantage report.
 func ComputeVantages(pools []model.Pool, observations []model.Observation, vantages map[string]bool, now time.Time) model.Snapshot {
 	filtered := make([]model.Observation, 0, len(observations))
+	selectedVantages := 0
+	for _, selected := range vantages {
+		if selected {
+			selectedVantages++
+		}
+	}
 	for _, observation := range observations {
 		if vantages[observation.Vantage] {
 			filtered = append(filtered, observation)
 		}
 	}
-	regional := Compute(pools, filtered, now)
+	regional := compute(pools, filtered, now, selectedVantages > 1)
 	global := Compute(pools, observations, now)
 	globalReports := make(map[string]model.PoolReport, len(global.Reports))
 	for _, poolReport := range global.Reports {
@@ -300,23 +320,114 @@ func RetainObservations(observations []model.Observation, now time.Time) []model
 	return retained
 }
 
-func build(a *accumulator, now time.Time) model.PoolReport {
-	blocks, arrivals := len(a.blocks), len(a.offsets)
-	availability := 0.0
-	if blocks > 0 {
-		if arrivals > blocks {
-			arrivals = blocks
+func availabilityForChecks(blocks map[string]bool, offsets map[string]metricSample) float64 {
+	if len(blocks) == 0 {
+		return 0
+	}
+	arrivals := len(offsets)
+	if arrivals > len(blocks) {
+		arrivals = len(blocks)
+	}
+	return 100 * float64(arrivals) / float64(len(blocks))
+}
+
+func uniqueBlockCounts(blocks map[string]bool, offsets map[string]metricSample) (int, int) {
+	eligibleBlocks := make(map[string]bool)
+	deliveredBlocks := make(map[string]bool)
+	for key := range blocks {
+		_, blockID := observationKeyParts(key)
+		eligibleBlocks[blockID] = true
+	}
+	for key := range offsets {
+		_, blockID := observationKeyParts(key)
+		deliveredBlocks[blockID] = true
+	}
+	return len(eligibleBlocks), len(deliveredBlocks)
+}
+
+// combinedVantageAvailability gives every region equal influence even when
+// completed probe runs contain different numbers of Bitcoin blocks.
+func combinedVantageAvailability(blocks map[string]bool, offsets map[string]metricSample) float64 {
+	type counts struct{ eligible, delivered int }
+	byVantage := make(map[string]counts)
+	for key := range blocks {
+		vantage, _ := observationKeyParts(key)
+		count := byVantage[vantage]
+		count.eligible++
+		byVantage[vantage] = count
+	}
+	for key := range offsets {
+		vantage, _ := observationKeyParts(key)
+		count := byVantage[vantage]
+		count.delivered++
+		byVantage[vantage] = count
+	}
+	if len(byVantage) == 0 {
+		return 0
+	}
+	total := 0.0
+	measured := 0
+	for _, count := range byVantage {
+		if count.eligible == 0 {
+			continue
 		}
-		availability = 100 * float64(arrivals) / float64(blocks)
+		delivered := count.delivered
+		if delivered > count.eligible {
+			delivered = count.eligible
+		}
+		total += 100 * float64(delivered) / float64(count.eligible)
+		measured++
+	}
+	if measured == 0 {
+		return 0
+	}
+	return total / float64(measured)
+}
+
+func medianLatencyByBlock(samples []metricSample) []metricSample {
+	byBlock := make(map[string][]metricSample)
+	for _, sample := range samples {
+		byBlock[sample.blockID] = append(byBlock[sample.blockID], sample)
+	}
+	combined := make([]metricSample, 0, len(byBlock))
+	for blockID, regional := range byBlock {
+		values := make([]float64, 0, len(regional))
+		canonical := regional[0]
+		for _, sample := range regional {
+			values = append(values, sample.value)
+			if sample.at.Before(canonical.at) || (sample.at.Equal(canonical.at) && sample.order < canonical.order) {
+				canonical = sample
+			}
+		}
+		sort.Float64s(values)
+		canonical.value = percentile(values, .5)
+		canonical.blockID = blockID
+		combined = append(combined, canonical)
+	}
+	return combined
+}
+
+func build(a *accumulator, now time.Time, combineVantages bool) model.PoolReport {
+	eligibleChecks, deliveryChecks := len(a.blocks), len(a.offsets)
+	blocks, arrivals := eligibleChecks, deliveryChecks
+	availability := availabilityForChecks(a.blocks, a.offsets)
+	if combineVantages {
+		blocks, arrivals = uniqueBlockCounts(a.blocks, a.offsets)
+		availability = combinedVantageAvailability(a.blocks, a.offsets)
 	}
 
-	latencySamples := make([]metricSample, 0, arrivals)
+	latencySamples := make([]metricSample, 0, deliveryChecks)
 	offsetValues := make([]float64, 0, arrivals)
 	for _, sample := range a.offsets {
 		if !withinLatencyWindow(sample.at, now) {
 			continue
 		}
 		latencySamples = append(latencySamples, sample)
+	}
+	if combineVantages {
+		latencySamples = medianLatencyByBlock(latencySamples)
+	}
+	for _, sample := range latencySamples {
 		offsetValues = append(offsetValues, sample.value)
 	}
 	var median, p95 *float64
@@ -439,7 +550,8 @@ func build(a *accumulator, now time.Time) model.PoolReport {
 		PoolID: a.pool.ID, PoolName: a.pool.Name, Category: a.pool.Category, Products: a.pool.Products,
 		Endpoint: a.address, EndpointTLS: a.endpoint.TLS, EndpointRegion: a.endpoint.Region,
 		LastObservedAt: lastObservedAt,
-		Blocks:         blocks, Arrivals: arrivals, MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median, availability, blocks),
+		Blocks:         blocks, Arrivals: arrivals, EligibleChecks: eligibleChecks, DeliveryChecks: deliveryChecks,
+		MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median, availability, blocks),
 		Availability: round(availability, 1), TLSObserved: a.tls,
 		ConnectTiming: timingStats(a, model.ProtocolConnect), TLSTiming: timingStats(a, model.ProtocolTLSHandshake),
 		SubscribeTiming: timingStats(a, model.ProtocolSubscribe), AuthorizeTiming: timingStats(a, model.ProtocolAuthorize), PingTiming: timingStats(a, model.ProtocolPing),
@@ -498,6 +610,14 @@ func estimatedMiningLoss(latencyMS *float64, availability float64, blocks int) *
 
 func observationKey(o model.Observation) string {
 	return o.Vantage + "\x00" + o.BlockID
+}
+
+func observationKeyParts(key string) (string, string) {
+	vantage, blockID, found := strings.Cut(key, "\x00")
+	if !found {
+		return "", key
+	}
+	return vantage, blockID
 }
 
 func blockWindowKey(o model.Observation) string {

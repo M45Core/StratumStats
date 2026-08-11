@@ -74,7 +74,9 @@ Regional probe ingestion is provided by
 compares observations only within the same vantage. Scheduled block samples
 enter availability and score calculations only after the complete, lossless
 probe run has been received, so an interrupted upload cannot create a partial
-scoring cohort.
+scoring cohort. The US combined view reduces the available regional delays to
+one median per Bitcoin block before computing history, median, P95, mining loss,
+and score; its availability gives each reporting US region equal weight.
 
 ## Production installation
 

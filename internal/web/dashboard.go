@@ -21,8 +21,8 @@ type dashboardPool struct {
 	UnsafeReason     string
 	WalletEvidence   string
 	IsSolo           bool
-	TLSConfigured    bool
 	FeeSortValue     *float64
+	CombinedVantage  bool
 	LatencyChart     latencyHistoryChart
 	FeeChangeHistory []feeChangePoint
 }
@@ -107,7 +107,7 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 		pool := dashboardPool{
 			PoolReport: report, Website: websiteByPoolID[report.PoolID], RowID: endpointRowID(report), SortName: report.PoolName + " " + report.Endpoint,
 			LatencyClass: latencyClass(report.MedianMS), MiningLossClass: miningLossClass(report.EstimatedMiningLossPct),
-			IsSolo: isSolo, TLSConfigured: report.EndpointTLS, FeeSortValue: feeSortValue,
+			IsSolo: isSolo, FeeSortValue: feeSortValue, CombinedVantage: selectedVantage == "us-all",
 			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
 		}
 		displayedPools = append(displayedPools, pool)
