@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	MethodologyVersion = "2026-08-11.29"
-	reportHistoryLimit = 12
+	MethodologyVersion     = "2026-08-12.30"
+	reportHistoryLimit     = 12
+	regionalCohortMissPct  = 20
+	regionalCohortMinPools = 5
 	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
 	LatencyWindow = 24 * time.Hour
 	// RetentionWindow is the maximum age of any observation used in a report.
@@ -109,6 +111,7 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 	templateDeliveries := make(map[string]bool)
 	canonicalWindows := make(map[string]time.Time)
 	latestBlockID := ""
+	var latestBlockHeight uint64
 	var latestBlockObservedAt time.Time
 	for _, p := range pools {
 		poolsByID[p.ID] = p
@@ -130,9 +133,10 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 			canonicalWindows[key] = o.ObservedAt
 		}
 	}
+	excludedRegionalCohorts := unhealthyRegionalCohorts(observations, acc, poolsByID, completedRemoteRuns, canonicalWindows)
 	for order, o := range observations {
 		protocolRecord := o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != ""
-		if !protocolRecord && o.BlockID != "" && scoreableBlockObservation(o, completedRemoteRuns) {
+		if !protocolRecord && o.BlockID != "" && scoreableBlockObservation(o, completedRemoteRuns) && !excludedRegionalCohorts[blockWindowKey(o)] {
 			observedBlocks[o.BlockID] = true
 		}
 		a, ok := observationAccumulator(acc, poolsByID, o)
@@ -152,9 +156,15 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 		if start := canonicalWindows[blockWindowKey(o)]; !o.ObservedAt.Equal(start) {
 			continue
 		}
+		if excludedRegionalCohorts[blockWindowKey(o)] {
+			continue
+		}
 		if o.ObservedAt.After(latestBlockObservedAt) || (o.ObservedAt.Equal(latestBlockObservedAt) && o.BlockID > latestBlockID) {
 			latestBlockID = o.BlockID
+			latestBlockHeight = o.BlockHeight
 			latestBlockObservedAt = o.ObservedAt
+		} else if o.ObservedAt.Equal(latestBlockObservedAt) && o.BlockID == latestBlockID && o.BlockHeight > 0 {
+			latestBlockHeight = o.BlockHeight
 		}
 		recordLatestObservation(a, o.ObservedAt)
 		key := observationKey(o)
@@ -197,9 +207,11 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 		LatencyWindowHours:      int(LatencyWindow / time.Hour),
 		RetentionWindowDays:     int(RetentionWindow / (24 * time.Hour)),
 		LatestBlockID:           latestBlockID,
+		LatestBlockHeight:       latestBlockHeight,
 		BlocksObserved:          len(observedBlocks),
 		EligibleEndpointSamples: len(eligibleEndpointSamples),
 		TemplateDeliveries:      len(templateDeliveries),
+		ExcludedRegionalCohorts: len(excludedRegionalCohorts),
 		Reports:                 reports,
 		Disclosure: []string{
 			"Reports use automated endpoint observations only; no pool pays or applies for placement.",
@@ -208,12 +220,63 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 			"No observation older than 30 days is used; block-template latency, latency history, and protocol timing use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
 			"Scheduled block observations affect scores only after their probe run completes successfully without dropped observations.",
+			"A scheduled regional block cohort is excluded when at least 20% of eligible endpoints across at least five pools miss together, indicating a vantage-wide measurement failure rather than independent pool availability.",
 			"The probe uses pseudonymous miner credentials, but a pool can still observe its source IP.",
 			"Observed solo-pool fee is inferred only when a decoded coinbase output matches the generated worker script; optional donations or splits may be included.",
 			"Matched worker payout destinations are reduced to aggregate verification and fee evidence; their address and script are never published.",
 			"Coinbase destinations identify decoded output scripts, not who controls a non-worker address.",
 		},
 	}
+}
+
+type regionalCohortHealth struct {
+	eligible map[string]bool
+	missed   map[string]string
+}
+
+// unhealthyRegionalCohorts identifies broad, correlated misses produced by a
+// regional observer failure. The raw observations remain retained, but the
+// entire cohort is omitted so neither its misses nor its surviving latencies
+// affect endpoint comparisons.
+func unhealthyRegionalCohorts(observations []model.Observation, acc map[string]*accumulator, pools map[string]model.Pool, completedRemoteRuns map[string]bool, canonicalWindows map[string]time.Time) map[string]bool {
+	cohorts := make(map[string]*regionalCohortHealth)
+	for _, observation := range observations {
+		if observation.Source != model.SourceRemoteScheduled || observation.RecordType == model.RecordTypeProtocol || observation.ProtocolMethod != "" ||
+			!observation.Eligible || observation.BlockID == "" || !scoreableBlockObservation(observation, completedRemoteRuns) {
+			continue
+		}
+		key := blockWindowKey(observation)
+		if !observation.ObservedAt.Equal(canonicalWindows[key]) {
+			continue
+		}
+		a, ok := observationAccumulator(acc, pools, observation)
+		if !ok {
+			continue
+		}
+		health := cohorts[key]
+		if health == nil {
+			health = &regionalCohortHealth{eligible: make(map[string]bool), missed: make(map[string]string)}
+			cohorts[key] = health
+		}
+		endpoint := endpointReportKey(observation.PoolID, a.address, a.endpoint.TLS)
+		health.eligible[endpoint] = true
+		if observation.Arrived {
+			delete(health.missed, endpoint)
+			continue
+		}
+		health.missed[endpoint] = observation.PoolID
+	}
+	excluded := make(map[string]bool)
+	for key, health := range cohorts {
+		missPools := make(map[string]bool)
+		for _, poolID := range health.missed {
+			missPools[poolID] = true
+		}
+		if len(missPools) >= regionalCohortMinPools && len(health.missed)*100 >= len(health.eligible)*regionalCohortMissPct {
+			excluded[key] = true
+		}
+	}
+	return excluded
 }
 
 // completedScheduledRuns returns the remote run IDs whose terminal record

@@ -76,7 +76,7 @@ func TestComputePublishesLatestEligibleBlockID(t *testing.T) {
 	pool := model.Pool{ID: "pool", Name: "Pool"}
 	observations := []model.Observation{
 		{PoolID: pool.ID, Vantage: "west", BlockID: "older-block", ObservedAt: now.Add(-time.Minute), Eligible: true, Arrived: true},
-		{PoolID: pool.ID, Vantage: "west", BlockID: "latest-block", ObservedAt: now, Eligible: true},
+		{PoolID: pool.ID, Vantage: "west", BlockID: "latest-block", BlockHeight: 900_000, ObservedAt: now, Eligible: true, Arrived: true},
 		{PoolID: pool.ID, Vantage: "west", BlockID: "ineligible-block", ObservedAt: now.Add(time.Minute)},
 		{PoolID: "removed", Vantage: "west", BlockID: "unknown-pool-block", ObservedAt: now.Add(2 * time.Minute), Eligible: true},
 	}
@@ -84,6 +84,9 @@ func TestComputePublishesLatestEligibleBlockID(t *testing.T) {
 	snapshot := Compute([]model.Pool{pool}, observations, now.Add(3*time.Minute))
 	if snapshot.LatestBlockID != "latest-block" {
 		t.Fatalf("latest block ID=%q, want latest-block", snapshot.LatestBlockID)
+	}
+	if snapshot.LatestBlockHeight != 900_000 {
+		t.Fatalf("latest block height=%d, want 900000", snapshot.LatestBlockHeight)
 	}
 }
 
@@ -145,6 +148,82 @@ func TestComputeScoresOnlyCompletedLosslessScheduledRuns(t *testing.T) {
 	}
 	if snapshot.Reports[0].OverallScore == nil || snapshot.Reports[1].OverallScore == nil || *snapshot.Reports[0].OverallScore <= *snapshot.Reports[1].OverallScore {
 		t.Fatalf("completed availability miss was not reflected in scores: fast=%v slow=%v", snapshot.Reports[0].OverallScore, snapshot.Reports[1].OverallScore)
+	}
+}
+
+func TestComputeExcludesBroadRegionalMissesButKeepsLocalizedOutages(t *testing.T) {
+	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	started := now.Add(-time.Minute)
+	pools := make([]model.Pool, 0, 8)
+	for index := 0; index < 8; index++ {
+		poolID := "pool-" + string(rune('a'+index))
+		endpoints := []model.Endpoint{{Host: poolID + ".example", Port: 3333}}
+		if index == 0 {
+			endpoints = append(endpoints,
+				model.Endpoint{Host: poolID + "-two.example", Port: 3333},
+				model.Endpoint{Host: poolID + "-three.example", Port: 3333},
+			)
+		}
+		pools = append(pools, model.Pool{ID: poolID, Name: poolID, Endpoints: endpoints})
+	}
+	var observations []model.Observation
+	addCohort := func(runID, blockID string, misses map[string]bool) {
+		observedAt := now.Add(-30 * time.Second)
+		for _, pool := range pools {
+			for _, endpoint := range pool.Endpoints {
+				address := endpointAddress(endpoint)
+				key := endpointReportKey(pool.ID, address, endpoint.TLS)
+				observations = append(observations, model.Observation{
+					Version: model.ObservationVersion, Source: model.SourceRemoteScheduled,
+					ObservationID: runID + "/" + key, RunID: runID, Vantage: "us-east",
+					BlockID: blockID, PoolID: pool.ID, Endpoint: address, ObservedAt: observedAt,
+					Eligible: true, Arrived: !misses[key], TLS: endpoint.TLS,
+				})
+			}
+		}
+		observations = append(observations, model.Observation{
+			Version: model.ObservationVersion, Source: model.SourceRemoteScheduled,
+			ObservationID: runID + "/summary", RunID: runID, Vantage: "us-east",
+			RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started,
+			RunStatus: "ok", DroppedObservations: 0,
+		})
+	}
+	addCohort("healthy", "healthy", nil)
+	broadMisses := make(map[string]bool)
+	for index := 0; index < 5; index++ {
+		pool := pools[index]
+		broadMisses[endpointReportKey(pool.ID, endpointAddress(pool.Endpoints[0]), false)] = true
+	}
+	addCohort("regional-failure", "regional-failure", broadMisses)
+	localizedMisses := make(map[string]bool)
+	for _, endpoint := range pools[0].Endpoints {
+		localizedMisses[endpointReportKey(pools[0].ID, endpointAddress(endpoint), false)] = true
+	}
+	addCohort("pool-outage", "pool-outage", localizedMisses)
+
+	snapshot := Compute(pools, observations, now)
+	if snapshot.ExcludedRegionalCohorts != 1 {
+		t.Fatalf("excluded regional cohorts=%d, want 1", snapshot.ExcludedRegionalCohorts)
+	}
+	if snapshot.BlocksObserved != 2 || snapshot.EligibleEndpointSamples != 20 || snapshot.TemplateDeliveries != 17 {
+		t.Fatalf("included counts = blocks:%d eligible:%d delivered:%d, want 2/20/17", snapshot.BlocksObserved, snapshot.EligibleEndpointSamples, snapshot.TemplateDeliveries)
+	}
+	for _, report := range snapshot.Reports {
+		if report.Blocks != 2 {
+			t.Fatalf("%s blocks=%d, broad regional cohort affected scoring", report.Endpoint, report.Blocks)
+		}
+		if report.PoolID == pools[0].ID && report.Availability != 50 {
+			t.Fatalf("localized outage availability=%.1f, want 50.0", report.Availability)
+		}
+		if report.PoolID != pools[0].ID && report.Availability != 100 {
+			t.Fatalf("healthy endpoint %s availability=%.1f, want 100.0", report.Endpoint, report.Availability)
+		}
+		if report.OverallScore == nil {
+			t.Fatalf("%s has no score after healthy cohorts", report.Endpoint)
+		}
+	}
+	if *snapshot.Reports[0].OverallScore >= *snapshot.Reports[3].OverallScore {
+		t.Fatalf("localized outage did not lower score: affected=%v healthy=%v", snapshot.Reports[0].OverallScore, snapshot.Reports[3].OverallScore)
 	}
 }
 

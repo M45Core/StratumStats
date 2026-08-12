@@ -334,11 +334,11 @@ func validateObservation(observation model.Observation, pools map[string]bool, e
 		}
 		if !oneOf(observation.ProtocolMethod, model.ProtocolConnect, model.ProtocolTLSHandshake, model.ProtocolSubscribe, model.ProtocolAuthorize, model.ProtocolPing) ||
 			!oneOf(observation.ResponseStatus, model.ProtocolStatusOK, model.ProtocolStatusRejected, model.ProtocolStatusUnsupported, model.ProtocolStatusTimeout, model.ProtocolStatusError) ||
-			observation.DurationMS == nil || observation.BlockID != "" {
+			observation.DurationMS == nil || observation.BlockID != "" || observation.BlockHeight != 0 {
 			return errors.New("invalid protocol result")
 		}
 	case model.RecordTypeProbeRun:
-		if observation.PoolID != "" || observation.BlockID != "" ||
+		if observation.PoolID != "" || observation.BlockID != "" || observation.BlockHeight != 0 ||
 			observation.RunStartedAt == nil || observation.RunStartedAt.IsZero() ||
 			!oneOf(observation.RunStatus, "ok", "partial", "error") ||
 			observation.ConfiguredEndpoints < 0 || observation.SuccessfulSessions < 0 ||
@@ -348,7 +348,7 @@ func validateObservation(observation model.Observation, pools map[string]bool, e
 		}
 	case "":
 		if !pools[observation.PoolID] || observation.BlockID == "" || !observation.Eligible ||
-			(!observation.Arrived && observation.OffsetMS != 0) || observation.Endpoint == "" ||
+			(!observation.Arrived && (observation.OffsetMS != 0 || observation.BlockHeight != 0)) || observation.Endpoint == "" ||
 			!endpoints[endpointIdentity{poolID: observation.PoolID, address: observation.Endpoint, tls: observation.TLS}] {
 			return errors.New("invalid block observation")
 		}

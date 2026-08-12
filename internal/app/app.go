@@ -29,6 +29,8 @@ import (
 	webapp "github.com/M45Core/StratumStats/internal/web"
 )
 
+const observationCompactionInterval = 7 * 24 * time.Hour
+
 func Main(args []string) {
 	if err := Run(args); err != nil && !errors.Is(err, context.Canceled) {
 		log.Fatal(err)
@@ -71,11 +73,20 @@ func serve(args []string, demo bool) error {
 	if demo {
 		pools = demoPools(pools)
 	}
+	var appender *store.Appender
+	if !demo {
+		appender = &store.Appender{Path: *dataPath}
+		if result, err := compactObservations(appender, time.Now().UTC(), true); err != nil {
+			log.Printf("observation compaction check failed: error=%q", err.Error())
+		} else if result.Compacted {
+			log.Printf("compacted observations: retained=%d removed=%d", result.Retained, result.Removed)
+		}
+	}
 	loader := func() ([]model.Observation, error) {
 		if demo {
 			return demoData(pools), nil
 		}
-		return store.LoadSince(*dataPath, time.Now().UTC().Add(-report.RetentionWindow))
+		return appender.LoadSince(time.Now().UTC().Add(-report.RetentionWindow))
 	}
 	var ingestHandler http.Handler
 	keyID, secret := os.Getenv("STRATUMSTATS_INGEST_KEY_ID"), os.Getenv("STRATUMSTATS_INGEST_SECRET")
@@ -86,7 +97,6 @@ func serve(args []string, demo bool) error {
 		return fmt.Errorf("STRATUMSTATS_INGEST_SECRET must contain at least 32 bytes")
 	}
 	if !demo && keyID != "" {
-		appender := &store.Appender{Path: *dataPath}
 		receiver := ingest.Receiver{
 			Pools:   cfg.Pools,
 			Keys:    map[string][]byte{keyID: []byte(secret)},
@@ -111,6 +121,9 @@ func serve(args []string, demo bool) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if appender != nil {
+		go runObservationCompactor(ctx, appender)
+	}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -127,6 +140,35 @@ func serve(args []string, demo bool) error {
 		return nil
 	}
 	return err
+}
+
+func compactObservations(appender *store.Appender, now time.Time, startup bool) (store.CompactionResult, error) {
+	retainCutoff := now.UTC().Add(-report.RetentionWindow)
+	triggerCutoff := retainCutoff
+	if startup {
+		triggerCutoff = triggerCutoff.Add(-observationCompactionInterval)
+	}
+	return appender.CompactBefore(retainCutoff, triggerCutoff)
+}
+
+func runObservationCompactor(ctx context.Context, appender *store.Appender) {
+	ticker := time.NewTicker(observationCompactionInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			result, err := compactObservations(appender, now.UTC(), false)
+			if err != nil {
+				log.Printf("observation compaction failed: error=%q", err.Error())
+				continue
+			}
+			if result.Compacted {
+				log.Printf("compacted observations: retained=%d removed=%d", result.Retained, result.Removed)
+			}
+		}
+	}
 }
 
 func collect(args []string) error {
@@ -299,6 +341,9 @@ func demoData(pools []model.Pool) []model.Observation {
 					arrived = i%30 != 0 || endpointIndex != 0 // four missed deliveries on one endpoint
 				}
 				observation := model.Observation{Version: model.ObservationVersion, ObservedAt: now.Add(-time.Duration(120-i) * 10 * time.Minute), Vantage: demoVantages[i%len(demoVantages)], BlockID: fmt.Sprintf("demo-%03d", i), PoolID: pool.ID, Endpoint: net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port)), Eligible: true, Arrived: arrived, OffsetMS: offset, EmptyFirst: rng.Float64() < float64(p)*.018, TLS: endpoint.TLS, CoinbaseAnalyzed: arrived}
+				if arrived {
+					observation.BlockHeight = uint64(900_000 + i)
+				}
 				if pool.Category == "solo" && arrived {
 					fee := float64((p % 4)) * 0.5
 					total := uint64(312_500_000)

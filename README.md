@@ -16,6 +16,7 @@ measurements.
 
 - Compares template delivery only for the same Bitcoin block and vantage.
 - Publishes median and P95 delay, availability, protocol timing, and sample counts.
+- Shows the latest regional Bitcoin block height and highlights new blocks live.
 - Measures solo-pool fees only when the probe worker output is found in coinbase.
 - Verifies TLS certificates and reports failures explicitly.
 - Keeps raw JSONL evidence independently recomputable.
@@ -59,6 +60,10 @@ for the same block and vantage. Every configured endpoint is eligible for that
 block, so an endpoint that is down records a missed delivery and mining loss.
 Median, P95, history, and protocol timings use a rolling 24-hour window. No report,
 score, count, payout, or fee evidence uses observations older than 30 days.
+The production server checks the oldest JSONL observation weekly and atomically
+compacts the file to that same 30-day horizon. A startup check acts only when
+the file has accumulated more than one extra week, avoiding rewrites on routine
+service restarts.
 
 Protocol measurements include TCP connect, TLS handshake, `mining.subscribe`,
 `mining.authorize`, and optional `mining.ping`. Coinbase reconstruction checks
@@ -74,7 +79,10 @@ Regional probe ingestion is provided by
 compares observations only within the same vantage. Scheduled block samples
 enter availability and score calculations only after the complete, lossless
 probe run has been received, so an interrupted upload cannot create a partial
-scoring cohort.
+scoring cohort. A completed regional cohort is also excluded when at least 20%
+of eligible endpoints across at least five distinct pools miss together. This
+retains the raw diagnostic evidence without treating a vantage-wide observer
+failure as independent pool downtime.
 The production Fly regions are IAD (`us-east`), FRA (`europe`), LAX
 (`us-west`), NRT (`japan`), and SIN (`singapore`). IAD is the default view.
 The embedded [`regions.json`](internal/model/regions.json) catalogs all current

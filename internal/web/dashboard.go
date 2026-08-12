@@ -52,29 +52,22 @@ type latencyHistoryChart struct {
 }
 
 type dashboardPage struct {
-	Snapshot                    model.Snapshot  `json:"snapshot"`
-	DataUpdatedAt               *time.Time      `json:"data_updated_at,omitempty"`
-	Demo                        bool            `json:"demo"`
-	FreePools                   []dashboardPool `json:"free_pools"`
-	NormalPools                 []dashboardPool `json:"normal_pools"`
-	MissingWalletPools          []dashboardPool `json:"missing_wallet_pools"`
-	PendingWalletPools          []dashboardPool `json:"pending_wallet_pools"`
-	PPLNSPools                  []dashboardPool `json:"pplns_pools"`
-	OtherPools                  []dashboardPool `json:"other_pools"`
-	NoRecentDataPools           []dashboardPool `json:"no_recent_data_pools"`
-	FreePoolsUpdatedAt          *time.Time      `json:"free_pools_updated_at,omitempty"`
-	NormalPoolsUpdatedAt        *time.Time      `json:"normal_pools_updated_at,omitempty"`
-	MissingWalletPoolsUpdatedAt *time.Time      `json:"missing_wallet_pools_updated_at,omitempty"`
-	PendingWalletPoolsUpdatedAt *time.Time      `json:"pending_wallet_pools_updated_at,omitempty"`
-	PPLNSPoolsUpdatedAt         *time.Time      `json:"pplns_pools_updated_at,omitempty"`
-	OtherPoolsUpdatedAt         *time.Time      `json:"other_pools_updated_at,omitempty"`
-	NoRecentDataPoolsUpdatedAt  *time.Time      `json:"no_recent_data_pools_updated_at,omitempty"`
-	SelectedVantage             string          `json:"selected_vantage"`
-	SelectedLabel               string          `json:"selected_label"`
-	SelectedTransport           string          `json:"selected_transport"`
-	VantageStatus               *vantageStatus  `json:"vantage_status,omitempty"`
-	AvailableVantages           map[string]bool `json:"available_vantages"`
-	VantageOptions              []vantageOption `json:"vantage_options"`
+	Snapshot           model.Snapshot  `json:"snapshot"`
+	DataUpdatedAt      *time.Time      `json:"data_updated_at,omitempty"`
+	Demo               bool            `json:"demo"`
+	FreePools          []dashboardPool `json:"free_pools"`
+	NormalPools        []dashboardPool `json:"normal_pools"`
+	MissingWalletPools []dashboardPool `json:"missing_wallet_pools"`
+	PendingWalletPools []dashboardPool `json:"pending_wallet_pools"`
+	PPLNSPools         []dashboardPool `json:"pplns_pools"`
+	OtherPools         []dashboardPool `json:"other_pools"`
+	NoRecentDataPools  []dashboardPool `json:"no_recent_data_pools"`
+	SelectedVantage    string          `json:"selected_vantage"`
+	SelectedLabel      string          `json:"selected_label"`
+	SelectedTransport  string          `json:"selected_transport"`
+	VantageStatus      *vantageStatus  `json:"vantage_status,omitempty"`
+	AvailableVantages  map[string]bool `json:"available_vantages"`
+	VantageOptions     []vantageOption `json:"vantage_options"`
 }
 
 type vantageOption struct {
@@ -165,14 +158,11 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 	sortByOverallScore(page.PPLNSPools)
 	sortByOverallScore(page.OtherPools)
 	sortByTemplateLatency(page.NoRecentDataPools)
-	page.FreePoolsUpdatedAt = latestPoolUpdate(page.FreePools)
-	page.NormalPoolsUpdatedAt = latestPoolUpdate(page.NormalPools)
-	page.MissingWalletPoolsUpdatedAt = latestPoolUpdate(page.MissingWalletPools)
-	page.PendingWalletPoolsUpdatedAt = latestPoolUpdate(page.PendingWalletPools)
-	page.PPLNSPoolsUpdatedAt = latestPoolUpdate(page.PPLNSPools)
-	page.OtherPoolsUpdatedAt = latestPoolUpdate(page.OtherPools)
-	page.NoRecentDataPoolsUpdatedAt = latestPoolUpdate(page.NoRecentDataPools)
-	page.DataUpdatedAt = latestPoolUpdate(displayedPools)
+	if status != nil && status.LastSuccessfulRunAt != nil {
+		page.DataUpdatedAt = status.LastSuccessfulRunAt
+	} else {
+		page.DataUpdatedAt = latestPoolUpdate(displayedPools)
+	}
 	return page
 }
 

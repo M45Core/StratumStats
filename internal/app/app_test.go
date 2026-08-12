@@ -2,9 +2,14 @@ package app
 
 import (
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/M45Core/StratumStats/internal/model"
+	"github.com/M45Core/StratumStats/internal/store"
 )
 
 func TestRepositoryPoolRegistryIsWellFormed(t *testing.T) {
@@ -63,5 +68,31 @@ func TestRepositoryPoolRegistryIsWellFormed(t *testing.T) {
 			}
 			endpoints[key] = struct{}{}
 		}
+	}
+}
+
+func TestObservationCompactionUsesWeeklyStartupGrace(t *testing.T) {
+	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "observations.jsonl")
+	appender := &store.Appender{Path: path}
+	if err := appender.Append([]model.Observation{
+		{Version: model.ObservationVersion, ObservationID: "stale", ObservedAt: now.Add(-31 * 24 * time.Hour)},
+		{Version: model.ObservationVersion, ObservationID: "recent", ObservedAt: now.Add(-time.Hour)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	startup, err := compactObservations(appender, now, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if startup.Compacted {
+		t.Fatalf("startup compacted a file less than one week beyond retention: %+v", startup)
+	}
+	weekly, err := compactObservations(appender, now, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !weekly.Compacted || weekly.Removed != 1 || weekly.Retained != 1 {
+		t.Fatalf("weekly compaction=%+v, want one stale record removed", weekly)
 	}
 }

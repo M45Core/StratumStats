@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Methodology — StratumStats</title>
   <link rel="icon" href="/static/brand/stratumstats-favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css?v=c4ae6d38">
+  <link rel="stylesheet" href="/static/style.css?v=ee9335fb">
 </head>
 <body>
 <header>
@@ -32,7 +32,7 @@
   <div class="method-grid">
     <article><h3 id="block-template-latency">Median block delay</h3><p>The median delay until one configured endpoint sends its first valid block template, compared with the earliest valid template seen for the same Bitcoin block and region. Lower is better. The dashboard uses the latest 24 hours.</p></article>
     <article><h3 id="p95">P95 block delay</h3><p>The 95th-percentile delay. Ninety-five percent of measured deliveries were this fast or faster, so P95 exposes occasional stalls that the median may hide.</p></article>
-    <article><h3 id="availability">Availability</h3><p>Valid block-template deliveries divided by eligible block observations for that configured endpoint during the latest 30 days. Every configured endpoint is eligible once a block window is confirmed, even if it is disconnected, because a down server cannot provide mining work. Scheduled observations enter this calculation only after their complete, lossless probe run is received, so an interrupted upload cannot lower availability. The dashboard shows the percentage directly; estimated mining loss carries the color bar.</p></article>
+    <article><h3 id="availability">Availability</h3><p>Valid block-template deliveries divided by eligible block observations for that configured endpoint during the latest 30 days. Every configured endpoint is eligible once a block window is confirmed, even if it is disconnected, because a down server cannot provide mining work. Scheduled observations enter this calculation only after their complete, lossless probe run is received. A regional cohort is excluded when at least 20% of eligible endpoints across at least five pools miss together, because that correlated failure indicates an unhealthy observer rather than independent pool downtime. The dashboard shows the percentage directly; estimated mining loss carries the color bar.</p></article>
     <article><h3 id="estimated-mining-loss">Estimated mining loss</h3><p>The unavailable share of eligible template deliveries plus median relative delay during available time, using Bitcoin’s 600-second target block interval. This estimates idle and stale-work time; it is not measured payout or revenue loss.</p></article>
     <article><h3 id="tcp">TCP connection</h3><p>Time to establish the basic network connection to a pool, including local name lookup.</p></article>
     <article><h3 id="tls">TLS handshake</h3><p>Time to establish an encrypted connection and verify the pool’s certificate, hostname, validity period, and trusted issuer.</p></article>
@@ -105,7 +105,7 @@
   <p id="pplns"><strong>PPLNS</strong> means Pay Per Last N Shares: rewards are based on work submitted during a recent share window. Other shared pools use different payout methods.</p>
 
   <h2>What is excluded</h2>
-  <p>Pool size, popularity, sponsorship, paid placement, subjective reputation, operator-advertised fees, and unobservable shared-pool fees.</p>
+  <p>Pool size, popularity, sponsorship, paid placement, subjective reputation, operator-advertised fees, unobservable shared-pool fees, incomplete scheduled runs, and vantage-wide unhealthy regional cohorts.</p>
 
   <h2>Privacy and disclosures</h2>
   <p>Operational details that could identify measurement traffic are intentionally withheld. Published results are aggregated to protect measurement integrity.</p>

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -133,5 +134,101 @@ func TestAppenderSerializesConcurrentBatches(t *testing.T) {
 	}
 	if len(got) != batches {
 		t.Fatalf("records=%d, want %d", len(got), batches)
+	}
+}
+
+func TestAppenderCompactsAtomicallyToRetentionCutoff(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "observations.jsonl")
+	cutoff := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+	observations := []model.Observation{
+		{Version: model.ObservationVersion, ObservationID: "old", ObservedAt: cutoff.Add(-time.Nanosecond)},
+		{Version: model.ObservationVersion - 1, ObservationID: "old-schema", ObservedAt: cutoff.Add(time.Minute)},
+		{Version: model.ObservationVersion, ObservationID: "boundary", ObservedAt: cutoff},
+		{Version: model.ObservationVersion, ObservationID: "recent", ObservedAt: cutoff.Add(time.Hour)},
+	}
+	if err := Append(path, observations); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0640); err != nil {
+		t.Fatal(err)
+	}
+	appender := &Appender{Path: path}
+	result, err := appender.CompactBefore(cutoff, cutoff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Compacted || result.Removed != 2 || result.Retained != 2 {
+		t.Fatalf("compaction result=%+v, want compacted with 2 removed and 2 retained", result)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ObservationID != "boundary" || got[1].ObservationID != "recent" {
+		t.Fatalf("compacted observations=%+v", got)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0640 {
+		t.Fatalf("compacted permissions=%04o, want 0640", info.Mode().Perm())
+	}
+	matches, err := filepath.Glob(filepath.Join(filepath.Dir(path), ".observations.jsonl.compact-*"))
+	if err != nil || len(matches) != 0 {
+		t.Fatalf("temporary files=%v err=%v", matches, err)
+	}
+}
+
+func TestAppenderCompactionWaitsForOldestTrigger(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "observations.jsonl")
+	now := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	if err := Append(path, []model.Observation{{Version: model.ObservationVersion, ObservationID: "stale", ObservedAt: now.Add(-31 * 24 * time.Hour)}}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := (&Appender{Path: path}).CompactBefore(now.Add(-30*24*time.Hour), now.Add(-37*24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Compacted || !bytes.Equal(before, after) {
+		t.Fatalf("premature compaction result=%+v before=%q after=%q", result, before, after)
+	}
+}
+
+func TestAppenderCompactionPreservesOriginalOnInvalidJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "observations.jsonl")
+	old := model.Observation{Version: model.ObservationVersion, ObservationID: "old", ObservedAt: time.Unix(1, 0).UTC()}
+	if err := Append(path, []model.Observation{old}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("not-json\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := (&Appender{Path: path}).CompactBefore(time.Unix(2, 0).UTC(), time.Unix(2, 0).UTC())
+	if err == nil || result.Compacted {
+		t.Fatalf("invalid JSON compaction result=%+v err=%v", result, err)
+	}
+	after, readErr := os.ReadFile(path)
+	if readErr != nil || !bytes.Equal(before, after) {
+		t.Fatalf("original changed after failure: readErr=%v before=%q after=%q", readErr, before, after)
 	}
 }
