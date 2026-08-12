@@ -16,7 +16,8 @@ measurements.
 
 - Compares template delivery only for the same Bitcoin block and vantage.
 - Publishes median and P95 delay, availability, protocol timing, and sample counts.
-- Shows the latest regional Bitcoin block height and highlights new blocks live.
+- Repeats each region's freshness and latest observed Bitcoin block height at
+  every results section, and highlights newly observed heights live.
 - Measures solo-pool fees only when the probe worker output is found in coinbase.
 - Verifies TLS certificates and reports failures explicitly.
 - Keeps raw JSONL evidence independently recomputable.
@@ -65,6 +66,20 @@ compacts the file to that same 30-day horizon. A startup check acts only when
 the file has accumulated more than one extra week, avoiding rewrites on routine
 service restarts.
 
+### Dashboard freshness
+
+Every visible results section repeats the same region-wide status. `Region
+updated` is not a per-pool or per-section timestamp: for a remote vantage it is
+the completion time of that region's latest successful, lossless scheduled run.
+For a local collector it falls back to the newest displayed pool observation.
+
+The block-height pill is decoded from the BIP34 height in the coinbase input of
+the latest report-eligible Stratum job observed in that region. It is an
+observation from the selected vantage, not a separate chain-tip RPC, so it can
+lag until that vantage receives and completes another usable cohort. After the
+initial page render, every visible copy flashes together when the height
+changes.
+
 Protocol measurements include TCP connect, TLS handshake, `mining.subscribe`,
 `mining.authorize`, and optional `mining.ping`. Coinbase reconstruction checks
 whether the generated worker script is present and redacts that destination
@@ -83,6 +98,10 @@ scoring cohort. A completed regional cohort is also excluded when at least 20%
 of eligible endpoints across at least five distinct pools miss together. This
 retains the raw diagnostic evidence without treating a vantage-wide observer
 failure as independent pool downtime.
+Neither the misses nor the surviving measurements in an excluded cohort affect
+availability, latency, payout evidence, fees, or score; the original JSONL
+records remain available for diagnosis. The dashboard payload publishes the
+number of excluded cohorts as `snapshot.excluded_regional_cohorts`.
 The production Fly regions are IAD (`us-east`), FRA (`europe`), LAX
 (`us-west`), NRT (`japan`), and SIN (`singapore`). IAD is the default view.
 The embedded [`regions.json`](internal/model/regions.json) catalogs all current
