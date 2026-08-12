@@ -134,7 +134,11 @@ The service listens on `127.0.0.1:8081` and stores observations in
 The dashboard HTML is a static shell. It loads and periodically revalidates
 `GET /dashboard-data`, whose JSON is generated only when observations change.
 The service keeps serving the previous complete response while a replacement is
-built, then swaps the new response cache into place atomically.
+built, then swaps the new response cache into place atomically. Accepted ingest
+requests are coalesced for ten seconds, matching the browser refresh interval,
+so the observation and completion batches uploaded by multiple regions for the
+same Bitcoin block trigger one cache rebuild. Arrivals during a rebuild request
+at most one follow-up rebuild.
 
 - `GET /dashboard-data` — data used by the dashboard renderer
 - `GET /api/v1/probe-config` — probe-compatible endpoint configuration

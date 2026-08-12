@@ -27,6 +27,62 @@ type dashboardResponseCache struct {
 	entries map[string]cachedDashboardResponse
 }
 
+// Regional Scouts finalize the same Bitcoin block about 30 seconds after first
+// observing it, then upload their observation batch and terminal run record.
+// Ten seconds groups that multi-region burst, matches the dashboard client's
+// polling interval, and remains short relative to Bitcoin's 10-minute mean
+// block interval (about 1.65% of intervals are shorter).
+const dashboardRefreshCoalesceWindow = 10 * time.Second
+
+// dashboardRefreshScheduler coalesces bursts of accepted ingest requests. At
+// most one rebuild runs at a time, and arrivals during that rebuild request a
+// single follow-up pass instead of queuing one full rebuild per batch.
+type dashboardRefreshScheduler struct {
+	mu         sync.Mutex
+	running    bool
+	generation uint64
+	delay      time.Duration
+	refresh    func() error
+	onError    func(error)
+}
+
+func (scheduler *dashboardRefreshScheduler) schedule() {
+	scheduler.mu.Lock()
+	scheduler.generation++
+	if scheduler.running {
+		scheduler.mu.Unlock()
+		return
+	}
+	scheduler.running = true
+	scheduler.mu.Unlock()
+	go scheduler.run()
+}
+
+func (scheduler *dashboardRefreshScheduler) run() {
+	delay := scheduler.delay
+	if delay <= 0 {
+		delay = dashboardRefreshCoalesceWindow
+	}
+	for {
+		time.Sleep(delay)
+		scheduler.mu.Lock()
+		generation := scheduler.generation
+		scheduler.mu.Unlock()
+
+		if err := scheduler.refresh(); err != nil && scheduler.onError != nil {
+			scheduler.onError(err)
+		}
+
+		scheduler.mu.Lock()
+		if scheduler.generation == generation {
+			scheduler.running = false
+			scheduler.mu.Unlock()
+			return
+		}
+		scheduler.mu.Unlock()
+	}
+}
+
 func encodeDashboard(page dashboardPage) (cachedDashboardResponse, error) {
 	body, err := json.Marshal(page)
 	if err != nil {

@@ -39,6 +39,15 @@ func (s Server) Handler() (http.Handler, error) {
 	if err := dashboardResponses.rebuildFrom(cache, s.Pools, s.Demo); err != nil {
 		return nil, err
 	}
+	dashboardRefreshes := &dashboardRefreshScheduler{
+		refresh: func() error {
+			cache.invalidate()
+			return dashboardResponses.rebuildFrom(cache, s.Pools, s.Demo)
+		},
+		onError: func(err error) {
+			log.Printf("dashboard cache rebuild failed: error=%q", err.Error())
+		},
+	}
 	methodologyData, err := cache.snapshot("", time.Now().UTC())
 	if err != nil {
 		return nil, err
@@ -96,12 +105,7 @@ func (s Server) Handler() (http.Handler, error) {
 			tracked := &statusResponseWriter{ResponseWriter: w}
 			s.Ingest.ServeHTTP(tracked, r)
 			if tracked.status == http.StatusAccepted {
-				cache.invalidate()
-				go func() {
-					if err := dashboardResponses.rebuildFrom(cache, s.Pools, s.Demo); err != nil {
-						log.Printf("dashboard cache rebuild failed: error=%q", err.Error())
-					}
-				}()
+				dashboardRefreshes.schedule()
 			}
 		})
 	} else {

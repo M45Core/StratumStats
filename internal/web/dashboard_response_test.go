@@ -3,11 +3,78 @@ package web
 import (
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/M45Core/StratumStats/internal/model"
 )
+
+func TestDashboardRefreshSchedulerCoalescesBurst(t *testing.T) {
+	var calls atomic.Int32
+	refreshed := make(chan struct{})
+	scheduler := &dashboardRefreshScheduler{
+		delay: 25 * time.Millisecond,
+		refresh: func() error {
+			if calls.Add(1) == 1 {
+				close(refreshed)
+			}
+			return nil
+		},
+	}
+	for range 20 {
+		scheduler.schedule()
+	}
+	select {
+	case <-refreshed:
+	case <-time.After(time.Second):
+		t.Fatal("dashboard refresh did not run")
+	}
+	time.Sleep(75 * time.Millisecond)
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("refresh calls = %d, want 1", got)
+	}
+}
+
+func TestDashboardRefreshSchedulerRunsOnceMoreForArrivalDuringRefresh(t *testing.T) {
+	var calls atomic.Int32
+	started := make(chan int, 2)
+	release := make(chan struct{}, 2)
+	scheduler := &dashboardRefreshScheduler{
+		delay: 10 * time.Millisecond,
+		refresh: func() error {
+			started <- int(calls.Add(1))
+			<-release
+			return nil
+		},
+	}
+	scheduler.schedule()
+	select {
+	case call := <-started:
+		if call != 1 {
+			t.Fatalf("first refresh call = %d", call)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("first dashboard refresh did not start")
+	}
+	for range 20 {
+		scheduler.schedule()
+	}
+	release <- struct{}{}
+	select {
+	case call := <-started:
+		if call != 2 {
+			t.Fatalf("second refresh call = %d", call)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("follow-up dashboard refresh did not start")
+	}
+	release <- struct{}{}
+	time.Sleep(50 * time.Millisecond)
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("refresh calls = %d, want 2", got)
+	}
+}
 
 func TestDashboardResponseCacheSwapsOnlyAfterCompleteRebuild(t *testing.T) {
 	now := time.Now().UTC().Add(-time.Minute)
