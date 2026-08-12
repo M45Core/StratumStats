@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	reportCacheTTL    = 5 * time.Second
 	vantageStaleAfter = 12 * time.Hour
 )
 
@@ -30,7 +29,6 @@ type snapshotCache struct {
 	mu           sync.Mutex
 	pools        []model.Pool
 	load         func() ([]model.Observation, error)
-	loadedAt     time.Time
 	observations []model.Observation
 	snapshots    map[string]model.Snapshot
 }
@@ -66,7 +64,7 @@ func (cache *snapshotCache) records(now time.Time) ([]model.Observation, error) 
 }
 
 func (cache *snapshotCache) refresh(now time.Time) error {
-	if cache.snapshots != nil && now.Sub(cache.loadedAt) < reportCacheTTL {
+	if cache.snapshots != nil {
 		return nil
 	}
 	observations, err := cache.load()
@@ -74,7 +72,6 @@ func (cache *snapshotCache) refresh(now time.Time) error {
 		return err
 	}
 	observations = report.RetainObservations(observations, now.UTC())
-	cache.loadedAt = now
 	cache.observations = observations
 	cache.snapshots = make(map[string]model.Snapshot)
 	return nil
@@ -82,8 +79,8 @@ func (cache *snapshotCache) refresh(now time.Time) error {
 
 func (cache *snapshotCache) invalidate() {
 	cache.mu.Lock()
-	cache.loadedAt = time.Time{}
 	cache.snapshots = nil
+	cache.observations = nil
 	cache.mu.Unlock()
 }
 

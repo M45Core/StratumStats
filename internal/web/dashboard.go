@@ -13,68 +13,68 @@ import (
 
 type dashboardPool struct {
 	model.PoolReport
-	Website          string
-	RowID            string
-	SortName         string
-	LatencyClass     string
-	MiningLossClass  string
-	UnsafeReason     string
-	WalletEvidence   string
-	IsSolo           bool
-	FeeSortValue     *float64
-	CombinedVantage  bool
-	LatencyChart     latencyHistoryChart
-	FeeChangeHistory []feeChangePoint
+	Website          string              `json:"website,omitempty"`
+	RowID            string              `json:"row_id"`
+	SortName         string              `json:"sort_name"`
+	LatencyClass     string              `json:"latency_class"`
+	MiningLossClass  string              `json:"mining_loss_class"`
+	UnsafeReason     string              `json:"unsafe_reason,omitempty"`
+	WalletEvidence   string              `json:"wallet_evidence,omitempty"`
+	IsSolo           bool                `json:"is_solo"`
+	FeeSortValue     *float64            `json:"fee_sort_value"`
+	CombinedVantage  bool                `json:"combined_vantage"`
+	LatencyChart     latencyHistoryChart `json:"latency_chart"`
+	FeeChangeHistory []feeChangePoint    `json:"fee_change_history,omitempty"`
 }
 
 type feeChangePoint struct {
 	model.MetricHistoryPoint
-	Previous float64
+	Previous float64 `json:"previous"`
 }
 
 type latencyChartPoint struct {
 	model.MetricHistoryPoint
-	X          float64
-	Y          float64
-	LabelX     float64
-	LabelY     float64
-	TextAnchor string
+	X          float64 `json:"x"`
+	Y          float64 `json:"y"`
+	LabelX     float64 `json:"label_x"`
+	LabelY     float64 `json:"label_y"`
+	TextAnchor string  `json:"text_anchor"`
 }
 
 type latencyHistoryChart struct {
-	Points   []latencyChartPoint
-	Polyline string
-	AreaPath string
-	MaxValue float64
-	MidValue float64
-	Start    model.MetricHistoryPoint
-	End      model.MetricHistoryPoint
+	Points   []latencyChartPoint      `json:"points,omitempty"`
+	Polyline string                   `json:"polyline,omitempty"`
+	AreaPath string                   `json:"area_path,omitempty"`
+	MaxValue float64                  `json:"max_value"`
+	MidValue float64                  `json:"mid_value"`
+	Start    model.MetricHistoryPoint `json:"start"`
+	End      model.MetricHistoryPoint `json:"end"`
 }
 
 type dashboardPage struct {
-	Snapshot                    model.Snapshot
-	DataUpdatedAt               *time.Time
-	Demo                        bool
-	FreePools                   []dashboardPool
-	NormalPools                 []dashboardPool
-	MissingWalletPools          []dashboardPool
-	PendingWalletPools          []dashboardPool
-	PPLNSPools                  []dashboardPool
-	OtherPools                  []dashboardPool
-	NoRecentDataPools           []dashboardPool
-	FreePoolsUpdatedAt          *time.Time
-	NormalPoolsUpdatedAt        *time.Time
-	MissingWalletPoolsUpdatedAt *time.Time
-	PendingWalletPoolsUpdatedAt *time.Time
-	PPLNSPoolsUpdatedAt         *time.Time
-	OtherPoolsUpdatedAt         *time.Time
-	NoRecentDataPoolsUpdatedAt  *time.Time
-	SelectedVantage             string
-	SelectedLabel               string
-	SelectedTransport           string
-	VantageStatus               *vantageStatus
-	AvailableVantages           map[string]bool
-	ShowUSCombined              bool
+	Snapshot                    model.Snapshot  `json:"snapshot"`
+	DataUpdatedAt               *time.Time      `json:"data_updated_at,omitempty"`
+	Demo                        bool            `json:"demo"`
+	FreePools                   []dashboardPool `json:"free_pools"`
+	NormalPools                 []dashboardPool `json:"normal_pools"`
+	MissingWalletPools          []dashboardPool `json:"missing_wallet_pools"`
+	PendingWalletPools          []dashboardPool `json:"pending_wallet_pools"`
+	PPLNSPools                  []dashboardPool `json:"pplns_pools"`
+	OtherPools                  []dashboardPool `json:"other_pools"`
+	NoRecentDataPools           []dashboardPool `json:"no_recent_data_pools"`
+	FreePoolsUpdatedAt          *time.Time      `json:"free_pools_updated_at,omitempty"`
+	NormalPoolsUpdatedAt        *time.Time      `json:"normal_pools_updated_at,omitempty"`
+	MissingWalletPoolsUpdatedAt *time.Time      `json:"missing_wallet_pools_updated_at,omitempty"`
+	PendingWalletPoolsUpdatedAt *time.Time      `json:"pending_wallet_pools_updated_at,omitempty"`
+	PPLNSPoolsUpdatedAt         *time.Time      `json:"pplns_pools_updated_at,omitempty"`
+	OtherPoolsUpdatedAt         *time.Time      `json:"other_pools_updated_at,omitempty"`
+	NoRecentDataPoolsUpdatedAt  *time.Time      `json:"no_recent_data_pools_updated_at,omitempty"`
+	SelectedVantage             string          `json:"selected_vantage"`
+	SelectedLabel               string          `json:"selected_label"`
+	SelectedTransport           string          `json:"selected_transport"`
+	VantageStatus               *vantageStatus  `json:"vantage_status,omitempty"`
+	AvailableVantages           map[string]bool `json:"available_vantages"`
+	ShowUSCombined              bool            `json:"show_us_combined"`
 }
 
 func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, selectedVantage string, status *vantageStatus, selectedTransport string) dashboardPage {

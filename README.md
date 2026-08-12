@@ -98,18 +98,64 @@ The service listens on `127.0.0.1:8081` and stores observations in
 [environment example](deploy/stratumstats.env.example) before installing. Use
 `--no-start` to install without starting the service.
 
-## HTTP API
+## HTTP endpoints
 
-- `GET /api/v1/reports` — per-endpoint reports
-- `GET /api/v1/vantages` — regional sample counts and health
+The dashboard HTML is a static shell. It loads and periodically revalidates
+`GET /dashboard-data`, whose JSON is generated only when observations change.
+The service keeps serving the previous complete response while a replacement is
+built, then swaps the new response cache into place atomically.
+
+- `GET /dashboard-data` — data used by the dashboard renderer
 - `GET /api/v1/probe-config` — probe-compatible endpoint configuration
-- `GET /api/v1/pools` — configured pool information
-- `GET /api/v1/methodology` — metric and scoring metadata
 - `GET /healthz` — liveness
 
 `POST /api/v1/ingest` is enabled only when
 `STRATUMSTATS_INGEST_KEY_ID` and `STRATUMSTATS_INGEST_SECRET` are set. The secret
 must contain at least 32 bytes.
+
+### Reverse-proxy caching
+
+StratumStats sends cache headers suited to each endpoint:
+
+| Path | Policy | Reason |
+| --- | --- | --- |
+| `/`, `/methodology`, `/static/*` | `public, max-age=300` | These responses change only when the binary is replaced. The short lifetime prevents an old shell or script surviving a deployment for long. |
+| `/dashboard-data` | `private, no-cache` with `ETag` | Browsers retain the selected region and transport response, then revalidate it. Unchanged data returns an empty `304`; updated data returns the atomically replaced response. |
+| `/api/v1/probe-config` | `public, max-age=300` | Probe configuration changes when the service is restarted with a new registry. |
+| `/api/v1/ingest`, `/healthz` | `no-store` | Writes and liveness checks must never be cached. |
+
+Do not put `/dashboard-data` in an nginx `proxy_cache`: nginx cannot know when
+an ingest has replaced the application's in-memory response. Let the request
+reach StratumStats so its current `ETag` can produce either `304 Not Modified`
+or the new cached JSON. The request does not recalculate reports or re-encode
+JSON.
+
+A minimal nginx reverse proxy can therefore rely on the upstream cache headers:
+
+```nginx
+server {
+    listen 80;
+    server_name stats.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /dashboard-data {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_cache off;
+        proxy_buffering on;
+    }
+}
+```
+
+Avoid overriding `Cache-Control`, `ETag`, `Vary`, or `Content-Encoding` on the
+dashboard-data location. StratumStats pre-compresses each dashboard response
+when its data changes and serves the cached gzip representation directly.
 
 ## Development
 
