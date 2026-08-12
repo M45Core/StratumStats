@@ -95,7 +95,7 @@ func writeCachedDashboard(w http.ResponseWriter, r *http.Request, response cache
 	w.Header().Set("Cache-Control", "private, no-cache")
 	w.Header().Set("ETag", response.etag)
 	w.Header().Set("Vary", "Accept-Encoding")
-	if r.Header.Get("If-None-Match") == response.etag {
+	if r.Header.Get("If-None-Match") == response.etag || r.URL.Query().Get("generation") == response.etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}

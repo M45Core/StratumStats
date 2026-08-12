@@ -29,7 +29,7 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 
 	script := httptest.NewRecorder()
 	h.ServeHTTP(script, httptest.NewRequest(http.MethodGet, "/static/dashboard.js", nil))
-	for _, want := range []string{"fetch(`/dashboard-data?${params}`", `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-line-chart", "setInterval(() => refresh(false)"} {
+	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-line-chart", "setInterval(() => refresh(false)"} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("renderer missing %q", want)
 		}

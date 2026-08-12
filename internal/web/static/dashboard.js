@@ -229,8 +229,10 @@
     refreshing = true;
     try {
       const params = new URLSearchParams(window.location.search);
+      const requestParams = new URLSearchParams(params);
+      if (currentETag) requestParams.set("generation", currentETag);
       const headers = currentETag ? { "If-None-Match": currentETag } : {};
-      const response = await fetch(`/dashboard-data?${params}`, { cache: "no-cache", headers });
+      const response = await fetch(`/dashboard-data?${requestParams}`, { cache: "no-cache", headers });
       if (response.status === 304) return;
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const etag = response.headers.get("ETag") || "";

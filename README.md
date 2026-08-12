@@ -120,7 +120,7 @@ StratumStats sends cache headers suited to each endpoint:
 | Path | Policy | Reason |
 | --- | --- | --- |
 | `/`, `/methodology`, `/static/*` | `public, max-age=300` | These responses change only when the binary is replaced. The short lifetime prevents an old shell or script surviving a deployment for long. |
-| `/dashboard-data` | `private, no-cache` with `ETag` | Browsers retain the selected region and transport response, then revalidate it. Unchanged data returns an empty `304`; updated data returns the atomically replaced response. |
+| `/dashboard-data` | `private, no-cache` with `ETag` | Browsers retain the selected region and transport response, then revalidate it. The client also sends the ETag as a `generation` query parameter so conditional refreshes survive proxies that discard `If-None-Match`. Unchanged data returns an empty `304`; updated data returns the atomically replaced response. |
 | `/api/v1/probe-config` | `public, max-age=300` | Probe configuration changes when the service is restarted with a new registry. |
 | `/api/v1/ingest`, `/healthz` | `no-store` | Writes and liveness checks must never be cached. |
 
@@ -147,6 +147,11 @@ server {
 
     location = /dashboard-data {
         proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header If-None-Match $http_if_none_match;
         proxy_cache off;
         proxy_buffering on;
     }
@@ -156,6 +161,13 @@ server {
 Avoid overriding `Cache-Control`, `ETag`, `Vary`, or `Content-Encoding` on the
 dashboard-data location. StratumStats pre-compresses each dashboard response
 when its data changes and serves the cached gzip representation directly.
+Explicitly forwarding `If-None-Match` protects conditional refreshes from a
+broader nginx configuration that clears request validators. If an unchanged
+conditional request returns `200` with the same ETag instead of an empty `304`,
+inspect the effective configuration with `nginx -T`. An `X-Cache-Status: MISS`
+response on `/dashboard-data` is a sign that the request is still entering an
+nginx cache configuration; make sure the exact location above is active and is
+not shadowed by generated or included configuration.
 
 ## Development
 
