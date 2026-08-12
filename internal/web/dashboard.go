@@ -74,7 +74,14 @@ type dashboardPage struct {
 	SelectedTransport           string          `json:"selected_transport"`
 	VantageStatus               *vantageStatus  `json:"vantage_status,omitempty"`
 	AvailableVantages           map[string]bool `json:"available_vantages"`
-	ShowUSCombined              bool            `json:"show_us_combined"`
+	VantageOptions              []vantageOption `json:"vantage_options"`
+}
+
+type vantageOption struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	City    string `json:"city"`
+	Country string `json:"country"`
 }
 
 func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, selectedVantage string, status *vantageStatus, selectedTransport string) dashboardPage {
@@ -89,6 +96,9 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 		SelectedLabel:     selectedLabel,
 		SelectedTransport: selectedTransport,
 		VantageStatus:     status,
+	}
+	for _, region := range model.ProductionRegions() {
+		page.VantageOptions = append(page.VantageOptions, vantageOption{ID: region.Vantage, Label: region.Label, City: region.City, Country: region.Country})
 	}
 	websiteByPoolID := make(map[string]string, len(pools))
 	for _, pool := range pools {

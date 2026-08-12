@@ -10,7 +10,7 @@ import (
 )
 
 func appendDemoProtocolData(out []model.Observation, pools []model.Pool, rng *rand.Rand, now time.Time) []model.Observation {
-	demoVantages := [...]string{"us-west", "us-central", "us-east", "europe"}
+	demoVantages := productionVantages()
 	for sample := 0; sample < 24; sample++ {
 		observedAt := now.Add(-time.Duration(24-sample) * 6 * time.Hour)
 		vantage := demoVantages[sample%len(demoVantages)]

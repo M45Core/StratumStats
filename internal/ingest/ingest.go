@@ -35,11 +35,15 @@ const (
 	RemoteSource               = model.SourceRemoteScheduled
 )
 
-var RegionVantages = map[string]string{
-	"lax": "us-west",
-	"dfw": "us-central",
-	"ewr": "us-east",
-	"fra": "europe",
+var RegionVantages = productionRegionVantages()
+
+func productionRegionVantages() map[string]string {
+	regions := model.ProductionRegions()
+	vantages := make(map[string]string, len(regions))
+	for _, region := range regions {
+		vantages[region.Region] = region.Vantage
+	}
+	return vantages
 }
 
 type Envelope struct {

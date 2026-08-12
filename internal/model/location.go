@@ -15,13 +15,16 @@ func EndpointContinent(endpoint Endpoint) string {
 // VantageContinent maps the public probe labels to coarse continents. Unknown
 // labels deliberately return empty so collection remains complete by default.
 func VantageContinent(vantage string) string {
+	if region, ok := ProductionRegionForVantage(vantage); ok {
+		return region.Continent
+	}
 	label := normalizeLocation(vantage)
 	switch label {
 	case "us west", "us central", "us east", "us", "united states", "north america", "canada":
 		return "north-america"
 	case "europe":
 		return "europe"
-	case "asia", "asia pacific":
+	case "asia", "asia pacific", "japan", "singapore":
 		return "asia"
 	case "africa":
 		return "africa"

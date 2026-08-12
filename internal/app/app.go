@@ -284,7 +284,7 @@ func demoData(pools []model.Pool) []model.Observation {
 	rng := rand.New(rand.NewSource(81)) // #nosec G404 -- reproducible synthetic demo data is intentional.
 	out := make([]model.Observation, 0, len(pools)*120)
 	now := time.Now().UTC()
-	demoVantages := [...]string{"us-west", "us-central", "us-east", "europe"}
+	demoVantages := productionVantages()
 	for i := 0; i < 120; i++ {
 		for p, pool := range pools {
 			for endpointIndex, endpoint := range pool.Endpoints {
@@ -329,6 +329,15 @@ func demoData(pools []model.Pool) []model.Observation {
 		}
 	}
 	return appendDemoProtocolData(out, pools, rng, now)
+}
+
+func productionVantages() []string {
+	regions := model.ProductionRegions()
+	vantages := make([]string, 0, len(regions))
+	for _, region := range regions {
+		vantages = append(vantages, region.Vantage)
+	}
+	return vantages
 }
 
 func demoPools(pools []model.Pool) []model.Pool {

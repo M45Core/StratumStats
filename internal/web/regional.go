@@ -14,16 +14,18 @@ const (
 	vantageStaleAfter = 12 * time.Hour
 )
 
-var vantageLabels = map[string]string{
-	"unknown":    "Local",
-	"us-all":     "US combined",
-	"us-west":    "US West",
-	"us-central": "US Central",
-	"us-east":    "US East",
-	"europe":     "Europe",
-}
+var vantageLabels, vantageOrder = productionVantageConfiguration()
 
-var vantageOrder = []string{"us-west", "us-central", "us-east", "europe"}
+func productionVantageConfiguration() (map[string]string, []string) {
+	regions := model.ProductionRegions()
+	labels := map[string]string{"unknown": "Local"}
+	order := make([]string, 0, len(regions))
+	for _, region := range regions {
+		labels[region.Vantage] = region.Label + " · " + region.City
+		order = append(order, region.Vantage)
+	}
+	return labels, order
+}
 
 type snapshotCache struct {
 	mu           sync.Mutex
@@ -45,8 +47,6 @@ func (cache *snapshotCache) snapshot(vantage string, now time.Time) (model.Snaps
 	var snapshot model.Snapshot
 	if vantage == "" {
 		snapshot = report.Compute(cache.pools, cache.observations, now)
-	} else if vantage == "us-all" {
-		snapshot = report.ComputeVantages(cache.pools, cache.observations, map[string]bool{"us-west": true, "us-central": true, "us-east": true}, now)
 	} else {
 		snapshot = report.ComputeVantage(cache.pools, cache.observations, vantage, now)
 	}

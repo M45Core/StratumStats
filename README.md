@@ -74,9 +74,13 @@ Regional probe ingestion is provided by
 compares observations only within the same vantage. Scheduled block samples
 enter availability and score calculations only after the complete, lossless
 probe run has been received, so an interrupted upload cannot create a partial
-scoring cohort. The US combined view reduces the available regional delays to
-one median per Bitcoin block before computing history, median, P95, mining loss,
-and score; its availability gives each reporting US region equal weight.
+scoring cohort.
+The production Fly regions are IAD (`us-east`), FRA (`europe`), LAX
+(`us-west`), NRT (`japan`), and SIN (`singapore`). IAD is the default view.
+The embedded [`regions.json`](internal/model/regions.json) catalogs all current
+Fly regions with friendly city/country names; `enabled` controls ingestion and
+dashboard tabs, `order` controls display/default order, and `continent` is kept
+for future combined views.
 
 ## Production installation
 

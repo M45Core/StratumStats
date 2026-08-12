@@ -20,7 +20,7 @@ func TestEndpointContinentUsesExplicitValueThenKnownRegion(t *testing.T) {
 
 func TestVantageContinent(t *testing.T) {
 	for _, test := range []struct{ vantage, want string }{
-		{"us-west", "north-america"}, {"europe", "europe"}, {"unknown", ""},
+		{"us-west", "north-america"}, {"europe", "europe"}, {"japan", "asia"}, {"singapore", "asia"}, {"unknown", ""},
 	} {
 		if got := VantageContinent(test.vantage); got != test.want {
 			t.Errorf("VantageContinent(%q) = %q, want %q", test.vantage, got, test.want)

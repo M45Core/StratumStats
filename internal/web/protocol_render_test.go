@@ -12,9 +12,9 @@ func TestProtocolTimingsAndTLSPenaltyReachDashboardData(t *testing.T) {
 	duration := 12.6
 	pool := model.Pool{ID: "test", Name: "Test Pool", Endpoints: []model.Endpoint{{Host: "test.example", Port: 443, TLS: true}}}
 	observations := []model.Observation{
-		{ObservedAt: observedAt, Vantage: "test", BlockID: "block", PoolID: "test", Endpoint: "test.example:443", TLS: true, Eligible: true, Arrived: true, OffsetMS: 42.6},
-		{ObservedAt: observedAt, RecordType: model.RecordTypeProtocol, PoolID: "test", Endpoint: "test.example:443", TLS: true, ProtocolMethod: model.ProtocolSubscribe, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration},
-		{ObservedAt: observedAt, RecordType: model.RecordTypeProtocol, PoolID: "test", Endpoint: "test.example:443", TLS: true, ProtocolMethod: model.ProtocolTLSHandshake, ResponseStatus: model.ProtocolStatusError, ErrorCategory: model.ProtocolErrorTLSCertificateInvalid, DurationMS: &duration},
+		{ObservedAt: observedAt, Vantage: "us-east", BlockID: "block", PoolID: "test", Endpoint: "test.example:443", TLS: true, Eligible: true, Arrived: true, OffsetMS: 42.6},
+		{ObservedAt: observedAt, Vantage: "us-east", RecordType: model.RecordTypeProtocol, PoolID: "test", Endpoint: "test.example:443", TLS: true, ProtocolMethod: model.ProtocolSubscribe, ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration},
+		{ObservedAt: observedAt, Vantage: "us-east", RecordType: model.RecordTypeProtocol, PoolID: "test", Endpoint: "test.example:443", TLS: true, ProtocolMethod: model.ProtocolTLSHandshake, ResponseStatus: model.ProtocolStatusError, ErrorCategory: model.ProtocolErrorTLSCertificateInvalid, DurationMS: &duration},
 	}
 	h, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return observations, nil }, Demo: true}).Handler()
 	if err != nil {

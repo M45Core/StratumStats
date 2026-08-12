@@ -127,15 +127,19 @@ func acceptsGzip(header string) bool {
 
 func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, requestedVantage, transport string, now time.Time, available map[string]bool, statuses vantageStatusResponse) (dashboardPage, error) {
 	vantage := requestedVantage
-	if vantage == "" && demo && (available["us-west"] || available["us-central"] || available["us-east"] || available["europe"]) {
-		vantage = "us-all"
-	} else if vantage == "" && !demo {
-		if available["us-west"] || available["us-central"] || available["us-east"] {
-			vantage = "us-all"
-		} else if available["unknown"] {
+	if vantage == "" {
+		if !demo && available["unknown"] {
 			vantage = "unknown"
 		} else {
-			vantage = "us-all"
+			for _, candidate := range vantageOrder {
+				if available[candidate] {
+					vantage = candidate
+					break
+				}
+			}
+			if vantage == "" {
+				vantage = vantageOrder[0]
+			}
 		}
 	}
 	snapshot, err := cache.snapshot(vantage, now)
@@ -148,6 +152,5 @@ func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, request
 	page.Snapshot.Reports = nil
 	page.Snapshot.Disclosure = nil
 	page.AvailableVantages = available
-	page.ShowUSCombined = available["us-west"] || available["us-central"] || available["us-east"]
 	return page, nil
 }

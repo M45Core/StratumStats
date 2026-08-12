@@ -10,7 +10,7 @@ import (
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
-func TestDashboardDataFiltersByVantageAndCombinesUS(t *testing.T) {
+func TestDashboardDataFiltersByVantage(t *testing.T) {
 	pool := model.Pool{ID: "pool", Name: "Pool", Category: "shared"}
 	now := time.Now().UTC().Add(-time.Minute)
 	observations := []model.Observation{{PoolID: "pool", Vantage: "us-west", BlockID: "west", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 10}, {PoolID: "pool", Vantage: "us-east", BlockID: "east", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 90}, {PoolID: "pool", Vantage: "europe", BlockID: "europe", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 50}}
@@ -22,9 +22,10 @@ func TestDashboardDataFiltersByVantageAndCombinesUS(t *testing.T) {
 	if west.OtherPools[0].MedianMS == nil || *west.OtherPools[0].MedianMS != 10 {
 		t.Fatalf("west=%+v", west.OtherPools)
 	}
-	combined := dashboardPayload(t, h, "/dashboard-data?vantage=us-all")
-	if combined.SelectedVantage != "us-all" || combined.OtherPools[0].Blocks != 2 || !combined.OtherPools[0].CombinedVantage {
-		t.Fatalf("combined=%+v", combined)
+	combined := httptest.NewRecorder()
+	h.ServeHTTP(combined, httptest.NewRequest(http.MethodGet, "/dashboard-data?vantage=us-all", nil))
+	if combined.Code != http.StatusBadRequest {
+		t.Fatalf("retired combined status=%d", combined.Code)
 	}
 	unknown := httptest.NewRecorder()
 	h.ServeHTTP(unknown, httptest.NewRequest(http.MethodGet, "/dashboard-data?vantage=moon", nil))
@@ -36,12 +37,12 @@ func TestDashboardDataFiltersByVantageAndCombinesUS(t *testing.T) {
 func TestDashboardDefaultsUseAvailableMeasurements(t *testing.T) {
 	now := time.Now().UTC()
 	pool := model.Pool{ID: "pool", Name: "Pool", Category: "shared"}
-	regional := []model.Observation{{PoolID: "pool", Vantage: "us-west", BlockID: "west", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 10}}
+	regional := []model.Observation{{PoolID: "pool", Vantage: "us-east", BlockID: "east", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 10}}
 	h, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return regional, nil }, Demo: true}).Handler()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := dashboardPayload(t, h, "/dashboard-data"); got.SelectedVantage != "us-all" || !got.ShowUSCombined {
+	if got := dashboardPayload(t, h, "/dashboard-data"); got.SelectedVantage != "us-east" {
 		t.Fatalf("default=%+v", got)
 	}
 	local := []model.Observation{{PoolID: "pool", Vantage: "unknown", BlockID: "local", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 10}}
@@ -52,15 +53,55 @@ func TestDashboardDefaultsUseAvailableMeasurements(t *testing.T) {
 	if got := dashboardPayload(t, h, "/dashboard-data"); got.SelectedVantage != "unknown" {
 		t.Fatalf("local default=%q", got.SelectedVantage)
 	}
+	started := now.Add(-time.Minute)
+	asia := []model.Observation{
+		{Source: ingest.RemoteSource, PoolID: "pool", Vantage: "japan", BlockID: "asia", ObservedAt: now, Eligible: true, Arrived: true, OffsetMS: 10},
+		{Source: ingest.RemoteSource, Vantage: "japan", RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started, RunStatus: "ok"},
+	}
+	h, err = (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return asia, nil }}).Handler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := dashboardPayload(t, h, "/dashboard-data"); got.SelectedVantage != "japan" {
+		t.Fatalf("Asia default=%q", got.SelectedVantage)
+	}
 }
 
 func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 	now := time.Now().UTC()
 	started := now.Add(-time.Minute)
 	observations := []model.Observation{{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProtocol, ObservedAt: now.Add(-30 * time.Second)}, {Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started, RunStatus: "partial", ConfigRevision: "sha256:test", DroppedObservations: 2}}
-	west := buildVantageStatuses(observations, now).Vantages[0]
-	if west.ID != "us-west" || west.ProtocolAttempts != 1 || !west.Incomplete || west.DroppedObservations != 2 || !west.Stale {
+	statuses := buildVantageStatuses(observations, now).Vantages
+	var west vantageStatus
+	for _, status := range statuses {
+		if status.ID == "us-west" {
+			west = status
+			break
+		}
+	}
+	if west.ID != "us-west" || west.Label != "LAX · Los Angeles" || west.ProtocolAttempts != 1 || !west.Incomplete || west.DroppedObservations != 2 || !west.Stale {
 		t.Fatalf("west=%+v", west)
+	}
+}
+
+func TestRegionalNodeOrderAndLabels(t *testing.T) {
+	want := []struct {
+		id    string
+		label string
+	}{
+		{id: "us-east", label: "IAD · Ashburn"},
+		{id: "europe", label: "FRA · Frankfurt"},
+		{id: "us-west", label: "LAX · Los Angeles"},
+		{id: "japan", label: "NRT · Tokyo"},
+		{id: "singapore", label: "SIN · Singapore"},
+	}
+	if len(vantageOrder) != len(want) {
+		t.Fatalf("vantageOrder=%v", vantageOrder)
+	}
+	for index, expected := range want {
+		if vantageOrder[index] != expected.id || vantageLabels[expected.id] != expected.label {
+			t.Fatalf("vantage %d = %q/%q, want %q/%q", index, vantageOrder[index], vantageLabels[vantageOrder[index]], expected.id, expected.label)
+		}
 	}
 }
 

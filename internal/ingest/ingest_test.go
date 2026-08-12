@@ -21,6 +21,24 @@ func testPool() model.Pool {
 	return model.Pool{ID: "pool", Name: "Pool", Endpoints: []model.Endpoint{{Host: "pool.example", Port: 3333}}}
 }
 
+func TestRegionVantagesMatchesDeployedNodes(t *testing.T) {
+	want := map[string]string{
+		"iad": "us-east",
+		"fra": "europe",
+		"lax": "us-west",
+		"nrt": "japan",
+		"sin": "singapore",
+	}
+	if len(RegionVantages) != len(want) {
+		t.Fatalf("RegionVantages=%v", RegionVantages)
+	}
+	for region, vantage := range want {
+		if RegionVantages[region] != vantage {
+			t.Errorf("RegionVantages[%q]=%q, want %q", region, RegionVantages[region], vantage)
+		}
+	}
+}
+
 func testEnvelope(now time.Time) Envelope {
 	duration := 12.5
 	return Envelope{
@@ -166,7 +184,7 @@ func TestReceiverAcceptsGermanyProbe(t *testing.T) {
 	}
 }
 
-func TestReceiverAcceptsSecaucusProbe(t *testing.T) {
+func TestReceiverAcceptsIADProbe(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	var appended []model.Observation
 	receiver := Receiver{
@@ -175,11 +193,38 @@ func TestReceiverAcceptsSecaucusProbe(t *testing.T) {
 		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
 	}
 	envelope := testEnvelope(now)
-	envelope.Region, envelope.Vantage = "ewr", "us-east"
+	envelope.Region, envelope.Vantage = "iad", "us-east"
 	response := httptest.NewRecorder()
 	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
 	if response.Code != http.StatusAccepted || len(appended) != 1 || appended[0].Vantage != "us-east" {
 		t.Fatalf("status=%d observations=%+v", response.Code, appended)
+	}
+}
+
+func TestReceiverAcceptsAsiaProbes(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	for _, test := range []struct {
+		region  string
+		vantage string
+	}{
+		{region: "nrt", vantage: "japan"},
+		{region: "sin", vantage: "singapore"},
+	} {
+		t.Run(test.region, func(t *testing.T) {
+			var appended []model.Observation
+			receiver := Receiver{
+				Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
+				Now:    func() time.Time { return now },
+				Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
+			}
+			envelope := testEnvelope(now)
+			envelope.Region, envelope.Vantage = test.region, test.vantage
+			response := httptest.NewRecorder()
+			receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
+			if response.Code != http.StatusAccepted || len(appended) != 1 || appended[0].Vantage != test.vantage {
+				t.Fatalf("status=%d observations=%+v", response.Code, appended)
+			}
+		})
 	}
 }
 

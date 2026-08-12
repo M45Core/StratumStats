@@ -32,12 +32,12 @@ func TestDashboardDataGroupsPoolsByMeasuredEvidence(t *testing.T) {
 	fee, freeFee := 0.75, 0.0
 	pools := []model.Pool{{ID: "paid", Name: "Paid", Category: "solo"}, {ID: "free", Name: "Free", Category: "solo"}, {ID: "missing", Name: "Missing", Category: "solo"}, {ID: "pending", Name: "Pending", Category: "solo"}, {ID: "pplns", Name: "PPLNS", Category: "shared", Products: []string{"PPLNS"}}, {ID: "other", Name: "Other", Category: "shared"}}
 	observations := []model.Observation{
-		{ObservedAt: now, Vantage: "test", BlockID: "paid", PoolID: "paid", Eligible: true, Arrived: true, OffsetMS: 10, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
-		{ObservedAt: now, Vantage: "test", BlockID: "free", PoolID: "free", Eligible: true, Arrived: true, OffsetMS: 20, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &freeFee},
-		{ObservedAt: now, Vantage: "test", BlockID: "missing", PoolID: "missing", Eligible: true, Arrived: true, OffsetMS: 30, CoinbaseAnalyzed: true},
-		{ObservedAt: now, Vantage: "test", BlockID: "pending", PoolID: "pending", Eligible: true, Arrived: true, OffsetMS: 35},
-		{ObservedAt: now, Vantage: "test", BlockID: "pplns", PoolID: "pplns", Eligible: true, Arrived: true, OffsetMS: 40},
-		{ObservedAt: now, Vantage: "test", BlockID: "other", PoolID: "other", Eligible: true, Arrived: true, OffsetMS: 50},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "paid", PoolID: "paid", Eligible: true, Arrived: true, OffsetMS: 10, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "free", PoolID: "free", Eligible: true, Arrived: true, OffsetMS: 20, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &freeFee},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "missing", PoolID: "missing", Eligible: true, Arrived: true, OffsetMS: 30, CoinbaseAnalyzed: true},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "pending", PoolID: "pending", Eligible: true, Arrived: true, OffsetMS: 35},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "pplns", PoolID: "pplns", Eligible: true, Arrived: true, OffsetMS: 40},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "other", PoolID: "other", Eligible: true, Arrived: true, OffsetMS: 50},
 	}
 	h, err := (Server{Pools: pools, Load: func() ([]model.Observation, error) { return observations, nil }, Demo: true}).Handler()
 	if err != nil {
@@ -67,8 +67,8 @@ func TestDashboardDataContainsClientDetailModelWithoutWorkerDestination(t *testi
 	now := time.Now().UTC().Add(-time.Minute)
 	pool := model.Pool{ID: "detail", Name: "Detail", Category: "solo"}
 	observations := []model.Observation{
-		{ObservedAt: now.Add(-time.Hour), Vantage: "test", BlockID: "before", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 10, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &previousFee},
-		{ObservedAt: now, Vantage: "test", BlockID: "latest", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 20, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &latestFee, CoinbaseTotalSats: 10_000, WorkerPayoutSats: 9_875, CoinbaseOutputCount: 2, CoinbaseOutputs: []model.CoinbaseOutput{{ValueSats: 9_875, Address: workerAddress, Worker: true}, {ValueSats: 125, Address: "bc1public", ScriptType: "p2wpkh"}}},
+		{ObservedAt: now.Add(-time.Hour), Vantage: "us-east", BlockID: "before", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 10, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &previousFee},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "latest", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 20, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &latestFee, CoinbaseTotalSats: 10_000, WorkerPayoutSats: 9_875, CoinbaseOutputCount: 2, CoinbaseOutputs: []model.CoinbaseOutput{{ValueSats: 9_875, Address: workerAddress, Worker: true}, {ValueSats: 125, Address: "bc1public", ScriptType: "p2wpkh"}}},
 	}
 	h, err := (Server{Pools: []model.Pool{pool}, Load: func() ([]model.Observation, error) { return observations, nil }, Demo: true}).Handler()
 	if err != nil {
