@@ -16,12 +16,20 @@ const (
 
 var vantageLabels, vantageOrder = productionVantageConfiguration()
 
+var vantageNames = map[string]string{
+	"us-east":   "US East",
+	"europe":    "Europe",
+	"us-west":   "US West",
+	"japan":     "Japan",
+	"singapore": "Southeast Asia",
+}
+
 func productionVantageConfiguration() (map[string]string, []string) {
 	regions := model.ProductionRegions()
 	labels := map[string]string{"unknown": "Local"}
 	order := make([]string, 0, len(regions))
 	for _, region := range regions {
-		labels[region.Vantage] = region.Label + " · " + region.City
+		labels[region.Vantage] = vantageNames[region.Vantage] + " · " + region.City
 		order = append(order, region.Vantage)
 	}
 	return labels, order

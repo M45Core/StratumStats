@@ -152,8 +152,9 @@
   function renderControls(data) {
     const available = data.available_vantages || {};
     const transport = data.selected_transport;
-    const vantageOptions = [["unknown", "Local", available.unknown, "Local collector"], ...(data.vantage_options || []).map(({id, label, city, country}) => [id, `${label} · ${city}`, available[id], `${city}, ${country}`])];
-    const links = vantageOptions.filter(([, , show]) => show).map(([id, label, , title]) => `<a href="/?vantage=${id}&amp;transport=${transport}" data-vantage="${id}" title="${escapeHTML(title)}"${data.selected_vantage === id ? ' aria-current="page"' : ""}>${escapeHTML(label)}</a>`).join("");
+    const names = {"us-east": "US East", europe: "Europe", "us-west": "US West", japan: "Japan", singapore: "Southeast Asia"};
+    const vantageOptions = [["unknown", "Local", "Collector", available.unknown, "Local collector"], ...(data.vantage_options || []).map(({id, city, country}) => [id, names[id] || id, city, available[id], `${city}, ${country}`])];
+    const links = vantageOptions.filter(([, , , show]) => show).map(([id, name, city, , title]) => `<a href="/?vantage=${id}&amp;transport=${transport}" data-vantage="${id}" title="${escapeHTML(title)}"${data.selected_vantage === id ? ' aria-current="page"' : ""}><span>${escapeHTML(name)}</span><small>${escapeHTML(city)}</small></a>`).join("");
     document.querySelector("[data-vantage-selector]").innerHTML = links;
     document.querySelector("[data-vantage-bar]").hidden = !links;
     document.querySelector("[data-transport-selector]").innerHTML = ["plain", "tls"].map((id) => `<a href="/?vantage=${data.selected_vantage}&amp;transport=${id}" data-transport="${id}"${transport === id ? ' aria-current="page"' : ""}>${id === "plain" ? "TCP" : "TLS"}</a>`).join("");

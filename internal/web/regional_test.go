@@ -79,7 +79,7 @@ func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 			break
 		}
 	}
-	if west.ID != "us-west" || west.Label != "LAX · Los Angeles" || west.ProtocolAttempts != 1 || !west.Incomplete || west.DroppedObservations != 2 || !west.Stale {
+	if west.ID != "us-west" || west.Label != "US West · Los Angeles" || west.ProtocolAttempts != 1 || !west.Incomplete || west.DroppedObservations != 2 || !west.Stale {
 		t.Fatalf("west=%+v", west)
 	}
 }
@@ -89,11 +89,11 @@ func TestRegionalNodeOrderAndLabels(t *testing.T) {
 		id    string
 		label string
 	}{
-		{id: "us-east", label: "IAD · Ashburn"},
-		{id: "europe", label: "FRA · Frankfurt"},
-		{id: "us-west", label: "LAX · Los Angeles"},
-		{id: "japan", label: "NRT · Tokyo"},
-		{id: "singapore", label: "SIN · Singapore"},
+		{id: "us-east", label: "US East · Ashburn"},
+		{id: "europe", label: "Europe · Frankfurt"},
+		{id: "us-west", label: "US West · Los Angeles"},
+		{id: "japan", label: "Japan · Tokyo"},
+		{id: "singapore", label: "Southeast Asia · Singapore"},
 	}
 	if len(vantageOrder) != len(want) {
 		t.Fatalf("vantageOrder=%v", vantageOrder)
