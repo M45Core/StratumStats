@@ -227,6 +227,60 @@ func TestComputeExcludesBroadRegionalMissesButKeepsLocalizedOutages(t *testing.T
 	}
 }
 
+func TestComputeExcludesBlockAcrossVantagesAfterMultiRegionObserverFailure(t *testing.T) {
+	now := time.Date(2026, 8, 14, 6, 0, 0, 0, time.UTC)
+	started := now.Add(-time.Minute)
+	var pools []model.Pool
+	for index := 0; index < 10; index++ {
+		poolID := "pool-" + string(rune('a'+index))
+		pools = append(pools, model.Pool{ID: poolID, Name: poolID, Endpoints: []model.Endpoint{{Host: poolID + ".example", Port: 3333}}})
+	}
+	var observations []model.Observation
+	addRun := func(vantage, runID, blockID string, missCount int) {
+		observedAt := now.Add(-30 * time.Second)
+		for index, pool := range pools {
+			endpoint := endpointAddress(pool.Endpoints[0])
+			observations = append(observations, model.Observation{
+				Version: model.ObservationVersion, Source: model.SourceRemoteScheduled,
+				ObservationID: runID + "/" + pool.ID, RunID: runID, Vantage: vantage,
+				BlockID: blockID, PoolID: pool.ID, Endpoint: endpoint, ObservedAt: observedAt,
+				Eligible: true, Arrived: index >= missCount,
+			})
+		}
+		observations = append(observations, model.Observation{
+			Version: model.ObservationVersion, Source: model.SourceRemoteScheduled,
+			ObservationID: runID + "/summary", RunID: runID, Vantage: vantage,
+			RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started,
+			RunStatus: "ok", DroppedObservations: 0,
+		})
+	}
+	for _, vantage := range []string{"us-east", "europe", "us-west"} {
+		addRun(vantage, "healthy-"+vantage, "healthy", 0)
+	}
+	addRun("us-east", "reboot-east", "reboot", 5)
+	addRun("europe", "reboot-europe", "reboot", 5)
+	addRun("us-west", "reboot-west", "reboot", 1)
+
+	snapshot := Compute(pools, observations, now)
+	if snapshot.BlocksObserved != 1 {
+		t.Fatalf("blocks=%d, want only the healthy block", snapshot.BlocksObserved)
+	}
+	if snapshot.ExcludedRegionalCohorts != 3 {
+		t.Fatalf("excluded regional cohorts=%d, want all 3 reboot cohorts", snapshot.ExcludedRegionalCohorts)
+	}
+	for _, report := range snapshot.Reports {
+		if report.Availability != 100 || report.EligibleChecks != 3 || report.DeliveryChecks != 3 {
+			t.Fatalf("reboot affected %s: %+v", report.Endpoint, report)
+		}
+	}
+	west := ComputeVantage(pools, observations, "us-west", now)
+	for _, report := range west.Reports {
+		if report.Availability != 100 || report.EligibleChecks != 1 || report.DeliveryChecks != 1 {
+			t.Fatalf("regional reboot affected %s: %+v", report.Endpoint, report)
+		}
+	}
+}
+
 func TestComputeVantageFiltersTimingButRetainsGlobalCoinbaseEvidence(t *testing.T) {
 	fee := 1.25
 	pools := []model.Pool{{ID: "pool", Name: "Pool", Category: "solo"}}

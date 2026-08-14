@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MethodologyVersion     = "2026-08-12.30"
+	MethodologyVersion     = "2026-08-14.31"
 	reportHistoryLimit     = 12
 	regionalCohortMissPct  = 20
 	regionalCohortMinPools = 5
@@ -134,6 +134,7 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 		}
 	}
 	excludedRegionalCohorts := unhealthyRegionalCohorts(observations, acc, poolsByID, completedRemoteRuns, canonicalWindows)
+	excludedRegionalCohorts = expandMultiRegionObserverFailures(observations, excludedRegionalCohorts)
 	for order, o := range observations {
 		protocolRecord := o.RecordType == model.RecordTypeProtocol || o.ProtocolMethod != ""
 		if !protocolRecord && o.BlockID != "" && scoreableBlockObservation(o, completedRemoteRuns) && !excludedRegionalCohorts[blockWindowKey(o)] {
@@ -221,6 +222,7 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
 			"Scheduled block observations affect scores only after their probe run completes successfully without dropped observations.",
 			"A scheduled regional block cohort is excluded when at least 20% of eligible endpoints across at least five pools miss together, indicating a vantage-wide measurement failure rather than independent pool availability.",
+			"When the same block has broad observer failures in multiple regions, that block is excluded from every regional view so rolling collector maintenance cannot be scored as pool downtime.",
 			"The probe uses pseudonymous miner credentials, but a pool can still observe its source IP.",
 			"Observed solo-pool fee is inferred only when a decoded coinbase output matches the generated worker script; optional donations or splits may be included.",
 			"Matched worker payout destinations are reduced to aggregate verification and fee evidence; their address and script are never published.",
@@ -279,6 +281,73 @@ func unhealthyRegionalCohorts(observations []model.Observation, acc map[string]*
 	return excluded
 }
 
+// expandMultiRegionObserverFailures treats the same block failing broadly in
+// multiple vantages as collector maintenance or infrastructure failure. Once
+// that signal is present, every regional cohort for the block is omitted so a
+// rolling observer restart cannot turn surviving partial cohorts into apparent
+// pool outages. A failure confined to one region remains region-local.
+func expandMultiRegionObserverFailures(observations []model.Observation, excluded map[string]bool) map[string]bool {
+	failedBlocks := multiRegionFailedBlocks(excluded)
+	if len(failedBlocks) == 0 {
+		return excluded
+	}
+	for _, observation := range observations {
+		if failedBlocks[observation.BlockID] {
+			excluded[blockWindowKey(observation)] = true
+		}
+	}
+	return excluded
+}
+
+func multiRegionFailedBlocks(excluded map[string]bool) map[string]bool {
+	failedVantages := make(map[string]map[string]bool)
+	for key := range excluded {
+		vantage, blockID := observationKeyParts(key)
+		if failedVantages[blockID] == nil {
+			failedVantages[blockID] = make(map[string]bool)
+		}
+		failedVantages[blockID][vantage] = true
+	}
+	failedBlocks := make(map[string]bool)
+	for blockID, vantages := range failedVantages {
+		if len(vantages) >= 2 {
+			failedBlocks[blockID] = true
+		}
+	}
+	return failedBlocks
+}
+
+func detectMultiRegionObserverFailures(pools []model.Pool, observations []model.Observation, now time.Time) map[string]bool {
+	observations = uniqueObservations(RetainObservations(observations, now.UTC()))
+	completedRemoteRuns := completedScheduledRuns(observations)
+	acc := make(map[string]*accumulator)
+	poolsByID := make(map[string]model.Pool, len(pools))
+	for _, pool := range pools {
+		poolsByID[pool.ID] = pool
+		if len(pool.Endpoints) == 0 {
+			acc[endpointReportKey(pool.ID, "", false)] = newAccumulator(pool, model.Endpoint{})
+			continue
+		}
+		for _, endpoint := range pool.Endpoints {
+			acc[endpointReportKey(pool.ID, endpointAddress(endpoint), endpoint.TLS)] = newAccumulator(pool, endpoint)
+		}
+	}
+	canonicalWindows := make(map[string]time.Time)
+	for _, observation := range observations {
+		if _, ok := observationAccumulator(acc, poolsByID, observation); !ok ||
+			observation.RecordType == model.RecordTypeProtocol || observation.ProtocolMethod != "" ||
+			!observation.Eligible || observation.BlockID == "" || !scoreableBlockObservation(observation, completedRemoteRuns) {
+			continue
+		}
+		key := blockWindowKey(observation)
+		if old, exists := canonicalWindows[key]; !exists || observation.ObservedAt.Before(old) {
+			canonicalWindows[key] = observation.ObservedAt
+		}
+	}
+	excluded := unhealthyRegionalCohorts(observations, acc, poolsByID, completedRemoteRuns, canonicalWindows)
+	return multiRegionFailedBlocks(excluded)
+}
+
 // completedScheduledRuns returns the remote run IDs whose terminal record
 // proves that the whole scheduled collection was uploaded without loss. Block
 // records can arrive in earlier batches, so an interrupted server upload may
@@ -310,6 +379,7 @@ func ComputeVantage(pools []model.Pool, observations []model.Observation, vantag
 // the same global evidence behavior as a single-vantage report.
 func ComputeVantages(pools []model.Pool, observations []model.Observation, vantages map[string]bool, now time.Time) model.Snapshot {
 	filtered := make([]model.Observation, 0, len(observations))
+	failedBlocks := detectMultiRegionObserverFailures(pools, observations, now)
 	selectedVantages := 0
 	for _, selected := range vantages {
 		if selected {
@@ -317,7 +387,7 @@ func ComputeVantages(pools []model.Pool, observations []model.Observation, vanta
 		}
 	}
 	for _, observation := range observations {
-		if vantages[observation.Vantage] {
+		if vantages[observation.Vantage] && !failedBlocks[observation.BlockID] {
 			filtered = append(filtered, observation)
 		}
 	}
