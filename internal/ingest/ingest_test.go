@@ -141,6 +141,25 @@ func TestReceiverAcceptsAuthenticatedBatchAndSetsProvenance(t *testing.T) {
 	}
 }
 
+func TestReceiverAcceptsContinuousCohortOpenLongerThanFifteenMinutes(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	envelope := testEnvelope(now)
+	// Continuous Scouts keep a cohort open until the next Bitcoin block, so
+	// its start time cannot be bounded by the one-shot RUN_FOR limit.
+	envelope.StartedAt = now.Add(-24 * time.Hour)
+	var appended []model.Observation
+	receiver := Receiver{
+		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
+		Now:    func() time.Time { return now },
+		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
+	}
+	response := httptest.NewRecorder()
+	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
+	if response.Code != http.StatusAccepted || len(appended) != 1 {
+		t.Fatalf("status=%d body=%s observations=%d", response.Code, response.Body.String(), len(appended))
+	}
+}
+
 func TestReceiverAppendsProbeRunMarkerAfterMeasurements(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	envelope := testEnvelope(now)

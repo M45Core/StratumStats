@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MethodologyVersion     = "2026-08-14.31"
+	MethodologyVersion     = "2026-08-14.32"
 	reportHistoryLimit     = 12
 	regionalCohortMissPct  = 20
 	regionalCohortMinPools = 5
@@ -317,7 +317,7 @@ func multiRegionFailedBlocks(excluded map[string]bool) map[string]bool {
 	return failedBlocks
 }
 
-func detectMultiRegionObserverFailures(pools []model.Pool, observations []model.Observation, now time.Time) map[string]bool {
+func detectMultiRegionObserverFailures(pools []model.Pool, observations []model.Observation, now time.Time) (map[string]bool, map[string]bool) {
 	observations = uniqueObservations(RetainObservations(observations, now.UTC()))
 	completedRemoteRuns := completedScheduledRuns(observations)
 	acc := make(map[string]*accumulator)
@@ -345,7 +345,8 @@ func detectMultiRegionObserverFailures(pools []model.Pool, observations []model.
 		}
 	}
 	excluded := unhealthyRegionalCohorts(observations, acc, poolsByID, completedRemoteRuns, canonicalWindows)
-	return multiRegionFailedBlocks(excluded)
+	failedBlocks := multiRegionFailedBlocks(excluded)
+	return failedBlocks, expandMultiRegionObserverFailures(observations, excluded)
 }
 
 // completedScheduledRuns returns the remote run IDs whose terminal record
@@ -379,7 +380,7 @@ func ComputeVantage(pools []model.Pool, observations []model.Observation, vantag
 // the same global evidence behavior as a single-vantage report.
 func ComputeVantages(pools []model.Pool, observations []model.Observation, vantages map[string]bool, now time.Time) model.Snapshot {
 	filtered := make([]model.Observation, 0, len(observations))
-	failedBlocks := detectMultiRegionObserverFailures(pools, observations, now)
+	failedBlocks, multiRegionExcludedCohorts := detectMultiRegionObserverFailures(pools, observations, now)
 	selectedVantages := 0
 	for _, selected := range vantages {
 		if selected {
@@ -392,6 +393,15 @@ func ComputeVantages(pools []model.Pool, observations []model.Observation, vanta
 		}
 	}
 	regional := compute(pools, filtered, now, selectedVantages > 1)
+	// Multi-region failures are removed before the regional computation so they
+	// cannot affect scoring. Restore their selected cohort count to the payload
+	// after computation; single-region exclusions remain counted by compute.
+	for key := range multiRegionExcludedCohorts {
+		vantage, blockID := observationKeyParts(key)
+		if vantages[vantage] && failedBlocks[blockID] {
+			regional.ExcludedRegionalCohorts++
+		}
+	}
 	global := Compute(pools, observations, now)
 	globalReports := make(map[string]model.PoolReport, len(global.Reports))
 	for _, poolReport := range global.Reports {

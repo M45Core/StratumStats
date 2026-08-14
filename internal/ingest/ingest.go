@@ -28,7 +28,6 @@ const (
 	maxCompressedBytes         = 256 << 10
 	maxDecompressedBytes       = 1 << 20
 	maxObservations            = 500
-	maxRunDuration             = 15 * time.Minute
 	maxRequestClockSkew        = 5 * time.Minute
 	maxRetainedCoinbaseOutputs = model.MaxRetainedCoinbaseOutputs
 	maxRetainedScriptHexLength = model.MaxRetainedCoinbaseScriptBytes * 2
@@ -236,7 +235,6 @@ func (receiver Receiver) validate(envelope Envelope, now time.Time) ([]model.Obs
 	}
 	if envelope.StartedAt.IsZero() || envelope.SentAt.IsZero() ||
 		envelope.SentAt.Before(envelope.StartedAt) ||
-		envelope.SentAt.Sub(envelope.StartedAt) > maxRunDuration ||
 		envelope.SentAt.After(now.Add(maxRequestClockSkew)) {
 		return nil, errors.New("invalid run interval")
 	}

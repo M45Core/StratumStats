@@ -274,6 +274,9 @@ func TestComputeExcludesBlockAcrossVantagesAfterMultiRegionObserverFailure(t *te
 		}
 	}
 	west := ComputeVantage(pools, observations, "us-west", now)
+	if west.ExcludedRegionalCohorts != 1 {
+		t.Fatalf("west excluded regional cohorts=%d, want 1", west.ExcludedRegionalCohorts)
+	}
 	for _, report := range west.Reports {
 		if report.Availability != 100 || report.EligibleChecks != 1 || report.DeliveryChecks != 1 {
 			t.Fatalf("regional reboot affected %s: %+v", report.Endpoint, report)
