@@ -405,7 +405,7 @@ func demoPools(pools []model.Pool) []model.Pool {
 		demo[index].Status = "active"
 		demo[index].Endpoints = append([]model.Endpoint(nil), pool.Endpoints...)
 		for endpoint := range demo[index].Endpoints {
-			demo[index].Endpoints[endpoint].Host = fmt.Sprintf("pool-%02d.example.invalid", index+1)
+			demo[index].Endpoints[endpoint].Host = fmt.Sprintf("pool-%02d-%02d.example.invalid", index+1, endpoint+1)
 			demo[index].Endpoints[endpoint].Region = ""
 			demo[index].Endpoints[endpoint].Continent = ""
 		}

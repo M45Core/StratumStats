@@ -50,6 +50,72 @@
       ]
     },
     {
+      "id": "asicpool_space",
+      "name": "A.S.I.C. Mining Pool — PROP",
+      "website": "https://asicpool.space/",
+      "category": "shared",
+      "endpoints": [
+        {
+          "host": "asicpool.space",
+          "port": 4333,
+          "tls": false
+        },
+        {
+          "host": "asicpool.space",
+          "port": 4334,
+          "tls": false
+        },
+        {
+          "host": "asicpool.space",
+          "port": 4335,
+          "tls": false
+        },
+        {
+          "host": "asicpool.space",
+          "port": 24333,
+          "tls": true
+        },
+        {
+          "host": "asicpool.space",
+          "port": 24334,
+          "tls": true
+        }
+      ],
+      "operator": "A.S.I.C. Mining Pool",
+      "status": "active",
+      "products": [
+        "PROP"
+      ]
+    },
+    {
+      "id": "asicpool_space_solo",
+      "name": "A.S.I.C. Mining Pool — Solo",
+      "website": "https://asicpool.space/",
+      "category": "solo",
+      "endpoints": [
+        {
+          "host": "asicpool.space",
+          "port": 4339,
+          "tls": false
+        },
+        {
+          "host": "asicpool.space",
+          "port": 4340,
+          "tls": false
+        },
+        {
+          "host": "asicpool.space",
+          "port": 24339,
+          "tls": true
+        }
+      ],
+      "operator": "A.S.I.C. Mining Pool",
+      "status": "active",
+      "products": [
+        "SOLO"
+      ]
+    },
+    {
       "id": "atlaspool",
       "name": "AtlasPool",
       "website": "https://atlaspool.io/",
