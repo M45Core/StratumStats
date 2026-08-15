@@ -155,3 +155,19 @@ func TestWatchSessionReportsInvalidTLSCertificate(t *testing.T) {
 		t.Fatalf("TLS failure record=%+v", *tlsRecord)
 	}
 }
+
+func TestPublishProtocolUsesWireCompletionTime(t *testing.T) {
+	started := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
+	finished := started.Add(1234 * time.Microsecond)
+	out := make(chan event, 1)
+	if err := publishProtocolAt(context.Background(), out, "pool", model.Endpoint{Host: "pool.example", Port: 3333}, model.ProtocolPing, started, finished, model.ProtocolStatusOK, ""); err != nil {
+		t.Fatal(err)
+	}
+	record := (<-out).protocol
+	if record == nil || record.DurationMS == nil || *record.DurationMS != 1.234 {
+		t.Fatalf("protocol record=%+v, want exact wire duration", record)
+	}
+	if !record.ObservedAt.Equal(finished) {
+		t.Fatalf("observed at=%v, want wire completion %v", record.ObservedAt, finished)
+	}
+}

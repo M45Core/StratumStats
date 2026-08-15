@@ -105,8 +105,11 @@ the newly logged one-time password.
 StratumStats records observations rather than pool claims. Each report represents
 one configured pool endpoint and transport (`pool + host:port + TLS mode`).
 Template latency is relative to the earliest structurally valid template observed
-for the same block and vantage. Every configured endpoint is eligible for that
-block, so an endpoint that is down records a missed delivery and mining loss.
+for the same block and vantage. Arrival is timestamped as soon as the complete
+Stratum message is read, before JSON parsing, coinbase reconstruction, or merkle
+verification; validation still determines whether the arrival is accepted. Every
+configured endpoint is eligible for that block, so an endpoint that is down
+records a missed delivery and mining loss.
 Median, P95, history, and protocol timings use a rolling 24-hour window. No report,
 score, count, payout, or fee evidence uses observations older than 30 days.
 The production server checks the oldest JSONL observation weekly and atomically
@@ -129,10 +132,12 @@ initial page render, every visible copy flashes together when the height
 changes.
 
 Protocol measurements include TCP connect, TLS handshake, `mining.subscribe`,
-`mining.authorize`, and optional `mining.ping`. Coinbase reconstruction checks
-whether the generated worker script is present and redacts that destination
-before telemetry is stored. Shared-pool fees are not shown because they cannot
-be measured from the block coinbase.
+`mining.authorize`, and optional `mining.ping`. Their completion timestamps are
+captured at the completed network operation or full response read, excluding
+subsequent response parsing. Coinbase reconstruction checks whether the generated
+worker script is present and redacts that destination before telemetry is stored.
+Shared-pool fees are not shown because they cannot be measured from the block
+coinbase.
 
 The dashboard's `/methodology` page documents scoring, payout interpretation,
 and limitations in detail.

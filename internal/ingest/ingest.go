@@ -201,20 +201,28 @@ func decodeEnvelope(raw []byte) (Envelope, int, error) {
 		return Envelope{}, http.StatusBadRequest, errors.New("invalid gzip body")
 	}
 	defer compressed.Close()
-	body, err := io.ReadAll(io.LimitReader(compressed, maxDecompressedBytes+1))
-	if err != nil {
-		return Envelope{}, http.StatusBadRequest, errors.New("cannot decompress body")
-	}
-	if len(body) > maxDecompressedBytes {
-		return Envelope{}, http.StatusRequestEntityTooLarge, errors.New("request too large")
-	}
+	limited := &io.LimitedReader{R: compressed, N: maxDecompressedBytes + 1}
 	var envelope Envelope
-	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder := json.NewDecoder(limited)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&envelope); err != nil {
+		_, drainErr := io.Copy(io.Discard, limited)
+		if limited.N == 0 {
+			return Envelope{}, http.StatusRequestEntityTooLarge, errors.New("request too large")
+		}
+		if drainErr != nil {
+			return Envelope{}, http.StatusBadRequest, errors.New("cannot decompress body")
+		}
 		return Envelope{}, http.StatusBadRequest, fmt.Errorf("invalid envelope: %w", err)
 	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+	trailingErr := decoder.Decode(&struct{}{})
+	if limited.N == 0 {
+		return Envelope{}, http.StatusRequestEntityTooLarge, errors.New("request too large")
+	}
+	if !errors.Is(trailingErr, io.EOF) {
+		if errors.Is(trailingErr, gzip.ErrChecksum) || errors.Is(trailingErr, gzip.ErrHeader) || errors.Is(trailingErr, io.ErrUnexpectedEOF) {
+			return Envelope{}, http.StatusBadRequest, errors.New("cannot decompress body")
+		}
 		return Envelope{}, http.StatusBadRequest, errors.New("invalid trailing data")
 	}
 	return envelope, 0, nil

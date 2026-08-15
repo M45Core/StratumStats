@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -138,6 +139,38 @@ func TestReceiverAcceptsAuthenticatedBatchAndSetsProvenance(t *testing.T) {
 	if got.Source != RemoteSource || got.Vantage != "us-west" || got.MachineID != "machine-1" ||
 		got.AgentVersion != "0.1.0" || got.ConfigRevision == "" {
 		t.Fatalf("provenance=%+v", got)
+	}
+}
+
+func BenchmarkDecodeEnvelope(b *testing.B) {
+	now := time.Date(2026, time.August, 15, 12, 0, 0, 0, time.UTC)
+	value := testEnvelope(now)
+	value.Observations = make([]model.Observation, 100)
+	for index := range value.Observations {
+		duration := 12.5 + float64(index)
+		value.Observations[index] = model.Observation{
+			Version: model.ObservationVersion, ObservationID: fmt.Sprintf("run-1/observation-%d", index),
+			RunID: value.RunID, ObservedAt: now, PoolID: "pool", Endpoint: "pool.example:3333",
+			RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolPing,
+			ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration,
+		}
+	}
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if err := json.NewEncoder(writer).Encode(value); err != nil {
+		b.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		b.Fatal(err)
+	}
+	raw := compressed.Bytes()
+	b.ReportAllocs()
+	b.SetBytes(int64(len(raw)))
+	b.ResetTimer()
+	for b.Loop() {
+		if _, _, err := decodeEnvelope(raw); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

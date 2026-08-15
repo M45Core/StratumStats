@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MethodologyVersion     = "2026-08-14.32"
+	MethodologyVersion     = "2026-08-14.33"
 	reportHistoryLimit     = 12
 	regionalCohortMissPct  = 20
 	regionalCohortMinPools = 5
@@ -217,6 +217,7 @@ func compute(pools []model.Pool, observations []model.Observation, now time.Time
 		Disclosure: []string{
 			"Reports use automated endpoint observations only; no pool pays or applies for placement.",
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
+			"Wire completion is timestamped before response parsing and block-template verification.",
 			"Combined-vantage reports reduce regional latency observations to one median per Bitcoin block before computing history, median, and P95.",
 			"No observation older than 30 days is used; block-template latency, latency history, and protocol timing use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
