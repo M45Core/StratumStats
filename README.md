@@ -52,6 +52,54 @@ Pool configuration lives in [`config/pools.json`](config/pools.json). Pass
 `-filter-continent` to `collect` to skip known endpoints outside the collector's
 continent; global and unlocated endpoints remain enabled.
 
+### Pool registry changes
+
+Validate an edited registry before deploying it:
+
+```bash
+go run . validate-config -config config/pools.json
+```
+
+`serve` and `collect` read their pool registry at startup. A running `serve`
+process reloads it only when it receives `SIGUSR1` (`sudo systemctl reload
+stratumstats`); it validates and builds the replacement
+completely before atomically swapping handlers. If validation or
+dashboard generation fails, the last good registry remains active. A local
+collector must still be restarted because it owns long-lived pool sessions.
+
+Production keeps the live registry at `/var/lib/stratumstats/pools.json`. Apply
+a repository edit without rebuilding the binary with:
+
+```bash
+./scripts/update-pools-production.sh
+```
+
+That helper validates the file, installs it atomically, sends `SIGUSR1`, and
+checks that `/api/v1/probe-config` exposes the expected revision. The current
+and immediately previous probe revisions are accepted during a one-hour grace
+window so an in-flight regional run is not rejected during endpoint removals.
+The dashboard marks a region as `Pool update pending` until that Scout's latest
+terminal run reports the active revision.
+
+### Pool registry admin
+
+A production `serve` process creates `/var/lib/stratumstats/admin.json` on first
+startup and logs a one-time generated `admin` password. The file contains only
+a salted PBKDF2-SHA256 password hash and is mode `0600`; retrieve the initial
+password from the service journal and store it in a password manager:
+
+```bash
+sudo journalctl -u stratumstats | grep "ADMIN INITIAL CREDENTIAL"
+```
+
+Open `/admin/login` over HTTPS (or directly from localhost) to edit the
+complete pool JSON. Saves use strict validation, an atomic file replacement,
+and immediate activation through the same reload
+path. Sessions are in memory, expire after 12 hours, and use HttpOnly,
+SameSite=Strict cookies plus CSRF protection. To deliberately rotate a lost
+admin password, stop the service, remove `admin.json`, and start it again; save
+the newly logged one-time password.
+
 ## Measurement model
 
 StratumStats records observations rather than pool claims. Each report represents
@@ -112,8 +160,9 @@ for future combined views.
 ## Production installation
 
 The generic systemd installer supports Debian and Ubuntu. It creates an
-unprivileged service account, installs the pool registry, preserves existing
-observations and credentials, and enables the service.
+unprivileged service account, seeds the persistent pool registry when absent,
+preserves existing pools, observations, admin credentials, and ingest
+credentials, and enables the service.
 
 ```bash
 # Optional static build.
@@ -128,6 +177,13 @@ The service listens on `127.0.0.1:8081` and stores observations in
 [systemd unit](deploy/stratumstats.service) and
 [environment example](deploy/stratumstats.env.example) before installing. Use
 `--no-start` to install without starting the service.
+
+The repository includes an automatic pool-only deployment workflow for pushes
+to `main` that change `config/pools.json`. It targets a self-hosted GitHub Actions
+runner labeled `stratumstats-production`; that runner needs passwordless sudo
+for the narrowly scoped install, move, and `systemctl reload` commands used by
+`scripts/update-pools-production.sh`. The `production` GitHub environment can
+add approval protection if desired.
 
 ## HTTP endpoints
 
@@ -156,7 +212,7 @@ StratumStats sends cache headers suited to each endpoint:
 | --- | --- | --- |
 | `/`, `/methodology`, `/static/*` | `public, max-age=300` | These responses change only when the binary is replaced. The short lifetime prevents an old shell or script surviving a deployment for long. |
 | `/dashboard-data` | `private, no-cache` with `ETag` | Browsers retain the selected region and transport response, then revalidate it. The client also sends the ETag as a `generation` query parameter so conditional refreshes survive proxies that discard `If-None-Match`. Unchanged data returns an empty `304`; updated data returns the atomically replaced response. |
-| `/api/v1/probe-config` | `public, max-age=300` | Probe configuration changes when the service is restarted with a new registry. |
+| `/api/v1/probe-config` | `no-cache` | Scouts revalidate the current revision after startup or a `SIGUSR1` registry reload. |
 | `/api/v1/ingest`, `/healthz` | `no-store` | Writes and liveness checks must never be cached. |
 
 Do not put `/dashboard-data` in an nginx `proxy_cache`: nginx cannot know when

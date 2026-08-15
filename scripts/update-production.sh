@@ -12,6 +12,9 @@ echo "Building StratumStats..."
 echo "Installing and restarting StratumStats..."
 sudo "$repo_dir/scripts/install-production.sh" --binary "$binary"
 
+echo "Activating the repository pool registry..."
+"$repo_dir/scripts/update-pools-production.sh" "$repo_dir/config/pools.json"
+
 echo "Checking service health..."
 curl --fail --silent --show-error --retry 5 --retry-delay 1 \
   --retry-connrefused \

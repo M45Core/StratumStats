@@ -104,7 +104,7 @@ func TestProbeConfigPublishesConfiguredEndpoints(t *testing.T) {
 	}
 	response := httptest.NewRecorder()
 	h.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/probe-config", nil))
-	if got := response.Header().Get("Cache-Control"); got != "public, max-age=300" {
+	if got := response.Header().Get("Cache-Control"); got != "no-cache" {
 		t.Fatalf("probe config Cache-Control=%q", got)
 	}
 	var body struct {

@@ -88,11 +88,20 @@ if ! getent passwd "$service_user" >/dev/null; then
   useradd --system --gid "$service_user" --home-dir "$data_dir" --shell "$nologin_shell" "$service_user"
 fi
 
-install -d -o root -g root -m 0755 "$install_dir" "$install_dir/config"
+install -d -o root -g root -m 0755 "$install_dir"
 install -d -o "$service_user" -g "$service_user" -m 0750 "$data_dir"
 install -o root -g root -m 0755 "$binary" "$install_dir/stratumstats"
-install -o root -g root -m 0644 "$repo_dir/config/pools.json" "$install_dir/config/pools.json"
 install -o root -g root -m 0644 "$repo_dir/deploy/stratumstats.service" "$unit_file"
+
+if [[ ! -e "$data_dir/pools.json" ]]; then
+  install -o "$service_user" -g "$service_user" -m 0640 "$repo_dir/config/pools.json" "$data_dir/pools.json"
+else
+  echo "Preserving existing $data_dir/pools.json"
+  chown "$service_user:$service_user" "$data_dir/pools.json"
+  chmod 0640 "$data_dir/pools.json"
+fi
+
+"$install_dir/stratumstats" validate-config -config "$data_dir/pools.json"
 
 if [[ ! -e "$data_dir/observations-v9.jsonl" ]]; then
   install -o "$service_user" -g "$service_user" -m 0640 /dev/null "$data_dir/observations-v9.jsonl"
@@ -123,6 +132,7 @@ if [[ "$start_service" == true ]]; then
 fi
 
 echo "Installed StratumStats in $install_dir"
+echo "Persistent pool registry: $data_dir/pools.json"
 echo "Persistent observations: $data_dir/observations-v9.jsonl"
 if [[ "$created_environment" == true ]]; then
   echo "Created $environment_file; copy its key ID and secret into your probe's secret manager."

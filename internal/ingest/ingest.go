@@ -65,11 +65,13 @@ type acceptedResponse struct {
 }
 
 type Receiver struct {
-	Pools   []model.Pool
-	Keys    map[string][]byte
-	Append  func([]model.Observation) error
-	Now     func() time.Time
-	Replays *ReplayGuard
+	Pools          []model.Pool
+	PoolRevisions  map[string][]model.Pool
+	RevisionExpiry map[string]time.Time
+	Keys           map[string][]byte
+	Append         func([]model.Observation) error
+	Now            func() time.Time
+	Replays        *ReplayGuard
 }
 
 // ReplayGuard prevents a valid, captured batch from being appended repeatedly
@@ -241,7 +243,10 @@ func (receiver Receiver) validate(envelope Envelope, now time.Time) ([]model.Obs
 	if len(envelope.Observations) == 0 || len(envelope.Observations) > maxObservations {
 		return nil, errors.New("invalid observation count")
 	}
-	pools, endpoints := receiver.allowedTargets()
+	pools, endpoints, err := receiver.allowedTargets(envelope.ConfigRevision, now)
+	if err != nil {
+		return nil, err
+	}
 	seen := make(map[string]bool, len(envelope.Observations))
 	observations := make([]model.Observation, len(envelope.Observations))
 	for index, original := range envelope.Observations {
@@ -293,10 +298,19 @@ type endpointIdentity struct {
 	tls             bool
 }
 
-func (receiver Receiver) allowedTargets() (map[string]bool, map[endpointIdentity]bool) {
+func (receiver Receiver) allowedTargets(revision string, now time.Time) (map[string]bool, map[endpointIdentity]bool, error) {
+	configured := receiver.Pools
+	if len(receiver.PoolRevisions) > 0 {
+		var ok bool
+		configured, ok = receiver.PoolRevisions[revision]
+		expiresAt := receiver.RevisionExpiry[revision]
+		if !ok || (!expiresAt.IsZero() && !now.Before(expiresAt)) {
+			return nil, nil, errors.New("unknown or expired configuration revision")
+		}
+	}
 	pools := make(map[string]bool)
 	endpoints := make(map[endpointIdentity]bool)
-	for _, pool := range receiver.Pools {
+	for _, pool := range configured {
 		if len(pool.Endpoints) == 0 {
 			continue
 		}
@@ -306,7 +320,7 @@ func (receiver Receiver) allowedTargets() (map[string]bool, map[endpointIdentity
 			endpoints[endpointIdentity{poolID: pool.ID, address: address, tls: endpoint.TLS}] = true
 		}
 	}
-	return pools, endpoints
+	return pools, endpoints, nil
 }
 
 func validateObservation(observation model.Observation, pools map[string]bool, endpoints map[endpointIdentity]bool) error {

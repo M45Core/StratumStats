@@ -1,5 +1,7 @@
 /stratumstats
 /data/*.jsonl
+/data/admin.json
+/data/pools.json
 !/data/.gitkeep
 *.tmp
 .DS_Store

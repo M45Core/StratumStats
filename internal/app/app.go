@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"math/rand"
@@ -48,6 +50,8 @@ func Run(args []string) error {
 		return serve(args[1:], true)
 	case "collect":
 		return collect(args[1:])
+	case "validate-config":
+		return validateConfig(args[1:])
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -62,16 +66,13 @@ func serve(args []string, demo bool) error {
 	addr := fs.String("addr", "127.0.0.1:8080", "HTTP listen address")
 	configPath := fs.String("config", "config/pools.json", "pool configuration")
 	dataPath := fs.String("data", "data/observations-v9.jsonl", "v9 endpoint JSONL observations")
+	adminConfigPath := fs.String("admin-config", "", "admin credential file (defaults beside the data file)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	cfg, err := loadConfig(*configPath)
 	if err != nil {
 		return err
-	}
-	pools := cfg.Pools
-	if demo {
-		pools = demoPools(pools)
 	}
 	var appender *store.Appender
 	if !demo {
@@ -82,13 +83,6 @@ func serve(args []string, demo bool) error {
 			log.Printf("compacted observations: retained=%d removed=%d", result.Retained, result.Removed)
 		}
 	}
-	loader := func() ([]model.Observation, error) {
-		if demo {
-			return demoData(pools), nil
-		}
-		return appender.LoadSince(time.Now().UTC().Add(-report.RetentionWindow))
-	}
-	var ingestHandler http.Handler
 	keyID, secret := os.Getenv("STRATUMSTATS_INGEST_KEY_ID"), os.Getenv("STRATUMSTATS_INGEST_SECRET")
 	if (keyID == "") != (secret == "") {
 		return fmt.Errorf("STRATUMSTATS_INGEST_KEY_ID and STRATUMSTATS_INGEST_SECRET must be set together")
@@ -96,31 +90,102 @@ func serve(args []string, demo bool) error {
 	if secret != "" && len(secret) < 32 {
 		return fmt.Errorf("STRATUMSTATS_INGEST_SECRET must contain at least 32 bytes")
 	}
-	if !demo && keyID != "" {
-		receiver := ingest.Receiver{
-			Pools:   cfg.Pools,
-			Keys:    map[string][]byte{keyID: []byte(secret)},
-			Append:  appender.Append,
-			Replays: ingest.NewReplayGuard(),
+	replayGuard := ingest.NewReplayGuard()
+	buildRegistry := func(current, previous model.Config) (http.Handler, string, error) {
+		pools := current.Pools
+		if demo {
+			pools = demoPools(pools)
 		}
-		ingestHandler = ingest.RateLimit(receiver)
-		log.Printf("authenticated regional-probe ingestion enabled")
+		probeConfig, err := ingest.BuildProbeConfig(current.Pools)
+		if err != nil {
+			return nil, "", err
+		}
+		loader := func() ([]model.Observation, error) {
+			if demo {
+				return demoData(pools), nil
+			}
+			return appender.LoadSince(time.Now().UTC().Add(-report.RetentionWindow))
+		}
+		var ingestHandler http.Handler
+		if !demo && keyID != "" {
+			revisions := map[string][]model.Pool{probeConfig.ConfigRevision: current.Pools}
+			expiry := make(map[string]time.Time)
+			if len(previous.Pools) > 0 {
+				oldConfig, err := ingest.BuildProbeConfig(previous.Pools)
+				if err != nil {
+					return nil, "", err
+				}
+				if oldConfig.ConfigRevision != probeConfig.ConfigRevision {
+					revisions[oldConfig.ConfigRevision] = previous.Pools
+					expiry[oldConfig.ConfigRevision] = time.Now().UTC().Add(time.Hour)
+				}
+			}
+			receiver := ingest.Receiver{
+				Pools: current.Pools, PoolRevisions: revisions, RevisionExpiry: expiry,
+				Keys:   map[string][]byte{keyID: []byte(secret)},
+				Append: appender.Append, Replays: replayGuard,
+			}
+			ingestHandler = ingest.RateLimit(receiver)
+		}
+		handler, err := (webapp.Server{
+			Pools: pools, Load: loader, Demo: demo, Ingest: ingestHandler,
+			ConfigRevision: probeConfig.ConfigRevision,
+		}).Handler()
+		return handler, probeConfig.ConfigRevision, err
 	}
-	app, err := (webapp.Server{Pools: pools, Load: loader, Demo: demo, Ingest: ingestHandler}).Handler()
+	registry, err := newRegistryManager(*configPath, cfg, buildRegistry)
 	if err != nil {
 		return err
 	}
+	var app http.Handler = registry.public
+	if !demo {
+		path := *adminConfigPath
+		if path == "" {
+			path = defaultAdminPath(*dataPath)
+		}
+		admin, generatedPassword, err := newAdminHandler(path, registry.json, registry.save)
+		if err != nil {
+			return fmt.Errorf("initialize admin: %w", err)
+		}
+		if generatedPassword != "" {
+			log.Printf("ADMIN INITIAL CREDENTIAL username=%q password=%q file=%q; save this password now because it is not stored", "admin", generatedPassword, path)
+		}
+		app = http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			if request.URL.Path == "/admin" || strings.HasPrefix(request.URL.Path, "/admin/") {
+				admin.ServeHTTP(response, request)
+				return
+			}
+			registry.public.ServeHTTP(response, request)
+		})
+		if keyID != "" {
+			log.Printf("authenticated regional-probe ingestion enabled")
+		}
+	}
 	srv := &http.Server{
-		Addr:              *addr,
-		Handler:           app,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    64 << 10,
+		Addr: *addr, Handler: app, ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second,
+		IdleTimeout: 60 * time.Second, MaxHeaderBytes: 64 << 10,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	reloadSignals := make(chan os.Signal, 1)
+	signal.Notify(reloadSignals, syscall.SIGUSR1)
+	defer signal.Stop(reloadSignals)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-reloadSignals:
+				revision, err := registry.reload()
+				if err != nil {
+					log.Printf("pool registry reload rejected: error=%q", err.Error())
+					continue
+				}
+				log.Printf("pool registry reloaded: revision=%s", revision)
+			}
+		}
+	}()
 	if appender != nil {
 		go runObservationCompactor(ctx, appender)
 	}
@@ -268,9 +333,24 @@ func loadConfig(path string) (model.Config, error) {
 	if err != nil {
 		return model.Config{}, err
 	}
+	return decodeConfig(b)
+}
+
+func decodeConfig(b []byte) (model.Config, error) {
 	var cfg model.Config
-	if err := json.Unmarshal(b, &cfg); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&cfg); err != nil {
 		return cfg, err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return cfg, fmt.Errorf("unexpected trailing JSON value")
+		}
+		return cfg, fmt.Errorf("invalid trailing JSON: %w", err)
+	}
+	if len(cfg.Pools) == 0 {
+		return cfg, fmt.Errorf("pool registry must not be empty")
 	}
 	seen := map[string]bool{}
 	for _, p := range cfg.Pools {
@@ -306,6 +386,24 @@ func loadConfig(path string) (model.Config, error) {
 		}
 	}
 	return cfg, nil
+}
+
+func validateConfig(args []string) error {
+	fs := flag.NewFlagSet("validate-config", flag.ContinueOnError)
+	configPath := fs.String("config", "config/pools.json", "pool configuration")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	cfg, err := loadConfig(*configPath)
+	if err != nil {
+		return err
+	}
+	probeConfig, err := ingest.BuildProbeConfig(cfg.Pools)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("valid pool configuration: pools=%d endpoints=%d revision=%s\n", len(cfg.Pools), endpointCount(cfg.Pools), probeConfig.ConfigRevision)
+	return nil
 }
 
 func validWebURL(raw string) bool {
@@ -429,6 +527,6 @@ func demoLatencyTarget(index, count int) float64 {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: stratumstats [serve|demo|collect] [options]")
+	fmt.Fprintln(os.Stderr, "Usage: stratumstats [serve|demo|collect|validate-config] [options]")
 	fmt.Fprintln(os.Stderr, "No command starts the synthetic demo dashboard on :8080.")
 }

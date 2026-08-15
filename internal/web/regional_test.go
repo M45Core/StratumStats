@@ -71,7 +71,7 @@ func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 	now := time.Now().UTC()
 	started := now.Add(-time.Minute)
 	observations := []model.Observation{{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProtocol, ObservedAt: now.Add(-30 * time.Second)}, {Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started, RunStatus: "partial", ConfigRevision: "sha256:test", DroppedObservations: 2}}
-	statuses := buildVantageStatuses(observations, now).Vantages
+	statuses := buildVantageStatuses(observations, now, "sha256:current").Vantages
 	var west vantageStatus
 	for _, status := range statuses {
 		if status.ID == "us-west" {
@@ -79,8 +79,14 @@ func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 			break
 		}
 	}
-	if west.ID != "us-west" || west.Label != "US West · Los Angeles" || west.ProtocolAttempts != 1 || !west.Incomplete || west.DroppedObservations != 2 || !west.Stale {
+	if west.ConfigCurrent || west.ID != "us-west" || west.Label != "US West · Los Angeles" || west.ProtocolAttempts != 1 || !west.Incomplete || west.DroppedObservations != 2 || !west.Stale {
 		t.Fatalf("west=%+v", west)
+	}
+	current := buildVantageStatuses(observations, now, "sha256:test").Vantages
+	for _, status := range current {
+		if status.ID == "us-west" && !status.ConfigCurrent {
+			t.Fatalf("current revision not recognized: %+v", status)
+		}
 	}
 }
 

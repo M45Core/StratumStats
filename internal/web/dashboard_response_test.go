@@ -90,7 +90,7 @@ func TestDashboardResponseCacheSwapsOnlyAfterCompleteRebuild(t *testing.T) {
 		return observations, nil
 	}}
 	responses := &dashboardResponseCache{}
-	if err := responses.rebuildFrom(snapshots, pools, false); err != nil {
+	if err := responses.rebuildFrom(snapshots, pools, false, ""); err != nil {
 		t.Fatal(err)
 	}
 	before, ok := responses.response("unknown\x00plain")
@@ -102,7 +102,7 @@ func TestDashboardResponseCacheSwapsOnlyAfterCompleteRebuild(t *testing.T) {
 	blockLoad = true
 	snapshots.invalidate()
 	done := make(chan error, 1)
-	go func() { done <- responses.rebuildFrom(snapshots, pools, false) }()
+	go func() { done <- responses.rebuildFrom(snapshots, pools, false, "") }()
 	<-started
 	during, ok := responses.response("unknown\x00plain")
 	if !ok || during.etag != before.etag {
@@ -128,13 +128,13 @@ func TestDashboardResponseCacheKeepsPreviousDataAfterFailedRebuild(t *testing.T)
 		return nil, nil
 	}}
 	responses := &dashboardResponseCache{}
-	if err := responses.rebuildFrom(snapshots, pools, false); err != nil {
+	if err := responses.rebuildFrom(snapshots, pools, false, ""); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := responses.response("\x00plain")
 	fail = true
 	snapshots.invalidate()
-	if err := responses.rebuildFrom(snapshots, pools, false); err == nil {
+	if err := responses.rebuildFrom(snapshots, pools, false, ""); err == nil {
 		t.Fatal("failed rebuild returned nil")
 	}
 	after, ok := responses.response("\x00plain")

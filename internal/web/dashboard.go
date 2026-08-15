@@ -66,6 +66,7 @@ type dashboardPage struct {
 	SelectedLabel      string          `json:"selected_label"`
 	SelectedTransport  string          `json:"selected_transport"`
 	VantageStatus      *vantageStatus  `json:"vantage_status,omitempty"`
+	ConfigRevision     string          `json:"config_revision,omitempty"`
 	AvailableVantages  map[string]bool `json:"available_vantages"`
 	VantageOptions     []vantageOption `json:"vantage_options"`
 }

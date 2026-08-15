@@ -108,7 +108,7 @@ func (cache *dashboardResponseCache) response(key string) (cachedDashboardRespon
 	return response, ok
 }
 
-func (cache *dashboardResponseCache) rebuildFrom(snapshots *snapshotCache, pools []model.Pool, demo bool) error {
+func (cache *dashboardResponseCache) rebuildFrom(snapshots *snapshotCache, pools []model.Pool, demo bool, configRevision string) error {
 	cache.rebuild.Lock()
 	defer cache.rebuild.Unlock()
 	now := time.Now().UTC()
@@ -117,7 +117,7 @@ func (cache *dashboardResponseCache) rebuildFrom(snapshots *snapshotCache, pools
 		return err
 	}
 	available := availableVantages(observations)
-	statuses := buildVantageStatuses(observations, now)
+	statuses := buildVantageStatuses(observations, now, configRevision)
 	if !demo {
 		hideStaleRegionalVantages(available, statuses)
 	}
@@ -129,7 +129,7 @@ func (cache *dashboardResponseCache) rebuildFrom(snapshots *snapshotCache, pools
 	}
 	for _, vantage := range vantages {
 		for _, transport := range []string{"plain", "tls"} {
-			page, err := buildDashboard(snapshots, pools, demo, vantage, transport, now, available, statuses)
+			page, err := buildDashboard(snapshots, pools, demo, vantage, transport, now, available, statuses, configRevision)
 			if err != nil {
 				return err
 			}
@@ -181,7 +181,7 @@ func acceptsGzip(header string) bool {
 	return false
 }
 
-func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, requestedVantage, transport string, now time.Time, available map[string]bool, statuses vantageStatusResponse) (dashboardPage, error) {
+func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, requestedVantage, transport string, now time.Time, available map[string]bool, statuses vantageStatusResponse, configRevision string) (dashboardPage, error) {
 	vantage := requestedVantage
 	if vantage == "" {
 		if !demo && available["unknown"] {
@@ -203,6 +203,7 @@ func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, request
 		return dashboardPage{}, err
 	}
 	page := buildDashboardPage(snapshot, pools, demo, vantage, selectedVantageStatus(statuses, vantage), transport)
+	page.ConfigRevision = configRevision
 	// Reports are represented once in the transport-filtered dashboard groups.
 	// Keeping the unfiltered copy in Snapshot nearly doubles the refresh payload.
 	page.Snapshot.Reports = nil

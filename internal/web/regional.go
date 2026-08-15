@@ -107,6 +107,7 @@ type vantageStatus struct {
 	LastSuccessfulRunAt *time.Time `json:"last_successful_run_at,omitempty"`
 	LastObservationAt   *time.Time `json:"last_observation_at,omitempty"`
 	ConfigRevision      string     `json:"config_revision,omitempty"`
+	ConfigCurrent       bool       `json:"config_current"`
 	Blocks              int        `json:"blocks"`
 	ProtocolAttempts    int        `json:"protocol_attempts"`
 	DroppedObservations int        `json:"dropped_observations"`
@@ -119,7 +120,7 @@ type vantageStatusResponse struct {
 	Vantages    []vantageStatus `json:"vantages"`
 }
 
-func buildVantageStatuses(observations []model.Observation, now time.Time) vantageStatusResponse {
+func buildVantageStatuses(observations []model.Observation, now time.Time, currentRevision string) vantageStatusResponse {
 	statuses := make(map[string]*vantageStatus, len(vantageOrder))
 	blocks := make(map[string]map[string]bool, len(vantageOrder))
 	latestRuns := make(map[string]time.Time, len(vantageOrder))
@@ -168,6 +169,7 @@ func buildVantageStatuses(observations []model.Observation, now time.Time) vanta
 	for _, vantage := range vantageOrder {
 		status := statuses[vantage]
 		status.Blocks = len(blocks[vantage])
+		status.ConfigCurrent = status.ConfigRevision != "" && status.ConfigRevision == currentRevision
 		status.Stale = status.LastSuccessfulRunAt == nil || now.Sub(*status.LastSuccessfulRunAt) > vantageStaleAfter
 		response.Vantages = append(response.Vantages, *status)
 	}

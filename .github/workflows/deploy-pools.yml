@@ -1,0 +1,36 @@
+name: Deploy pool registry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - config/pools.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stratumstats-production-pools
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.12
+          cache: true
+      - run: go run . validate-config -config config/pools.json
+      - run: go test ./...
+      - run: go vet ./...
+
+  deploy:
+    needs: validate
+    environment: production
+    runs-on: [self-hosted, stratumstats-production]
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/update-pools-production.sh

@@ -18,10 +18,11 @@ import (
 var assets embed.FS
 
 type Server struct {
-	Pools  []model.Pool
-	Load   func() ([]model.Observation, error)
-	Demo   bool
-	Ingest http.Handler
+	Pools          []model.Pool
+	ConfigRevision string
+	Load           func() ([]model.Observation, error)
+	Demo           bool
+	Ingest         http.Handler
 }
 
 func (s Server) Handler() (http.Handler, error) {
@@ -36,13 +37,13 @@ func (s Server) Handler() (http.Handler, error) {
 	mux := http.NewServeMux()
 	cache := &snapshotCache{pools: s.Pools, load: s.Load}
 	dashboardResponses := &dashboardResponseCache{}
-	if err := dashboardResponses.rebuildFrom(cache, s.Pools, s.Demo); err != nil {
+	if err := dashboardResponses.rebuildFrom(cache, s.Pools, s.Demo, s.ConfigRevision); err != nil {
 		return nil, err
 	}
 	dashboardRefreshes := &dashboardRefreshScheduler{
 		refresh: func() error {
 			cache.invalidate()
-			return dashboardResponses.rebuildFrom(cache, s.Pools, s.Demo)
+			return dashboardResponses.rebuildFrom(cache, s.Pools, s.Demo, s.ConfigRevision)
 		},
 		onError: func(err error) {
 			log.Printf("dashboard cache rebuild failed: error=%q", err.Error())
@@ -96,7 +97,7 @@ func (s Server) Handler() (http.Handler, error) {
 		return nil, err
 	}
 	mux.HandleFunc("GET /api/v1/probe-config", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=300")
+		w.Header().Set("Cache-Control", "no-cache")
 		writeJSON(w, probeConfig)
 	})
 	if s.Ingest != nil {

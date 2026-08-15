@@ -171,7 +171,8 @@
     const heightChanged = renderedVantage === data.selected_vantage && renderedBlockHeight !== null && blockHeight !== null && blockHeight !== renderedBlockHeight;
     const update = data.data_updated_at ? `Region updated ${timeHTML(data.data_updated_at)}` : `No regional data in the last ${snapshot.retention_window_days} days`;
     const height = blockHeight ? `<span class="block-height-pill${heightChanged ? " block-height-changed" : ""}" data-block-height title="Latest solved Bitcoin block observed in this region">Block <strong>${blockHeight.toLocaleString()}</strong></span>` : "";
-    const regionSummary = `<div class="region-summary" aria-label="Regional measurement status" data-region-summary><span class="region-update-pill">${update}</span>${height}</div>`;
+    const configState = data.vantage_status && !data.vantage_status.config_current ? `<span class="config-pending-pill" title="This regional Scout has not reported the active pool configuration yet">Pool update pending</span>` : "";
+    const regionSummary = `<div class="region-summary" aria-label="Regional measurement status" data-region-summary><span class="region-update-pill">${update}</span>${configState}${height}</div>`;
     const jump = document.querySelector("[data-section-jump]");
     jump.innerHTML = '<span class="control-label">Jump to</span>';
     let visible = 0;
