@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +26,10 @@ type dashboardResponseCache struct {
 	mu      sync.RWMutex
 	rebuild sync.Mutex
 	entries map[string]cachedDashboardResponse
+}
+
+var dashboardGzipWriters = sync.Pool{
+	New: func() any { return gzip.NewWriter(io.Discard) },
 }
 
 // Regional Scouts finalize the same Bitcoin block about 30 seconds after first
@@ -90,7 +95,12 @@ func encodeDashboard(page dashboardPage) (cachedDashboardResponse, error) {
 	}
 	body = append(body, '\n')
 	var compressed bytes.Buffer
-	compressor := gzip.NewWriter(&compressed)
+	compressor := dashboardGzipWriters.Get().(*gzip.Writer)
+	compressor.Reset(&compressed)
+	defer func() {
+		compressor.Reset(io.Discard)
+		dashboardGzipWriters.Put(compressor)
+	}()
 	if _, err := compressor.Write(body); err != nil {
 		return cachedDashboardResponse{}, err
 	}
@@ -151,7 +161,7 @@ func writeCachedDashboard(w http.ResponseWriter, r *http.Request, response cache
 	w.Header().Set("Cache-Control", "private, no-cache")
 	w.Header().Set("ETag", response.etag)
 	w.Header().Set("Vary", "Accept-Encoding")
-	if r.Header.Get("If-None-Match") == response.etag || r.URL.Query().Get("generation") == response.etag {
+	if ifNoneMatch(r.Header.Get("If-None-Match"), response.etag) || weakETagEqual(r.URL.Query().Get("generation"), response.etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
@@ -162,6 +172,22 @@ func writeCachedDashboard(w http.ResponseWriter, r *http.Request, response cache
 	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	_, _ = w.Write(body)
+}
+
+func ifNoneMatch(header, current string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || weakETagEqual(candidate, current) {
+			return true
+		}
+	}
+	return false
+}
+
+func weakETagEqual(left, right string) bool {
+	left = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(left), "W/"))
+	right = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(right), "W/"))
+	return left != "" && left == right
 }
 
 func acceptsGzip(header string) bool {

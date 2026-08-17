@@ -29,8 +29,12 @@ func LoadSince(path string, cutoff time.Time) ([]model.Observation, error) {
 		return nil, err
 	}
 	defer f.Close()
+	return loadSinceReader(f, cutoff)
+}
+
+func loadSinceReader(reader io.Reader, cutoff time.Time) ([]model.Observation, error) {
 	var out []model.Observation
-	s := bufio.NewScanner(f)
+	s := bufio.NewScanner(reader)
 	s.Buffer(make([]byte, 64*1024), 1024*1024)
 	for s.Scan() {
 		var o model.Observation
@@ -86,15 +90,40 @@ type Appender struct {
 }
 
 func (a *Appender) LoadSince(cutoff time.Time) ([]model.Observation, error) {
+	// Capture a complete append boundary under the mutex, then release writers
+	// while the immutable prefix is decoded. Later appends extend the inode past
+	// size; a concurrent atomic compaction may replace the path but cannot change
+	// this already-open file descriptor.
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	return LoadSince(a.Path, cutoff)
+	f, size, err := openSnapshot(a.Path)
+	a.mu.Unlock()
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return loadSinceReader(io.LimitReader(f, size), cutoff)
 }
 
 func (a *Appender) Append(observations []model.Observation) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return Append(a.Path, observations)
+}
+
+func openSnapshot(path string) (*os.File, int64, error) {
+	f, err := os.Open(path) // #nosec G304 -- the local operator selects the telemetry path.
+	if err != nil {
+		return nil, 0, err
+	}
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, 0, err
+	}
+	return f, info.Size(), nil
 }
 
 type CompactionResult struct {

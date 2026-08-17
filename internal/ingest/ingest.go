@@ -85,18 +85,18 @@ func NewReplayGuard() *ReplayGuard {
 	return &ReplayGuard{batches: make(map[string]time.Time)}
 }
 
-func (guard *ReplayGuard) claim(key string, now time.Time) bool {
+func (guard *ReplayGuard) claim(key string, now, expiresAt time.Time) bool {
 	guard.mu.Lock()
 	defer guard.mu.Unlock()
 	for batch, expiry := range guard.batches {
-		if !expiry.After(now) {
+		if now.After(expiry) {
 			delete(guard.batches, batch)
 		}
 	}
 	if _, exists := guard.batches[key]; exists {
 		return false
 	}
-	guard.batches[key] = now.Add(maxRequestClockSkew)
+	guard.batches[key] = expiresAt
 	return true
 }
 
@@ -136,7 +136,9 @@ func (receiver Receiver) ServeHTTP(w http.ResponseWriter, request *http.Request)
 		return
 	}
 	replayKey := request.Header.Get("X-StratumStats-Key-ID") + "\n" + envelope.BatchID
-	if receiver.Replays != nil && !receiver.Replays.claim(replayKey, now) {
+	authTimestamp, _ := strconv.ParseInt(request.Header.Get("X-StratumStats-Timestamp"), 10, 64)
+	replayExpiresAt := time.Unix(authTimestamp, 0).Add(maxRequestClockSkew)
+	if receiver.Replays != nil && !receiver.Replays.claim(replayKey, now, replayExpiresAt) {
 		http.Error(w, "duplicate batch", http.StatusConflict)
 		return
 	}

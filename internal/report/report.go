@@ -101,8 +101,13 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 
 func compute(pools []model.Pool, observations []model.Observation, now time.Time, combineVantages bool) model.Snapshot {
 	now = now.UTC()
-	observations = RetainObservations(observations, now)
-	observations = uniqueObservations(observations)
+	return computePrepared(pools, prepareObservations(observations, now), now, combineVantages)
+}
+
+// computePrepared aggregates an already retained and de-duplicated slice. The
+// dashboard prepares the shared 30-day data set once, then computes each
+// regional view from it without repeatedly copying every observation.
+func computePrepared(pools []model.Pool, observations []model.Observation, now time.Time, combineVantages bool) model.Snapshot {
 	completedRemoteRuns := completedScheduledRuns(observations)
 	acc := make(map[string]*accumulator)
 	poolsByID := make(map[string]model.Pool, len(pools))
@@ -319,7 +324,11 @@ func multiRegionFailedBlocks(excluded map[string]bool) map[string]bool {
 }
 
 func detectMultiRegionObserverFailures(pools []model.Pool, observations []model.Observation, now time.Time) (map[string]bool, map[string]bool) {
-	observations = uniqueObservations(RetainObservations(observations, now.UTC()))
+	now = now.UTC()
+	return detectMultiRegionObserverFailuresPrepared(pools, prepareObservations(observations, now))
+}
+
+func detectMultiRegionObserverFailuresPrepared(pools []model.Pool, observations []model.Observation) (map[string]bool, map[string]bool) {
 	completedRemoteRuns := completedScheduledRuns(observations)
 	acc := make(map[string]*accumulator)
 	poolsByID := make(map[string]model.Pool, len(pools))
@@ -374,42 +383,87 @@ func scoreableBlockObservation(observation model.Observation, completedRemoteRun
 // ComputeVantage filters telemetry to one coarse vantage while retaining
 // global coinbase evidence for endpoint safety classification and fee history.
 func ComputeVantage(pools []model.Pool, observations []model.Observation, vantage string, now time.Time) model.Snapshot {
-	return ComputeVantages(pools, observations, map[string]bool{vantage: true}, now)
+	return Prepare(pools, observations, now).ComputeVantage(vantage)
 }
 
 // ComputeVantages filters telemetry to a set of coarse vantages while keeping
 // the same global evidence behavior as a single-vantage report.
 func ComputeVantages(pools []model.Pool, observations []model.Observation, vantages map[string]bool, now time.Time) model.Snapshot {
-	filtered := make([]model.Observation, 0, len(observations))
-	failedBlocks, multiRegionExcludedCohorts := detectMultiRegionObserverFailures(pools, observations, now)
+	return Prepare(pools, observations, now).ComputeVantages(vantages)
+}
+
+// PreparedReports holds the immutable work shared by multiple regional
+// snapshots. It is especially useful to the dashboard, which publishes every
+// production vantage from the same observation generation.
+type PreparedReports struct {
+	pools                      []model.Pool
+	observations               []model.Observation
+	now                        time.Time
+	failedBlocks               map[string]bool
+	multiRegionExcludedCohorts map[string]bool
+	global                     model.Snapshot
+	globalReports              map[string]model.PoolReport
+}
+
+// Prepare applies retention and observation-ID de-duplication once, computes
+// global evidence once, and records the multi-region failure set once.
+func Prepare(pools []model.Pool, observations []model.Observation, now time.Time) *PreparedReports {
+	now = now.UTC()
+	observations = prepareObservations(observations, now)
+	global := computePrepared(pools, observations, now, false)
+	failedBlocks, multiRegionExcludedCohorts := detectMultiRegionObserverFailuresPrepared(pools, observations)
+	globalReports := make(map[string]model.PoolReport, len(global.Reports))
+	for _, poolReport := range global.Reports {
+		globalReports[reportKey(poolReport)] = poolReport
+	}
+	return &PreparedReports{
+		pools: pools, observations: observations, now: now,
+		failedBlocks: failedBlocks, multiRegionExcludedCohorts: multiRegionExcludedCohorts,
+		global: global, globalReports: globalReports,
+	}
+}
+
+// Global returns the all-vantage snapshot used as the source of payout and fee
+// evidence in regional views.
+func (prepared *PreparedReports) Global() model.Snapshot {
+	return prepared.global
+}
+
+// Observations returns the retained, de-duplicated input owned by this prepared
+// generation. Callers must treat the returned slice as read-only.
+func (prepared *PreparedReports) Observations() []model.Observation {
+	return prepared.observations
+}
+
+func (prepared *PreparedReports) ComputeVantage(vantage string) model.Snapshot {
+	return prepared.ComputeVantages(map[string]bool{vantage: true})
+}
+
+func (prepared *PreparedReports) ComputeVantages(vantages map[string]bool) model.Snapshot {
+	var filtered []model.Observation
 	selectedVantages := 0
 	for _, selected := range vantages {
 		if selected {
 			selectedVantages++
 		}
 	}
-	for _, observation := range observations {
-		if vantages[observation.Vantage] && !failedBlocks[observation.BlockID] {
+	for _, observation := range prepared.observations {
+		if vantages[observation.Vantage] && !prepared.failedBlocks[observation.BlockID] {
 			filtered = append(filtered, observation)
 		}
 	}
-	regional := compute(pools, filtered, now, selectedVantages > 1)
+	regional := computePrepared(prepared.pools, filtered, prepared.now, selectedVantages > 1)
 	// Multi-region failures are removed before the regional computation so they
 	// cannot affect scoring. Restore their selected cohort count to the payload
 	// after computation; single-region exclusions remain counted by compute.
-	for key := range multiRegionExcludedCohorts {
+	for key := range prepared.multiRegionExcludedCohorts {
 		vantage, blockID := observationKeyParts(key)
-		if vantages[vantage] && failedBlocks[blockID] {
+		if vantages[vantage] && prepared.failedBlocks[blockID] {
 			regional.ExcludedRegionalCohorts++
 		}
 	}
-	global := Compute(pools, observations, now)
-	globalReports := make(map[string]model.PoolReport, len(global.Reports))
-	for _, poolReport := range global.Reports {
-		globalReports[reportKey(poolReport)] = poolReport
-	}
 	for index := range regional.Reports {
-		evidence := globalReports[reportKey(regional.Reports[index])]
+		evidence := prepared.globalReports[reportKey(regional.Reports[index])]
 		regional.Reports[index].CoinbaseSamples = evidence.CoinbaseSamples
 		regional.Reports[index].WorkerAddressObservedPct = evidence.WorkerAddressObservedPct
 		regional.Reports[index].WorkerAddressStatus = evidence.WorkerAddressStatus
@@ -426,7 +480,7 @@ func ComputeVantages(pools []model.Pool, observations []model.Observation, vanta
 		regional.Reports[index].LatestPayoutDestinationsTruncated = evidence.LatestPayoutDestinationsTruncated
 		regional.Reports[index].LatestPayoutOmittedSats = evidence.LatestPayoutOmittedSats
 		regional.Reports[index].PoolFeeHistory = evidence.PoolFeeHistory
-		applyOverallScore(&regional.Reports[index], now)
+		applyOverallScore(&regional.Reports[index], prepared.now)
 	}
 	regional.Disclosure = append(regional.Disclosure,
 		"Regional views contain scheduled samples only; availability is not continuous uptime.",
@@ -448,6 +502,10 @@ func uniqueObservations(observations []model.Observation) []model.Observation {
 		unique = append(unique, observation)
 	}
 	return unique
+}
+
+func prepareObservations(observations []model.Observation, now time.Time) []model.Observation {
+	return uniqueObservations(RetainObservations(observations, now))
 }
 
 // RetainObservations applies the hard report horizon before observations enter

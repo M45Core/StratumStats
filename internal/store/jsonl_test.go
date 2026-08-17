@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,6 +135,29 @@ func TestAppenderSerializesConcurrentBatches(t *testing.T) {
 	}
 	if len(got) != batches {
 		t.Fatalf("records=%d, want %d", len(got), batches)
+	}
+}
+
+func TestAppenderSnapshotStopsAtCapturedAppendBoundary(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "observations.jsonl")
+	first := model.Observation{Version: model.ObservationVersion, ObservationID: "first"}
+	if err := Append(path, []model.Observation{first}); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, size, err := openSnapshot(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer snapshot.Close()
+	if err := Append(path, []model.Observation{{Version: model.ObservationVersion, ObservationID: "later"}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := loadSinceReader(io.LimitReader(snapshot, size), time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ObservationID != first.ObservationID {
+		t.Fatalf("snapshot observations=%+v, want only the captured prefix", got)
 	}
 }
 

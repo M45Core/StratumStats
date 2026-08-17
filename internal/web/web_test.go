@@ -71,6 +71,13 @@ func TestDashboardShellIsStaticAndDataIsCached(t *testing.T) {
 	if notModified.Code != http.StatusNotModified || notModified.Body.Len() != 0 {
 		t.Fatalf("conditional status=%d body=%q", notModified.Code, notModified.Body.String())
 	}
+	listedConditional := httptest.NewRequest(http.MethodGet, "/dashboard-data", nil)
+	listedConditional.Header.Set("If-None-Match", `"unrelated", `+strings.TrimPrefix(data.Header().Get("ETag"), "W/"))
+	listedNotModified := httptest.NewRecorder()
+	h.ServeHTTP(listedNotModified, listedConditional)
+	if listedNotModified.Code != http.StatusNotModified || listedNotModified.Body.Len() != 0 {
+		t.Fatalf("listed conditional status=%d body=%q", listedNotModified.Code, listedNotModified.Body.String())
+	}
 	queryConditional := httptest.NewRequest(http.MethodGet, "/dashboard-data?generation="+data.Header().Get("ETag"), nil)
 	queryNotModified := httptest.NewRecorder()
 	h.ServeHTTP(queryNotModified, queryConditional)

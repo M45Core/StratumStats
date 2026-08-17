@@ -313,6 +313,31 @@ func TestReceiverRejectsReplayedBatchWithoutAppendingAgain(t *testing.T) {
 	}
 }
 
+func TestReceiverRetainsReplayClaimForFutureDatedAuthenticationWindow(t *testing.T) {
+	base := time.Unix(1_800_000_000, 0).UTC()
+	serverNow := base
+	authenticatedAt := base.Add(4 * time.Minute)
+	appends := 0
+	receiver := Receiver{
+		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
+		Now:     func() time.Time { return serverNow },
+		Replays: NewReplayGuard(),
+		Append:  func([]model.Observation) error { appends++; return nil },
+	}
+	envelope := testEnvelope(base)
+	first := httptest.NewRecorder()
+	receiver.ServeHTTP(first, signedRequest(t, envelope, []byte("secret"), authenticatedAt))
+
+	// The signature is still valid here. A replay claim based only on the first
+	// server receipt time would already have expired and permit a second append.
+	serverNow = base.Add(5*time.Minute + time.Second)
+	second := httptest.NewRecorder()
+	receiver.ServeHTTP(second, signedRequest(t, envelope, []byte("secret"), authenticatedAt))
+	if first.Code != http.StatusAccepted || second.Code != http.StatusConflict || appends != 1 {
+		t.Fatalf("first=%d second=%d appends=%d", first.Code, second.Code, appends)
+	}
+}
+
 func TestReceiverRejectsWholeBatchWhenOneObservationIsInvalid(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	envelope := testEnvelope(now)

@@ -70,7 +70,7 @@ func TestDashboardDefaultsUseAvailableMeasurements(t *testing.T) {
 func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 	now := time.Now().UTC()
 	started := now.Add(-time.Minute)
-	observations := []model.Observation{{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProtocol, ObservedAt: now.Add(-30 * time.Second)}, {Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started, RunStatus: "partial", ConfigRevision: "sha256:test", DroppedObservations: 2}}
+	observations := []model.Observation{{Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProtocol, ObservedAt: now.Add(-30 * time.Second)}, {Version: model.ObservationVersion, Source: ingest.RemoteSource, Vantage: "us-west", RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started, RunStatus: "ok", ConfigRevision: "sha256:test", DroppedObservations: 2}}
 	statuses := buildVantageStatuses(observations, now, "sha256:current").Vantages
 	var west vantageStatus
 	for _, status := range statuses {

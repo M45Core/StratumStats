@@ -36,11 +36,11 @@ func productionVantageConfiguration() (map[string]string, []string) {
 }
 
 type snapshotCache struct {
-	mu           sync.Mutex
-	pools        []model.Pool
-	load         func() ([]model.Observation, error)
-	observations []model.Observation
-	snapshots    map[string]model.Snapshot
+	mu        sync.Mutex
+	pools     []model.Pool
+	load      func() ([]model.Observation, error)
+	prepared  *report.PreparedReports
+	snapshots map[string]model.Snapshot
 }
 
 func (cache *snapshotCache) snapshot(vantage string, now time.Time) (model.Snapshot, error) {
@@ -54,9 +54,9 @@ func (cache *snapshotCache) snapshot(vantage string, now time.Time) (model.Snaps
 	}
 	var snapshot model.Snapshot
 	if vantage == "" {
-		snapshot = report.Compute(cache.pools, cache.observations, now)
+		snapshot = cache.prepared.Global()
 	} else {
-		snapshot = report.ComputeVantage(cache.pools, cache.observations, vantage, now)
+		snapshot = cache.prepared.ComputeVantage(vantage)
 	}
 	cache.snapshots[vantage] = snapshot
 	return snapshot, nil
@@ -68,27 +68,26 @@ func (cache *snapshotCache) records(now time.Time) ([]model.Observation, error) 
 	if err := cache.refresh(now); err != nil {
 		return nil, err
 	}
-	return append([]model.Observation(nil), cache.observations...), nil
+	return cache.prepared.Observations(), nil
 }
 
 func (cache *snapshotCache) refresh(now time.Time) error {
-	if cache.snapshots != nil {
+	if cache.prepared != nil {
 		return nil
 	}
 	observations, err := cache.load()
 	if err != nil {
 		return err
 	}
-	observations = report.RetainObservations(observations, now.UTC())
-	cache.observations = observations
+	cache.prepared = report.Prepare(cache.pools, observations, now.UTC())
 	cache.snapshots = make(map[string]model.Snapshot)
 	return nil
 }
 
 func (cache *snapshotCache) invalidate() {
 	cache.mu.Lock()
+	cache.prepared = nil
 	cache.snapshots = nil
-	cache.observations = nil
 	cache.mu.Unlock()
 }
 
@@ -151,7 +150,7 @@ func buildVantageStatuses(observations []model.Observation, now time.Time, curre
 			blocks[observation.Vantage][observation.BlockID] = true
 		}
 		if observation.RecordType == model.RecordTypeProbeRun {
-			if observation.RunStatus == "ok" {
+			if observation.RunStatus == "ok" && observation.DroppedObservations == 0 {
 				if status.LastSuccessfulRunAt == nil || observation.ObservedAt.After(*status.LastSuccessfulRunAt) {
 					runAt := observation.ObservedAt.UTC()
 					status.LastSuccessfulRunAt = &runAt
