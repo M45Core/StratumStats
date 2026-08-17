@@ -6,7 +6,7 @@
   const transportStorageKey = "stratumstats.selectedTransport";
   const groups = [
     ["free_pools", "free-pools-list", "free-solo-pools", "Free solo", "Overall score: highest first"],
-    ["normal_pools", "normal-pools-list", "non-free-solo-pools", "Paid solo", "Overall score: highest first"],
+    ["normal_pools", "normal-pools-list", "non-free-solo-pools", "Solo", "Overall score: highest first"],
     ["pplns_pools", "pplns-pools-list", "pplns-share-pools", "PPLNS shared", "Overall score: highest first"],
     ["other_pools", "other-pools-list", "other-non-solo-pools", "Other shared", "Overall score: highest first"],
     ["no_recent_data_pools", "no-recent-data-pools-list", "no-recent-data-pools", "No recent data", "Alphabetical"],
@@ -17,7 +17,7 @@
   let refreshing = false;
   let currentETag = "";
   let renderedVantage = "";
-  let renderedBlockHeight = null;
+  let renderedBlockID = "";
 
   const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
   const metric = (value) => value == null ? "" : Number(value);
@@ -104,7 +104,7 @@
     const destinations = pool.latest_payout_destinations || [];
     if (!destinations.length) {
       if (pool.is_solo && pool.latest_coinbase_total_sats) return '<p class="details-empty">The test miner address is private. No other payment was recorded.</p>';
-      return `<p class="details-empty">${pool.is_solo ? "Payment" : "Block payment"} details will appear after a new block is checked.${pool.is_solo ? "" : " These are not later payments to miners."}</p>`;
+      return `<p class="details-empty">No payment details were collected for this endpoint.${pool.is_solo ? "" : " These would describe the block itself, not later payments to miners."}</p>`;
     }
     const rows = destinations.map((destination) => {
       const destinationCode = destination.address
@@ -167,12 +167,12 @@
     renderControls(data);
     document.querySelector("[data-demo-notice]").hidden = !data.demo;
     const snapshot = data.snapshot;
-    const blockHeight = Number(snapshot.latest_block_height) || null;
-    const heightChanged = renderedVantage === data.selected_vantage && renderedBlockHeight !== null && blockHeight !== null && blockHeight !== renderedBlockHeight;
+    const blockID = String(snapshot.latest_block_id || "");
+    const blockChanged = renderedVantage === data.selected_vantage && renderedBlockID && blockID && blockID !== renderedBlockID;
     const update = data.data_updated_at ? `Region updated ${timeHTML(data.data_updated_at)}` : `No regional data in the last ${snapshot.retention_window_days} days`;
-    const height = blockHeight ? `<span class="block-height-pill${heightChanged ? " block-height-changed" : ""}" data-block-height title="Latest solved Bitcoin block observed in this region">Block <strong>${blockHeight.toLocaleString()}</strong></span>` : "";
+    const block = blockID ? `<span class="block-height-pill${blockChanged ? " block-height-changed" : ""}" data-block-id title="Latest previous-block hash observed in this region">Block <strong>${escapeHTML(shortBlockID(blockID))}</strong></span>` : "";
     const configState = data.vantage_status && !data.vantage_status.config_current ? `<span class="config-pending-pill" title="This regional Scout has not reported the active pool configuration yet">Pool update pending</span>` : "";
-    const regionSummary = `<div class="region-summary" aria-label="Regional measurement status" data-region-summary><span class="region-update-pill">${update}</span>${configState}${height}</div>`;
+    const regionSummary = `<div class="region-summary" aria-label="Regional measurement status" data-region-summary><span class="region-update-pill">${update}</span>${configState}${block}</div>`;
     const jump = document.querySelector("[data-section-jump]");
     jump.innerHTML = '<span class="control-label">Jump to</span>';
     let visible = 0;
@@ -189,9 +189,9 @@
     }
     jump.hidden = visible === 0;
     expanded.forEach((id) => setDetailsState(document.querySelector(`.measurement-row[data-pool-id="${CSS.escape(id)}"]`), true));
-    if (heightChanged) document.querySelector("[data-live-status]").textContent = `New Bitcoin block ${blockHeight.toLocaleString()} observed in ${data.selected_label}.`;
+    if (blockChanged) document.querySelector("[data-live-status]").textContent = `New Bitcoin block ${shortBlockID(blockID)} observed in ${data.selected_label}.`;
     renderedVantage = data.selected_vantage;
-    renderedBlockHeight = blockHeight;
+    renderedBlockID = blockID;
     document.querySelector("[data-live-footnote]").innerHTML = `${escapeHTML(data.selected_label)}. Median, P95, history, and Stratum timings use the latest ${snapshot.latency_window_hours} hours. No observation older than ${snapshot.retention_window_days} days is used; availability uses eligible block observations within that window. Estimated mining loss combines missed eligible deliveries with median relative delay during available time; values below 0.1% display as &lt;0.1% and receive full mining-loss score. It is not measured revenue loss. Score weights: availability 40%, mining loss 25%, P95 20%, connection/setup responsiveness 10%, and observed fee stability 5% when available. A recent fee increase subtracts up to 15 additional points over 30 days; observed fees above 2.5% subtract up to 10 more points; an invalid TLS certificate subtracts 10 points. A solo pool whose worker wallet is not found receives a score of 0.`;
     updateRelativeTimes();
   }

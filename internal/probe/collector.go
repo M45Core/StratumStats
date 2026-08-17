@@ -11,7 +11,6 @@ import (
 	"net"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,11 +20,8 @@ import (
 const blockWindow = 15 * time.Second
 
 var (
-	errPoolRejected    = errors.New("pool rejected probe")
-	requestTimeout     = 30 * time.Second
-	pingInterval       = 60 * time.Second
-	pingResponseWindow = 10 * time.Second
-	sessionReadTimeout = 90 * time.Second
+	errPoolRejected = errors.New("pool rejected probe")
+	requestTimeout  = 30 * time.Second
 )
 
 type event struct {
@@ -301,92 +297,28 @@ func watchSession(ctx context.Context, poolID string, endpoint model.Endpoint, o
 		case <-ctx.Done():
 		}
 	}()
+	if err := conn.SetReadDeadline(time.Time{}); err != nil {
+		return err
+	}
 
 	var window notifyWindow
-	pingID := 1000
-	pingPending := false
-	pingDisabled := false
-	pingStarted := time.Time{}
-	pingDeadline := time.Time{}
-	nextPing := time.Now()
 
 	for {
-		now := time.Now()
-		if !pingDisabled && !pingPending && !nextPing.IsZero() && !now.Before(nextPing) {
-			pingID++
-			pingStarted = now
-			if err := request(w, pingID, model.ProtocolPing, []any{}); err != nil {
-				_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, model.ProtocolStatusError, "ping_write_failed")
-				return err
-			}
-			pingPending = true
-			pingDeadline = now.Add(pingResponseWindow)
-		}
-
-		readDeadline := now.Add(sessionReadTimeout)
-		if pingPending && pingDeadline.Before(readDeadline) {
-			readDeadline = pingDeadline
-		}
-		if !pingDisabled && !pingPending && !nextPing.IsZero() && nextPing.Before(readDeadline) {
-			readDeadline = nextPing
-		}
-		if err := conn.SetReadDeadline(readDeadline); err != nil {
-			return err
-		}
 		line, err := r.ReadBytes('\n')
 		receivedAt := time.Now()
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			now = time.Now()
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				if pingPending && !now.Before(pingDeadline) {
-					if publishErr := publishProtocol(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, model.ProtocolStatusTimeout, "ping_timeout"); publishErr != nil {
-						return publishErr
-					}
-					pingPending, pingDisabled = false, true
-					continue
-				}
-				if !pingDisabled && !pingPending && !nextPing.IsZero() && !now.Before(nextPing) {
-					continue
-				}
-			}
-			if pingPending {
-				_ = publishProtocol(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, model.ProtocolStatusError, "ping_connection_closed")
-			}
 			return err
 		}
 
 		var msg struct {
-			ID     any             `json:"id"`
-			Method string          `json:"method"`
-			Params []any           `json:"params"`
-			Result json.RawMessage `json:"result"`
-			Error  any             `json:"error"`
+			ID     any    `json:"id"`
+			Method string `json:"method"`
+			Params []any  `json:"params"`
 		}
 		if json.Unmarshal(line, &msg) != nil {
-			continue
-		}
-		if pingPending && responseID(msg.ID) == pingID {
-			status, category := model.ProtocolStatusOK, ""
-			if msg.Error != nil {
-				status, category = model.ProtocolStatusUnsupported, "ping_unsupported"
-				pingDisabled = true
-			} else {
-				var pong string
-				if json.Unmarshal(msg.Result, &pong) != nil || !strings.EqualFold(pong, "pong") {
-					status, category = model.ProtocolStatusError, "ping_invalid_response"
-					pingDisabled = true
-				}
-			}
-			if err := publishProtocolAt(ctx, out, poolID, endpoint, model.ProtocolPing, pingStarted, receivedAt, status, category); err != nil {
-				return err
-			}
-			pingPending = false
-			if !pingDisabled {
-				nextPing = time.Now().Add(pingInterval)
-			}
 			continue
 		}
 		if msg.Method == "client.get_version" {

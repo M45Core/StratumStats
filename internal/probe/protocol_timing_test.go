@@ -79,13 +79,7 @@ func TestWatchSessionMeasuresProtocolResponses(t *testing.T) {
 			return
 		}
 
-		id, err = readMethod(model.ProtocolPing)
-		if err != nil {
-			serverErr <- err
-			return
-		}
-		time.Sleep(6 * time.Millisecond)
-		serverErr <- respond(map[string]any{"id": id, "result": "pong", "error": nil})
+		serverErr <- nil
 	}()
 
 	address := listener.Addr().(*net.TCPAddr)
@@ -105,7 +99,7 @@ func TestWatchSessionMeasuresProtocolResponses(t *testing.T) {
 			records[e.protocol.ProtocolMethod] = *e.protocol
 		}
 	}
-	for _, method := range []string{model.ProtocolConnect, model.ProtocolSubscribe, model.ProtocolAuthorize, model.ProtocolPing} {
+	for _, method := range []string{model.ProtocolConnect, model.ProtocolSubscribe, model.ProtocolAuthorize} {
 		record, ok := records[method]
 		if !ok {
 			t.Errorf("missing %s timing", method)
@@ -160,7 +154,7 @@ func TestPublishProtocolUsesWireCompletionTime(t *testing.T) {
 	started := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
 	finished := started.Add(1234 * time.Microsecond)
 	out := make(chan event, 1)
-	if err := publishProtocolAt(context.Background(), out, "pool", model.Endpoint{Host: "pool.example", Port: 3333}, model.ProtocolPing, started, finished, model.ProtocolStatusOK, ""); err != nil {
+	if err := publishProtocolAt(context.Background(), out, "pool", model.Endpoint{Host: "pool.example", Port: 3333}, model.ProtocolConnect, started, finished, model.ProtocolStatusOK, ""); err != nil {
 		t.Fatal(err)
 	}
 	record := (<-out).protocol

@@ -18,42 +18,25 @@ import (
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
-func testPool() model.Pool {
-	return model.Pool{ID: "pool", Name: "Pool", Endpoints: []model.Endpoint{{Host: "pool.example", Port: 3333}}}
-}
-
-func TestRegionVantagesMatchesDeployedNodes(t *testing.T) {
-	want := map[string]string{
-		"iad": "us-east",
-		"fra": "europe",
-		"lax": "us-west",
-		"nrt": "japan",
-		"sin": "singapore",
+func testBlockEnvelope(now time.Time) (Envelope, []model.Pool) {
+	blockID := strings.Repeat("a", 64)
+	first, second := now.Add(-30*time.Second), now.Add(-30*time.Second+25_500*time.Microsecond)
+	connect := &model.ProtocolSample{ObservedAt: now.Add(-time.Minute), DurationMS: 12.5, ResponseStatus: model.ProtocolStatusOK}
+	pools := []model.Pool{{
+		ID: "pool", Name: "Pool",
+		Endpoints: []model.Endpoint{{Host: "one.example", Port: 3333}, {Host: "two.example", Port: 443, TLS: true}},
+	}}
+	sample := &model.BlockSample{
+		BlockID: blockID,
+		EndpointSamples: []model.ForwardedEndpointSample{
+			{PoolID: "pool", Endpoint: "one.example:3333", ReceivedAt: &first, Setup: &model.EndpointSetup{Connect: connect}},
+			{PoolID: "pool", Endpoint: "two.example:443", TLS: true, ReceivedAt: &second},
+		},
 	}
-	if len(RegionVantages) != len(want) {
-		t.Fatalf("RegionVantages=%v", RegionVantages)
-	}
-	for region, vantage := range want {
-		if RegionVantages[region] != vantage {
-			t.Errorf("RegionVantages[%q]=%q, want %q", region, RegionVantages[region], vantage)
-		}
-	}
-}
-
-func testEnvelope(now time.Time) Envelope {
-	duration := 12.5
 	return Envelope{
-		SchemaVersion: EnvelopeVersion, BatchID: "batch-1", RunID: "run-1",
-		AgentVersion: "0.1.0", ConfigRevision: "sha256:" + strings.Repeat("a", 64),
-		Region: "lax", Vantage: "us-west", MachineID: "machine-1",
-		StartedAt: now.Add(-time.Minute), SentAt: now,
-		Observations: []model.Observation{{
-			Version: model.ObservationVersion, ObservationID: "run-1/1", RunID: "run-1",
-			RecordType: model.RecordTypeProtocol, ObservedAt: now.Add(-30 * time.Second),
-			PoolID: "pool", Endpoint: "pool.example:3333", ProtocolMethod: model.ProtocolConnect,
-			DurationMS: &duration, ResponseStatus: model.ProtocolStatusOK,
-		}},
-	}
+		SchemaVersion: BlockEnvelopeVersion, BatchID: "lax-" + blockID,
+		ConfigRevision: "sha256:" + strings.Repeat("a", 64), Region: "lax", Sample: sample,
+	}, pools
 }
 
 func signedRequest(t *testing.T, envelope Envelope, secret []byte, now time.Time) *http.Request {
@@ -83,292 +66,212 @@ func signedBodyRequest(body, secret []byte, now time.Time) *http.Request {
 	return request
 }
 
-func TestReceiverRejectsOversizedCompressedRequest(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0).UTC()
-	receiver := Receiver{
-		Keys:   map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func([]model.Observation) error { return nil },
-	}
-	response := httptest.NewRecorder()
-	receiver.ServeHTTP(response, signedBodyRequest(make([]byte, maxCompressedBytes+1), []byte("secret"), now))
-	if response.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+func testReceiver(now time.Time, pools []model.Pool, appended *[]model.Observation) Receiver {
+	return Receiver{
+		Pools: pools, Keys: map[string][]byte{"current": []byte("secret")},
+		Now: func() time.Time { return now },
+		Append: func(observations []model.Observation) error {
+			*appended = append(*appended, observations...)
+			return nil
+		},
 	}
 }
 
-func TestReceiverRejectsOversizedDecompressedRequest(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0).UTC()
-	var body bytes.Buffer
-	compressed := gzip.NewWriter(&body)
-	if _, err := compressed.Write(make([]byte, maxDecompressedBytes+1)); err != nil {
-		t.Fatal(err)
+func TestRegionVantagesMatchesDeployedNodes(t *testing.T) {
+	want := map[string]string{
+		"iad": "us-east", "fra": "europe", "lax": "us-west", "nrt": "japan", "sin": "singapore",
 	}
-	if err := compressed.Close(); err != nil {
-		t.Fatal(err)
+	if len(RegionVantages) != len(want) {
+		t.Fatalf("RegionVantages=%v", RegionVantages)
 	}
-	receiver := Receiver{
-		Keys:   map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func([]model.Observation) error { return nil },
-	}
-	response := httptest.NewRecorder()
-	receiver.ServeHTTP(response, signedBodyRequest(body.Bytes(), []byte("secret"), now))
-	if response.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
-	}
-}
-
-func TestReceiverAcceptsAuthenticatedBatchAndSetsProvenance(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0).UTC()
-	var appended []model.Observation
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
-	}
-	response := httptest.NewRecorder()
-	receiver.ServeHTTP(response, signedRequest(t, testEnvelope(now), []byte("secret"), now))
-	if response.Code != http.StatusAccepted {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
-	}
-	if len(appended) != 1 {
-		t.Fatalf("appended=%d", len(appended))
-	}
-	got := appended[0]
-	if got.Source != RemoteSource || got.Vantage != "us-west" || got.MachineID != "machine-1" ||
-		got.AgentVersion != "0.1.0" || got.ConfigRevision == "" {
-		t.Fatalf("provenance=%+v", got)
-	}
-}
-
-func BenchmarkDecodeEnvelope(b *testing.B) {
-	now := time.Date(2026, time.August, 15, 12, 0, 0, 0, time.UTC)
-	value := testEnvelope(now)
-	value.Observations = make([]model.Observation, 100)
-	for index := range value.Observations {
-		duration := 12.5 + float64(index)
-		value.Observations[index] = model.Observation{
-			Version: model.ObservationVersion, ObservationID: fmt.Sprintf("run-1/observation-%d", index),
-			RunID: value.RunID, ObservedAt: now, PoolID: "pool", Endpoint: "pool.example:3333",
-			RecordType: model.RecordTypeProtocol, ProtocolMethod: model.ProtocolPing,
-			ResponseStatus: model.ProtocolStatusOK, DurationMS: &duration,
-		}
-	}
-	var compressed bytes.Buffer
-	writer := gzip.NewWriter(&compressed)
-	if err := json.NewEncoder(writer).Encode(value); err != nil {
-		b.Fatal(err)
-	}
-	if err := writer.Close(); err != nil {
-		b.Fatal(err)
-	}
-	raw := compressed.Bytes()
-	b.ReportAllocs()
-	b.SetBytes(int64(len(raw)))
-	b.ResetTimer()
-	for b.Loop() {
-		if _, _, err := decodeEnvelope(raw); err != nil {
-			b.Fatal(err)
+	for region, vantage := range want {
+		if RegionVantages[region] != vantage {
+			t.Errorf("RegionVantages[%q]=%q, want %q", region, RegionVantages[region], vantage)
 		}
 	}
 }
 
-func TestReceiverAcceptsContinuousCohortOpenLongerThanFifteenMinutes(t *testing.T) {
+func TestReceiverAcceptsOneAtomicBlockSample(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
-	envelope := testEnvelope(now)
-	// Continuous Scouts keep a cohort open until the next Bitcoin block, so
-	// its start time cannot be bounded by the one-shot RUN_FOR limit.
-	envelope.StartedAt = now.Add(-24 * time.Hour)
+	envelope, pools := testBlockEnvelope(now)
 	var appended []model.Observation
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
-	}
+	receiver := testReceiver(now, pools, &appended)
 	response := httptest.NewRecorder()
 	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
 	if response.Code != http.StatusAccepted || len(appended) != 1 {
-		t.Fatalf("status=%d body=%s observations=%d", response.Code, response.Body.String(), len(appended))
+		t.Fatalf("status=%d body=%s appended=%+v", response.Code, response.Body.String(), appended)
+	}
+	got := appended[0]
+	if got.RecordType != model.RecordTypeBlockSample || got.Source != RemoteSource || got.Vantage != "us-west" ||
+		got.RunID != envelope.BatchID || got.BlockID != envelope.Sample.BlockID || got.BlockHeight != 0 ||
+		len(got.EndpointSamples) != 2 || len(got.EligibleEndpoints) != 2 {
+		t.Fatalf("block sample=%+v", got)
+	}
+	if got.EndpointSamples[0].Setup == nil || got.EndpointSamples[0].Setup.Connect == nil || got.EndpointSamples[0].Setup.Subscribe != nil {
+		t.Fatalf("optional setup=%+v", got.EndpointSamples[0].Setup)
+	}
+	if got.EndpointSamples[0].OffsetMS == nil || *got.EndpointSamples[0].OffsetMS != 0 ||
+		got.EndpointSamples[1].OffsetMS == nil || *got.EndpointSamples[1].OffsetMS != 25.5 {
+		t.Fatalf("central offsets=%+v", got.EndpointSamples)
+	}
+	stored, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, transient := range []string{`"received_at"`, `"job"`, `"coinbase1"`, `"machine_id"`, `"agent_version"`} {
+		if bytes.Contains(stored, []byte(transient)) {
+			t.Fatalf("transient field %s reached storage: %s", transient, stored)
+		}
 	}
 }
 
-func TestReceiverAppendsProbeRunMarkerAfterMeasurements(t *testing.T) {
+func TestReceiverAcceptsSingleArrivalBlockSample(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
-	envelope := testEnvelope(now)
-	started := envelope.StartedAt
-	summary := model.Observation{
-		Version: model.ObservationVersion, ObservationID: "run-1/summary", RunID: "run-1",
-		RecordType: model.RecordTypeProbeRun, ObservedAt: now, RunStartedAt: &started,
-		RunStatus: "ok", ConfiguredEndpoints: 1, SuccessfulSessions: 1,
-	}
-	envelope.Observations = append([]model.Observation{summary}, envelope.Observations...)
+	envelope, pools := testBlockEnvelope(now)
+	envelope.Sample.EndpointSamples = envelope.Sample.EndpointSamples[:1]
 	var appended []model.Observation
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
-	}
+	receiver := testReceiver(now, pools, &appended)
 	response := httptest.NewRecorder()
 	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
-	if response.Code != http.StatusAccepted {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
-	}
-	if len(appended) != 2 || appended[0].RecordType != model.RecordTypeProtocol || appended[1].RecordType != model.RecordTypeProbeRun {
-		t.Fatalf("append order=%+v, want measurements before run marker", appended)
+	if response.Code != http.StatusAccepted || len(appended) != 1 ||
+		len(appended[0].EndpointSamples) != 1 || len(appended[0].EligibleEndpoints) != 2 {
+		t.Fatalf("status=%d body=%s appended=%+v", response.Code, response.Body.String(), appended)
 	}
 }
 
-func TestReceiverAcceptsGermanyProbe(t *testing.T) {
+func TestReceiverUsesFilteredRosterForAtomicBlockSample(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
+	envelope, pools := testBlockEnvelope(now)
+	envelope.FilterContinents = true
+	pools[0].Endpoints[0].Continent = "north-america"
+	pools[0].Endpoints = append(pools[0].Endpoints, model.Endpoint{Host: "europe.example", Port: 3333, Continent: "europe"})
 	var appended []model.Observation
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
-	}
-	envelope := testEnvelope(now)
-	envelope.Region, envelope.Vantage = "fra", "europe"
+	receiver := testReceiver(now, pools, &appended)
 	response := httptest.NewRecorder()
 	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
-	if response.Code != http.StatusAccepted || len(appended) != 1 || appended[0].Vantage != "europe" {
-		t.Fatalf("status=%d observations=%+v", response.Code, appended)
+	if response.Code != http.StatusAccepted || len(appended) != 1 || len(appended[0].EligibleEndpoints) != 2 {
+		t.Fatalf("status=%d body=%s appended=%+v", response.Code, response.Body.String(), appended)
+	}
+	for _, endpoint := range appended[0].EligibleEndpoints {
+		if endpoint.Endpoint == "europe.example:3333" {
+			t.Fatalf("filtered endpoint reached roster: %+v", appended[0].EligibleEndpoints)
+		}
 	}
 }
 
-func TestReceiverAcceptsIADProbe(t *testing.T) {
+func TestReceiverRejectsUnknownOrEmptyEndpointSamples(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
-	var appended []model.Observation
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
-	}
-	envelope := testEnvelope(now)
-	envelope.Region, envelope.Vantage = "iad", "us-east"
-	response := httptest.NewRecorder()
-	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
-	if response.Code != http.StatusAccepted || len(appended) != 1 || appended[0].Vantage != "us-east" {
-		t.Fatalf("status=%d observations=%+v", response.Code, appended)
-	}
-}
-
-func TestReceiverAcceptsAsiaProbes(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0).UTC()
-	for _, test := range []struct {
-		region  string
-		vantage string
-	}{
-		{region: "nrt", vantage: "japan"},
-		{region: "sin", vantage: "singapore"},
+	for name, mutate := range map[string]func(*Envelope){
+		"unknown": func(envelope *Envelope) {
+			envelope.Sample.EndpointSamples = append(envelope.Sample.EndpointSamples, model.ForwardedEndpointSample{PoolID: "pool", Endpoint: "missing.example:3333"})
+		},
+		"empty": func(envelope *Envelope) {
+			envelope.Sample.EndpointSamples[0].ReceivedAt = nil
+			envelope.Sample.EndpointSamples[0].Setup = nil
+		},
 	} {
-		t.Run(test.region, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
+			envelope, pools := testBlockEnvelope(now)
+			mutate(&envelope)
 			var appended []model.Observation
-			receiver := Receiver{
-				Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-				Now:    func() time.Time { return now },
-				Append: func(observations []model.Observation) error { appended = append(appended, observations...); return nil },
-			}
-			envelope := testEnvelope(now)
-			envelope.Region, envelope.Vantage = test.region, test.vantage
+			receiver := testReceiver(now, pools, &appended)
 			response := httptest.NewRecorder()
 			receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
-			if response.Code != http.StatusAccepted || len(appended) != 1 || appended[0].Vantage != test.vantage {
-				t.Fatalf("status=%d observations=%+v", response.Code, appended)
+			if response.Code != http.StatusUnprocessableEntity || len(appended) != 0 {
+				t.Fatalf("status=%d body=%s appended=%+v", response.Code, response.Body.String(), appended)
 			}
 		})
 	}
 }
 
-func TestReceiverRejectsBadSignatureWithoutAppend(t *testing.T) {
+func TestReceiverRejectsLegacyEnvelopeFields(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
-	called := false
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func([]model.Observation) error { called = true; return nil },
+	envelope, pools := testBlockEnvelope(now)
+	raw, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
 	}
+	raw = bytes.Replace(raw, []byte(`"sample":`), []byte(`"run_id":"legacy","sample":`), 1)
+	var body bytes.Buffer
+	compressed := gzip.NewWriter(&body)
+	_, _ = compressed.Write(raw)
+	if err := compressed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var appended []model.Observation
+	receiver := testReceiver(now, pools, &appended)
 	response := httptest.NewRecorder()
-	receiver.ServeHTTP(response, signedRequest(t, testEnvelope(now), []byte("wrong"), now))
-	if response.Code != http.StatusUnauthorized || called {
-		t.Fatalf("status=%d append=%t", response.Code, called)
+	receiver.ServeHTTP(response, signedBodyRequest(body.Bytes(), []byte("secret"), now))
+	if response.Code != http.StatusBadRequest || len(appended) != 0 {
+		t.Fatalf("status=%d body=%s appended=%+v", response.Code, response.Body.String(), appended)
 	}
 }
 
-func TestReceiverRejectsReplayedBatchWithoutAppendingAgain(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0).UTC()
-	appends := 0
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:     func() time.Time { return now },
-		Replays: NewReplayGuard(),
-		Append:  func([]model.Observation) error { appends++; return nil },
-	}
-	first := httptest.NewRecorder()
-	receiver.ServeHTTP(first, signedRequest(t, testEnvelope(now), []byte("secret"), now))
-	second := httptest.NewRecorder()
-	receiver.ServeHTTP(second, signedRequest(t, testEnvelope(now), []byte("secret"), now))
-	if first.Code != http.StatusAccepted || second.Code != http.StatusConflict || appends != 1 {
-		t.Fatalf("first=%d second=%d appends=%d", first.Code, second.Code, appends)
-	}
-}
-
-func TestReceiverRetainsReplayClaimForFutureDatedAuthenticationWindow(t *testing.T) {
-	base := time.Unix(1_800_000_000, 0).UTC()
-	serverNow := base
-	authenticatedAt := base.Add(4 * time.Minute)
-	appends := 0
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:     func() time.Time { return serverNow },
-		Replays: NewReplayGuard(),
-		Append:  func([]model.Observation) error { appends++; return nil },
-	}
-	envelope := testEnvelope(base)
-	first := httptest.NewRecorder()
-	receiver.ServeHTTP(first, signedRequest(t, envelope, []byte("secret"), authenticatedAt))
-
-	// The signature is still valid here. A replay claim based only on the first
-	// server receipt time would already have expired and permit a second append.
-	serverNow = base.Add(5*time.Minute + time.Second)
-	second := httptest.NewRecorder()
-	receiver.ServeHTTP(second, signedRequest(t, envelope, []byte("secret"), authenticatedAt))
-	if first.Code != http.StatusAccepted || second.Code != http.StatusConflict || appends != 1 {
-		t.Fatalf("first=%d second=%d appends=%d", first.Code, second.Code, appends)
-	}
-}
-
-func TestReceiverRejectsWholeBatchWhenOneObservationIsInvalid(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0).UTC()
-	envelope := testEnvelope(now)
-	invalid := envelope.Observations[0]
-	invalid.ObservationID = "run-1/2"
-	invalid.PoolID = "unknown"
-	envelope.Observations = append(envelope.Observations, invalid)
-	called := false
-	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
-		Append: func([]model.Observation) error { called = true; return nil },
-	}
-	response := httptest.NewRecorder()
-	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
-	if response.Code != http.StatusUnprocessableEntity || called {
-		t.Fatalf("status=%d append=%t body=%s", response.Code, called, response.Body.String())
-	}
-}
-
-func TestReceiverRejectsStaleAuthentication(t *testing.T) {
+func TestReceiverRejectsOversizedRequests(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	receiver := Receiver{
-		Pools: []model.Pool{testPool()}, Keys: map[string][]byte{"current": []byte("secret")},
-		Now:    func() time.Time { return now },
+		Keys: map[string][]byte{"current": []byte("secret")}, Now: func() time.Time { return now },
 		Append: func([]model.Observation) error { return nil },
 	}
-	response := httptest.NewRecorder()
-	receiver.ServeHTTP(response, signedRequest(t, testEnvelope(now), []byte("secret"), now.Add(-6*time.Minute)))
-	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	t.Run("compressed", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		receiver.ServeHTTP(response, signedBodyRequest(make([]byte, maxCompressedBytes+1), []byte("secret"), now))
+		if response.Code != http.StatusRequestEntityTooLarge {
+			t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		}
+	})
+	t.Run("decompressed", func(t *testing.T) {
+		var body bytes.Buffer
+		compressed := gzip.NewWriter(&body)
+		_, _ = compressed.Write(make([]byte, maxDecompressedBytes+1))
+		if err := compressed.Close(); err != nil {
+			t.Fatal(err)
+		}
+		response := httptest.NewRecorder()
+		receiver.ServeHTTP(response, signedBodyRequest(body.Bytes(), []byte("secret"), now))
+		if response.Code != http.StatusRequestEntityTooLarge {
+			t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		}
+	})
+}
+
+func TestReceiverRejectsBadOrStaleAuthentication(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	envelope, pools := testBlockEnvelope(now)
+	for _, test := range []struct {
+		name     string
+		secret   []byte
+		signedAt time.Time
+	}{
+		{name: "bad-signature", secret: []byte("wrong"), signedAt: now},
+		{name: "stale", secret: []byte("secret"), signedAt: now.Add(-6 * time.Minute)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var appended []model.Observation
+			receiver := testReceiver(now, pools, &appended)
+			response := httptest.NewRecorder()
+			receiver.ServeHTTP(response, signedRequest(t, envelope, test.secret, test.signedAt))
+			if response.Code != http.StatusUnauthorized || len(appended) != 0 {
+				t.Fatalf("status=%d appended=%+v", response.Code, appended)
+			}
+		})
+	}
+}
+
+func TestReceiverRejectsReplayedBlock(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	envelope, pools := testBlockEnvelope(now)
+	appends := 0
+	receiver := Receiver{
+		Pools: pools, Keys: map[string][]byte{"current": []byte("secret")}, Now: func() time.Time { return now },
+		Replays: NewReplayGuard(), Append: func([]model.Observation) error { appends++; return nil },
+	}
+	first := httptest.NewRecorder()
+	receiver.ServeHTTP(first, signedRequest(t, envelope, []byte("secret"), now))
+	second := httptest.NewRecorder()
+	receiver.ServeHTTP(second, signedRequest(t, envelope, []byte("secret"), now))
+	if first.Code != http.StatusAccepted || second.Code != http.StatusConflict || appends != 1 {
+		t.Fatalf("first=%d second=%d appends=%d", first.Code, second.Code, appends)
 	}
 }
 
@@ -385,57 +288,35 @@ func TestBuildProbeConfigIncludesConfiguredPoolsAndIsStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.ConfigRevision != second.ConfigRevision || len(first.Pools) != 1 || first.Pools[0].ID != "pool" {
+	if first.ConfigRevision != second.ConfigRevision || len(first.Pools) != 1 || first.Pools[0].ID != "pool" || first.Pools[0].Endpoints[0].Continent != "europe" {
 		t.Fatalf("config=%+v second revision=%q", first, second.ConfigRevision)
-	}
-	if got := first.Pools[0].Endpoints[0].Continent; got != "europe" {
-		t.Fatalf("continent = %q, want europe", got)
 	}
 }
 
-func TestValidateCoinbaseObservationRequiresBalancedBoundedEvidence(t *testing.T) {
-	fee := 1.5
-	valid := model.Observation{
-		Arrived: true, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true,
-		CoinbaseTotalSats: 10_000, WorkerPayoutSats: 9_850, EstimatedPoolFeePct: &fee,
-		CoinbaseOutputCount: 3,
-		CoinbaseOutputs: []model.CoinbaseOutput{
-			{ValueSats: 150, ScriptPubKey: "0014751e76e8199196d454941c45d1b3a323f1433bd6", Address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", ScriptType: "p2wpkh"},
-		},
+func BenchmarkDecodeEnvelope(b *testing.B) {
+	now := time.Date(2026, time.August, 15, 12, 0, 0, 0, time.UTC)
+	envelope, _ := testBlockEnvelope(now)
+	first := *envelope.Sample.EndpointSamples[0].ReceivedAt
+	for index := range 100 {
+		at := first.Add(time.Duration(index) * time.Millisecond)
+		envelope.Sample.EndpointSamples = append(envelope.Sample.EndpointSamples, model.ForwardedEndpointSample{
+			PoolID: "pool", Endpoint: fmt.Sprintf("pool-%d.example:3333", index), ReceivedAt: &at,
+		})
 	}
-	if err := validateCoinbaseObservation(valid); err != nil {
-		t.Fatalf("valid coinbase evidence rejected: %v", err)
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if err := json.NewEncoder(writer).Encode(envelope); err != nil {
+		b.Fatal(err)
 	}
-
-	privateDestination := valid
-	privateDestination.CoinbaseOutputs = append([]model.CoinbaseOutput{{
-		ValueSats: 9_850, ScriptPubKey: "76a914111111111111111111111111111111111111111188ac",
-		Address: "12ZEw5Hcv1hTb6YUQJ69y1V7uhcoDz92PH", ScriptType: "p2pkh", Worker: true,
-	}}, privateDestination.CoinbaseOutputs...)
-	if err := validateCoinbaseObservation(privateDestination); err == nil {
-		t.Fatal("retained private worker destination accepted")
+	if err := writer.Close(); err != nil {
+		b.Fatal(err)
 	}
-
-	zeroFee := 0.0
-	allWorker := valid
-	allWorker.CoinbaseTotalSats = 9_850
-	allWorker.WorkerPayoutSats = 9_850
-	allWorker.EstimatedPoolFeePct = &zeroFee
-	allWorker.CoinbaseOutputCount = 1
-	allWorker.CoinbaseOutputs = nil
-	if err := validateCoinbaseObservation(allWorker); err != nil {
-		t.Fatalf("private-only coinbase evidence rejected: %v", err)
-	}
-
-	unbalanced := valid
-	unbalanced.CoinbaseTotalSats--
-	if err := validateCoinbaseObservation(unbalanced); err == nil {
-		t.Fatal("unbalanced coinbase evidence accepted")
-	}
-
-	tooMany := valid
-	tooMany.CoinbaseOutputs = make([]model.CoinbaseOutput, maxRetainedCoinbaseOutputs+1)
-	if err := validateCoinbaseObservation(tooMany); err == nil {
-		t.Fatal("oversized retained output list accepted")
+	raw := compressed.Bytes()
+	b.ReportAllocs()
+	b.SetBytes(int64(len(raw)))
+	for b.Loop() {
+		if _, _, err := decodeEnvelope(raw); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

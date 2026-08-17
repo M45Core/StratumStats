@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"testing"
 )
@@ -29,6 +30,22 @@ func TestVerifyJob(t *testing.T) {
 	j.Bits = "zz"
 	if VerifyJob(j).Valid {
 		t.Fatal("invalid bits accepted")
+	}
+}
+
+func TestVerifyJobMatchesForwardedWorkerScriptHash(t *testing.T) {
+	workerScript, _ := hex.DecodeString("76a914111111111111111111111111111111111111111188ac")
+	workerScriptHash := sha256.Sum256(workerScript)
+	job := Job{
+		PrevHash:       zeroHex(32),
+		Coinbase1:      "0100000001" + zeroHex(32) + "ffffffff0c03a1bb0d",
+		Coinbase2:      "ffffffff01" + "00f2052a01000000" + "19" + hex.EncodeToString(workerScript) + "00000000",
+		MerkleBranches: []string{zeroHex(32)}, Version: "20000000", Bits: "17034219", NTime: "66ad0000",
+		ExtraNonce1: "01020304", ExtraNonce2Size: 4, WorkerScriptSHA256: workerScriptHash[:],
+	}
+	verification := VerifyJob(job)
+	if !verification.Valid || !verification.WorkerWalletSeen || verification.EstimatedPoolFeePct == nil || *verification.EstimatedPoolFeePct != 0 {
+		t.Fatalf("forwarded worker hash verification=%+v", verification)
 	}
 }
 

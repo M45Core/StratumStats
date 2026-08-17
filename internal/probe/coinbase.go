@@ -2,6 +2,7 @@ package probe
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -30,6 +31,10 @@ type coinbaseSummary struct {
 // analyzeCoinbase parses both legacy and witness transaction serialization.
 // Matching uses the exact scriptPubKey generated for this probe session.
 func analyzeCoinbase(raw, workerScript []byte) (coinbaseSummary, error) {
+	return analyzeCoinbaseWithWorkerHash(raw, workerScript, nil)
+}
+
+func analyzeCoinbaseWithWorkerHash(raw, workerScript, workerScriptSHA256 []byte) (coinbaseSummary, error) {
 	var result coinbaseSummary
 	destinations := make(map[string]*model.CoinbaseOutput)
 	cursor := 0
@@ -112,6 +117,10 @@ func analyzeCoinbase(raw, workerScript []byte) (coinbaseSummary, error) {
 			return result, err
 		}
 		worker := value > 0 && len(workerScript) > 0 && bytes.Equal(script, workerScript)
+		if !worker && value > 0 && len(workerScriptSHA256) == sha256.Size {
+			digest := sha256.Sum256(script)
+			worker = bytes.Equal(digest[:], workerScriptSHA256)
+		}
 		if worker {
 			result.WorkerWalletSeen = true
 			if ^uint64(0)-result.WorkerSats < value {

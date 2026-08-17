@@ -29,11 +29,6 @@ func appendDemoProtocolData(out []model.Observation, pools []model.Pool, rng *ra
 			if endpoint.TLS {
 				out = append(out, demoProtocolObservation(observedAt, vantage, pool.ID, address, true, model.ProtocolTLSHandshake, model.ProtocolStatusOK, base*1.8+rng.Float64()*base*.7))
 			}
-			if index%5 == 0 {
-				out = append(out, demoProtocolObservation(observedAt, vantage, pool.ID, address, endpoint.TLS, model.ProtocolPing, model.ProtocolStatusUnsupported, 2+rng.Float64()*2))
-			} else {
-				out = append(out, demoProtocolObservation(observedAt, vantage, pool.ID, address, endpoint.TLS, model.ProtocolPing, model.ProtocolStatusOK, base*.9+rng.Float64()*base*.25))
-			}
 		}
 	}
 	return out

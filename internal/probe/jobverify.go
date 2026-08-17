@@ -19,6 +19,7 @@ type Job struct {
 	ExtraNonce1                    string
 	ExtraNonce2Size                int
 	WorkerScript                   []byte
+	WorkerScriptSHA256             []byte
 }
 
 type Verification struct {
@@ -93,7 +94,7 @@ func VerifyJob(j Job) Verification {
 	var estimatedPoolFeePct *float64
 	if len(errs) == 0 {
 		coinbase := append(append(append(append([]byte{}, cb1...), ex1...), make([]byte, j.ExtraNonce2Size)...), cb2...)
-		summary, err := analyzeCoinbase(coinbase, j.WorkerScript)
+		summary, err := analyzeCoinbaseWithWorkerHash(coinbase, j.WorkerScript, j.WorkerScriptSHA256)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("coinbase transaction: %v", err))
 		} else {

@@ -15,6 +15,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,14 +25,11 @@ import (
 )
 
 const (
-	EnvelopeVersion            = 1
-	maxCompressedBytes         = 256 << 10
-	maxDecompressedBytes       = 1 << 20
-	maxObservations            = 500
-	maxRequestClockSkew        = 5 * time.Minute
-	maxRetainedCoinbaseOutputs = model.MaxRetainedCoinbaseOutputs
-	maxRetainedScriptHexLength = model.MaxRetainedCoinbaseScriptBytes * 2
-	RemoteSource               = model.SourceRemoteScheduled
+	BlockEnvelopeVersion = 2
+	maxCompressedBytes   = 256 << 10
+	maxDecompressedBytes = 1 << 20
+	maxRequestClockSkew  = 5 * time.Minute
+	RemoteSource         = model.SourceRemoteScheduled
 )
 
 var RegionVantages = productionRegionVantages()
@@ -46,17 +44,12 @@ func productionRegionVantages() map[string]string {
 }
 
 type Envelope struct {
-	SchemaVersion  int                 `json:"schema_version"`
-	BatchID        string              `json:"batch_id"`
-	RunID          string              `json:"run_id"`
-	AgentVersion   string              `json:"agent_version"`
-	ConfigRevision string              `json:"config_revision"`
-	Region         string              `json:"region"`
-	Vantage        string              `json:"vantage"`
-	MachineID      string              `json:"machine_id"`
-	StartedAt      time.Time           `json:"started_at"`
-	SentAt         time.Time           `json:"sent_at"`
-	Observations   []model.Observation `json:"observations"`
+	SchemaVersion    int                `json:"schema_version"`
+	BatchID          string             `json:"batch_id"`
+	ConfigRevision   string             `json:"config_revision"`
+	Region           string             `json:"region"`
+	FilterContinents bool               `json:"filter_continents,omitempty"`
+	Sample           *model.BlockSample `json:"sample"`
 }
 
 type acceptedResponse struct {
@@ -231,76 +224,129 @@ func decodeEnvelope(raw []byte) (Envelope, int, error) {
 }
 
 func (receiver Receiver) validate(envelope Envelope, now time.Time) ([]model.Observation, error) {
-	if envelope.SchemaVersion != EnvelopeVersion {
+	if envelope.SchemaVersion != BlockEnvelopeVersion {
 		return nil, errors.New("unsupported envelope version")
 	}
-	if !validID(envelope.BatchID, 128) || !validID(envelope.RunID, 128) ||
-		!validID(envelope.MachineID, 128) || !validVersion(envelope.AgentVersion) {
+	return receiver.validateBlockEnvelope(envelope, now)
+}
+
+func (receiver Receiver) validateBlockEnvelope(envelope Envelope, now time.Time) ([]model.Observation, error) {
+	if !validID(envelope.BatchID, 128) {
 		return nil, errors.New("invalid envelope identity")
 	}
+	if envelope.Sample == nil {
+		return nil, errors.New("missing block sample")
+	}
 	vantage, ok := RegionVantages[envelope.Region]
-	if !ok || envelope.Vantage != vantage {
+	if !ok {
 		return nil, errors.New("invalid region or vantage")
 	}
 	if !validRevision(envelope.ConfigRevision) {
 		return nil, errors.New("invalid configuration revision")
 	}
-	if envelope.StartedAt.IsZero() || envelope.SentAt.IsZero() ||
-		envelope.SentAt.Before(envelope.StartedAt) ||
-		envelope.SentAt.After(now.Add(maxRequestClockSkew)) {
-		return nil, errors.New("invalid run interval")
-	}
-	if len(envelope.Observations) == 0 || len(envelope.Observations) > maxObservations {
-		return nil, errors.New("invalid observation count")
-	}
-	pools, endpoints, err := receiver.allowedTargets(envelope.ConfigRevision, now)
+	endpoints, err := receiver.allowedBlockTargets(envelope.ConfigRevision, vantage, envelope.FilterContinents, now)
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]bool, len(envelope.Observations))
-	observations := make([]model.Observation, len(envelope.Observations))
-	for index, original := range envelope.Observations {
-		observation := original
-		if observation.Version != model.ObservationVersion ||
-			!validID(observation.ObservationID, 192) ||
-			observation.RunID != envelope.RunID ||
-			seen[observation.ObservationID] {
-			return nil, fmt.Errorf("invalid observation %d identity", index)
-		}
-		seen[observation.ObservationID] = true
-		if observation.ObservedAt.Before(envelope.StartedAt) ||
-			observation.ObservedAt.After(envelope.SentAt.Add(time.Second)) {
-			return nil, fmt.Errorf("observation %d is outside run interval", index)
-		}
-		if err := validateObservation(observation, pools, endpoints); err != nil {
-			return nil, fmt.Errorf("invalid observation %d: %w", index, err)
-		}
-		if observation.RecordType == model.RecordTypeProbeRun && !observation.RunStartedAt.Equal(envelope.StartedAt) {
-			return nil, fmt.Errorf("observation %d has mismatched run start", index)
-		}
-		observation.Source = RemoteSource
-		observation.Vantage = vantage
-		observation.RunID = envelope.RunID
-		observation.MachineID = envelope.MachineID
-		observation.AgentVersion = envelope.AgentVersion
-		observation.ConfigRevision = envelope.ConfigRevision
-		observations[index] = observation
+	forwarded := *envelope.Sample
+	if !validBlockID(forwarded.BlockID) ||
+		envelope.BatchID != envelope.Region+"-"+forwarded.BlockID ||
+		len(forwarded.EndpointSamples) == 0 || len(forwarded.EndpointSamples) > len(endpoints) {
+		return nil, errors.New("invalid block sample")
 	}
-	// The terminal run record is the report layer's commit marker for scheduled
-	// block samples. Keep it physically after the measurements so a server
-	// restart cannot persist the marker while leaving a partial scoring cohort.
-	ordered := make([]model.Observation, 0, len(observations))
-	for _, observation := range observations {
-		if observation.RecordType != model.RecordTypeProbeRun {
-			ordered = append(ordered, observation)
+	seen := make(map[endpointIdentity]bool, len(forwarded.EndpointSamples))
+	arrivals := make(map[endpointIdentity]time.Time, len(forwarded.EndpointSamples))
+	var first time.Time
+	for index := range forwarded.EndpointSamples {
+		endpointSample := forwarded.EndpointSamples[index]
+		identity := endpointIdentity{poolID: endpointSample.PoolID, address: endpointSample.Endpoint, tls: endpointSample.TLS}
+		if !endpoints[identity] || seen[identity] {
+			return nil, fmt.Errorf("invalid endpoint sample %d identity", index)
+		}
+		seen[identity] = true
+		if err := validateEndpointSetup(endpointSample.Setup, endpointSample.TLS, now); err != nil {
+			return nil, fmt.Errorf("invalid endpoint sample %d setup: %w", index, err)
+		}
+		if endpointSample.ReceivedAt == nil && endpointSample.Setup == nil {
+			return nil, fmt.Errorf("empty endpoint sample %d", index)
+		}
+		if endpointSample.ReceivedAt == nil {
+			continue
+		}
+		receivedAt := endpointSample.ReceivedAt.UTC()
+		if receivedAt.IsZero() || receivedAt.After(now.Add(time.Second)) {
+			return nil, fmt.Errorf("invalid endpoint sample %d receive time", index)
+		}
+		arrivals[identity] = receivedAt
+		if first.IsZero() || receivedAt.Before(first) {
+			first = receivedAt
 		}
 	}
-	for _, observation := range observations {
-		if observation.RecordType == model.RecordTypeProbeRun {
-			ordered = append(ordered, observation)
+	if len(arrivals) == 0 {
+		return nil, errors.New("block sample needs an arrival")
+	}
+	derived := make([]model.EndpointBlockSample, 0, len(forwarded.EndpointSamples))
+	for _, forwardedEndpoint := range forwarded.EndpointSamples {
+		identity := endpointIdentity{poolID: forwardedEndpoint.PoolID, address: forwardedEndpoint.Endpoint, tls: forwardedEndpoint.TLS}
+		endpointSample := model.EndpointBlockSample{
+			PoolID: forwardedEndpoint.PoolID, Endpoint: forwardedEndpoint.Endpoint, TLS: forwardedEndpoint.TLS, Setup: forwardedEndpoint.Setup,
+		}
+		if receivedAt, ok := arrivals[identity]; ok {
+			offset := float64(receivedAt.Sub(first).Microseconds()) / 1000
+			endpointSample.OffsetMS = &offset
+		}
+		if endpointSample.OffsetMS == nil && endpointSample.Setup == nil {
+			continue
+		}
+		derived = append(derived, endpointSample)
+	}
+	eligible := make([]model.EndpointIdentity, 0, len(endpoints))
+	for identity := range endpoints {
+		eligible = append(eligible, model.EndpointIdentity{PoolID: identity.poolID, Endpoint: identity.address, TLS: identity.tls})
+	}
+	sort.Slice(eligible, func(i, j int) bool {
+		if eligible[i].PoolID != eligible[j].PoolID {
+			return eligible[i].PoolID < eligible[j].PoolID
+		}
+		if eligible[i].Endpoint != eligible[j].Endpoint {
+			return eligible[i].Endpoint < eligible[j].Endpoint
+		}
+		return !eligible[i].TLS && eligible[j].TLS
+	})
+	sample := model.Observation{
+		Version: model.ObservationVersion, ObservationID: envelope.BatchID,
+		Source: RemoteSource, RunID: envelope.BatchID, ConfigRevision: envelope.ConfigRevision,
+		RecordType: model.RecordTypeBlockSample, ObservedAt: first.UTC(), Vantage: vantage,
+		BlockID:         forwarded.BlockID,
+		EndpointSamples: derived, EligibleEndpoints: eligible,
+	}
+	return []model.Observation{sample}, nil
+}
+
+func validateEndpointSetup(setup *model.EndpointSetup, tlsEndpoint bool, sentAt time.Time) error {
+	if setup == nil {
+		return nil
+	}
+	if setup.Connect == nil && setup.TLS == nil && setup.Subscribe == nil && setup.Authorize == nil {
+		return errors.New("empty setup")
+	}
+	if !tlsEndpoint && setup.TLS != nil {
+		return errors.New("TLS result on plain endpoint")
+	}
+	for _, sample := range []*model.ProtocolSample{setup.Connect, setup.TLS, setup.Subscribe, setup.Authorize} {
+		if sample == nil {
+			continue
+		}
+		if sample.ObservedAt.IsZero() || sample.ObservedAt.After(sentAt.Add(time.Second)) ||
+			!finite(sample.DurationMS) || sample.DurationMS < 0 ||
+			!oneOf(sample.ResponseStatus, model.ProtocolStatusOK, model.ProtocolStatusRejected, model.ProtocolStatusTimeout, model.ProtocolStatusError) {
+			return errors.New("invalid protocol result")
+		}
+		if sample.ErrorCategory != "" && !validID(sample.ErrorCategory, 128) {
+			return errors.New("invalid error category")
 		}
 	}
-	return ordered, nil
+	return nil
 }
 
 type endpointIdentity struct {
@@ -308,158 +354,44 @@ type endpointIdentity struct {
 	tls             bool
 }
 
-func (receiver Receiver) allowedTargets(revision string, now time.Time) (map[string]bool, map[endpointIdentity]bool, error) {
+func (receiver Receiver) allowedConfiguration(revision string, now time.Time) ([]model.Pool, error) {
 	configured := receiver.Pools
 	if len(receiver.PoolRevisions) > 0 {
 		var ok bool
 		configured, ok = receiver.PoolRevisions[revision]
 		expiresAt := receiver.RevisionExpiry[revision]
 		if !ok || (!expiresAt.IsZero() && !now.Before(expiresAt)) {
-			return nil, nil, errors.New("unknown or expired configuration revision")
+			return nil, errors.New("unknown or expired configuration revision")
 		}
 	}
-	pools := make(map[string]bool)
+	return configured, nil
+}
+
+func targetEndpoints(configured []model.Pool, continent string) map[endpointIdentity]bool {
 	endpoints := make(map[endpointIdentity]bool)
 	for _, pool := range configured {
-		if len(pool.Endpoints) == 0 {
-			continue
-		}
-		pools[pool.ID] = true
 		for _, endpoint := range pool.Endpoints {
+			endpointContinent := model.EndpointContinent(endpoint)
+			if continent != "" && endpointContinent != "" && endpointContinent != continent {
+				continue
+			}
 			address := net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port))
 			endpoints[endpointIdentity{poolID: pool.ID, address: address, tls: endpoint.TLS}] = true
 		}
 	}
-	return pools, endpoints, nil
+	return endpoints
 }
 
-func validateObservation(observation model.Observation, pools map[string]bool, endpoints map[endpointIdentity]bool) error {
-	if observation.ObservedAt.IsZero() {
-		return errors.New("missing observation time")
+func (receiver Receiver) allowedBlockTargets(revision, vantage string, filterContinents bool, now time.Time) (map[endpointIdentity]bool, error) {
+	configured, err := receiver.allowedConfiguration(revision, now)
+	if err != nil {
+		return nil, err
 	}
-	if observation.DurationMS != nil && (!finite(*observation.DurationMS) || *observation.DurationMS < 0) {
-		return errors.New("invalid duration")
+	continent := ""
+	if filterContinents {
+		continent = model.VantageContinent(vantage)
 	}
-	if !finite(observation.OffsetMS) || observation.OffsetMS < 0 {
-		return errors.New("invalid offset")
-	}
-	if err := validateCoinbaseObservation(observation); err != nil {
-		return err
-	}
-	switch observation.RecordType {
-	case model.RecordTypeProtocol:
-		if !pools[observation.PoolID] {
-			return errors.New("unknown pool")
-		}
-		if !endpoints[endpointIdentity{poolID: observation.PoolID, address: observation.Endpoint, tls: observation.TLS}] {
-			return errors.New("unknown endpoint")
-		}
-		if !oneOf(observation.ProtocolMethod, model.ProtocolConnect, model.ProtocolTLSHandshake, model.ProtocolSubscribe, model.ProtocolAuthorize, model.ProtocolPing) ||
-			!oneOf(observation.ResponseStatus, model.ProtocolStatusOK, model.ProtocolStatusRejected, model.ProtocolStatusUnsupported, model.ProtocolStatusTimeout, model.ProtocolStatusError) ||
-			observation.DurationMS == nil || observation.BlockID != "" || observation.BlockHeight != 0 {
-			return errors.New("invalid protocol result")
-		}
-	case model.RecordTypeProbeRun:
-		if observation.PoolID != "" || observation.BlockID != "" || observation.BlockHeight != 0 ||
-			observation.RunStartedAt == nil || observation.RunStartedAt.IsZero() ||
-			!oneOf(observation.RunStatus, "ok", "partial", "error") ||
-			observation.ConfiguredEndpoints < 0 || observation.SuccessfulSessions < 0 ||
-			observation.AcceptedBlocks < 0 || observation.UploadedObservations < 0 ||
-			observation.DroppedObservations < 0 {
-			return errors.New("invalid probe run")
-		}
-	case "":
-		if !pools[observation.PoolID] || observation.BlockID == "" || !observation.Eligible ||
-			(!observation.Arrived && (observation.OffsetMS != 0 || observation.BlockHeight != 0)) || observation.Endpoint == "" ||
-			!endpoints[endpointIdentity{poolID: observation.PoolID, address: observation.Endpoint, tls: observation.TLS}] {
-			return errors.New("invalid block observation")
-		}
-	default:
-		return errors.New("unknown record type")
-	}
-	return nil
-}
-
-func validateCoinbaseObservation(observation model.Observation) error {
-	hasEvidence := observation.CoinbaseAnalyzed || observation.WorkerWalletInCoinbase || observation.CoinbaseTotalSats != 0 ||
-		observation.WorkerPayoutSats != 0 || len(observation.CoinbaseOutputs) != 0 || observation.CoinbaseOutputCount != 0 ||
-		observation.CoinbaseOutputsTruncated || observation.CoinbaseOmittedSats != 0 || observation.EstimatedPoolFeePct != nil
-	if observation.RecordType != "" {
-		if hasEvidence {
-			return errors.New("coinbase evidence on non-block record")
-		}
-		return nil
-	}
-	if !observation.CoinbaseAnalyzed {
-		if hasEvidence {
-			return errors.New("coinbase fields without decoded transaction")
-		}
-		return nil
-	}
-	if !observation.Arrived || observation.CoinbaseTotalSats == 0 || observation.CoinbaseOutputCount < 1 || observation.CoinbaseOutputCount > 10000 ||
-		len(observation.CoinbaseOutputs) > maxRetainedCoinbaseOutputs || observation.CoinbaseOutputCount < len(observation.CoinbaseOutputs) {
-		return errors.New("invalid decoded coinbase summary")
-	}
-	if observation.CoinbaseOutputsTruncated != (observation.CoinbaseOmittedSats > 0) {
-		return errors.New("invalid omitted coinbase value")
-	}
-	var retainedTotal uint64
-	for _, output := range observation.CoinbaseOutputs {
-		if output.Worker {
-			return errors.New("worker destination must be omitted")
-		}
-		if output.ValueSats == 0 || len(output.ScriptPubKey) > maxRetainedScriptHexLength || len(output.Address) > 90 || !validCoinbaseScriptType(output.ScriptType) {
-			return errors.New("invalid retained coinbase output")
-		}
-		if output.ScriptPubKey != "" {
-			if _, err := hex.DecodeString(output.ScriptPubKey); err != nil {
-				return errors.New("invalid retained script")
-			}
-		}
-		if output.ScriptPubKeyTruncated && len(output.ScriptPubKey) != maxRetainedScriptHexLength {
-			return errors.New("invalid truncated script")
-		}
-		for _, character := range output.Address {
-			if !((character >= 0x30 && character <= 0x39) || (character >= 0x41 && character <= 0x5a) || (character >= 0x61 && character <= 0x7a)) {
-				return errors.New("invalid output address")
-			}
-		}
-		if output.ValueSats > observation.CoinbaseTotalSats-retainedTotal {
-			return errors.New("coinbase output total exceeds transaction")
-		}
-		retainedTotal += output.ValueSats
-	}
-	if observation.WorkerPayoutSats > observation.CoinbaseTotalSats || retainedTotal > observation.CoinbaseTotalSats-observation.WorkerPayoutSats ||
-		observation.CoinbaseOmittedSats > observation.CoinbaseTotalSats-observation.WorkerPayoutSats-retainedTotal ||
-		retainedTotal+observation.WorkerPayoutSats+observation.CoinbaseOmittedSats != observation.CoinbaseTotalSats {
-		return errors.New("coinbase output totals do not balance")
-	}
-	if observation.WorkerWalletInCoinbase != (observation.WorkerPayoutSats > 0) {
-		return errors.New("worker payout does not match aggregate status")
-	}
-	if observation.WorkerWalletInCoinbase {
-		if observation.EstimatedPoolFeePct == nil || !finite(*observation.EstimatedPoolFeePct) || *observation.EstimatedPoolFeePct < 0 || *observation.EstimatedPoolFeePct > 100 {
-			return errors.New("invalid estimated pool fee")
-		}
-		expected := 100 * float64(observation.CoinbaseTotalSats-observation.WorkerPayoutSats) / float64(observation.CoinbaseTotalSats)
-		if math.Abs(*observation.EstimatedPoolFeePct-expected) > 0.000001 {
-			return errors.New("estimated pool fee does not match outputs")
-		}
-	} else if observation.EstimatedPoolFeePct != nil {
-		return errors.New("estimated pool fee without worker output")
-	}
-	return nil
-}
-
-func validCoinbaseScriptType(value string) bool {
-	if oneOf(value, "p2pkh", "p2sh", "p2wpkh", "p2wsh", "p2tr", "p2pk", "op_return", "unknown") {
-		return true
-	}
-	if !strings.HasPrefix(value, "witness_v") {
-		return false
-	}
-	version, err := strconv.Atoi(strings.TrimPrefix(value, "witness_v"))
-	return err == nil && version >= 1 && version <= 16
+	return targetEndpoints(configured, continent), nil
 }
 
 func validID(value string, max int) bool {
@@ -476,8 +408,9 @@ func validID(value string, max int) bool {
 	return true
 }
 
-func validVersion(value string) bool {
-	return value != "" && len(value) <= 64 && !strings.ContainsAny(value, "\r\n\t ")
+func validBlockID(value string) bool {
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == 32
 }
 
 func validRevision(value string) bool {

@@ -149,6 +149,20 @@ func buildVantageStatuses(observations []model.Observation, now time.Time, curre
 		if observation.RecordType == "" && observation.BlockID != "" {
 			blocks[observation.Vantage][observation.BlockID] = true
 		}
+		if observation.RecordType == model.RecordTypeBlockSample {
+			blocks[observation.Vantage][observation.BlockID] = true
+			status.ProtocolAttempts += blockSetupAttempts(observation)
+			if status.LastSuccessfulRunAt == nil || observation.ObservedAt.After(*status.LastSuccessfulRunAt) {
+				runAt := observation.ObservedAt.UTC()
+				status.LastSuccessfulRunAt = &runAt
+			}
+			if latestRuns[observation.Vantage].IsZero() || observation.ObservedAt.After(latestRuns[observation.Vantage]) {
+				latestRuns[observation.Vantage] = observation.ObservedAt
+				status.ConfigRevision = observation.ConfigRevision
+				status.DroppedObservations = 0
+				status.Incomplete = false
+			}
+		}
 		if observation.RecordType == model.RecordTypeProbeRun {
 			if observation.RunStatus == "ok" && observation.DroppedObservations == 0 {
 				if status.LastSuccessfulRunAt == nil || observation.ObservedAt.After(*status.LastSuccessfulRunAt) {
@@ -173,6 +187,26 @@ func buildVantageStatuses(observations []model.Observation, now time.Time, curre
 		response.Vantages = append(response.Vantages, *status)
 	}
 	return response
+}
+
+func blockSetupAttempts(sample model.Observation) int {
+	attempts := 0
+	for _, endpoint := range sample.EndpointSamples {
+		if endpoint.Setup == nil {
+			continue
+		}
+		for _, timing := range []*model.ProtocolSample{
+			endpoint.Setup.Connect,
+			endpoint.Setup.TLS,
+			endpoint.Setup.Subscribe,
+			endpoint.Setup.Authorize,
+		} {
+			if timing != nil {
+				attempts++
+			}
+		}
+	}
+	return attempts
 }
 
 func selectedVantageStatus(statuses vantageStatusResponse, vantage string) *vantageStatus {

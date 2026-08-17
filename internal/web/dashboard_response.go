@@ -33,8 +33,8 @@ var dashboardGzipWriters = sync.Pool{
 }
 
 // Regional Scouts finalize the same Bitcoin block about 30 seconds after first
-// observing it, then upload their observation batch and terminal run record.
-// Ten seconds groups that multi-region burst, matches the dashboard client's
+// observing it, then each uploads one atomic block sample. Ten seconds groups
+// that multi-region burst, matches the dashboard client's
 // polling interval, and remains short relative to Bitcoin's 10-minute mean
 // block interval (about 1.65% of intervals are shorter).
 const dashboardRefreshCoalesceWindow = 10 * time.Second

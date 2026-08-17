@@ -47,13 +47,20 @@ func TestDashboardDataGroupsPoolsByMeasuredEvidence(t *testing.T) {
 	if len(payload.FreePools) != 1 || payload.FreePools[0].PoolID != "free" {
 		t.Fatalf("free=%+v", payload.FreePools)
 	}
-	if len(payload.NormalPools) != 1 || payload.NormalPools[0].PoolID != "paid" {
-		t.Fatalf("paid=%+v", payload.NormalPools)
+	if len(payload.NormalPools) != 2 {
+		t.Fatalf("solo=%+v", payload.NormalPools)
+	}
+	normal := map[string]bool{}
+	for _, pool := range payload.NormalPools {
+		normal[pool.PoolID] = true
+	}
+	if !normal["paid"] || !normal["pending"] {
+		t.Fatalf("solo=%+v", payload.NormalPools)
 	}
 	if len(payload.MissingWalletPools) != 1 || payload.MissingWalletPools[0].OverallScore == nil || *payload.MissingWalletPools[0].OverallScore != 0 {
 		t.Fatalf("missing=%+v", payload.MissingWalletPools)
 	}
-	if len(payload.PendingWalletPools) != 1 || payload.PendingWalletPools[0].PoolID != "pending" {
+	if len(payload.PendingWalletPools) != 0 {
 		t.Fatalf("pending=%+v", payload.PendingWalletPools)
 	}
 	if len(payload.PPLNSPools) != 1 || len(payload.OtherPools) != 1 {

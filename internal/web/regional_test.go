@@ -90,6 +90,33 @@ func TestVantageStatusReportsLatestRunHealth(t *testing.T) {
 	}
 }
 
+func TestVantageStatusTreatsAtomicBlockAsCompleteRun(t *testing.T) {
+	now := time.Now().UTC()
+	connect := &model.ProtocolSample{ObservedAt: now.Add(-time.Minute), DurationMS: 12, ResponseStatus: model.ProtocolStatusOK}
+	authorize := &model.ProtocolSample{ObservedAt: now.Add(-time.Minute), DurationMS: 8, ResponseStatus: model.ProtocolStatusOK}
+	observations := []model.Observation{{
+		Version: model.ObservationVersion, ObservationID: "lax-block", Source: ingest.RemoteSource,
+		Vantage: "us-west", RecordType: model.RecordTypeBlockSample, ObservedAt: now,
+		BlockID: "block", ConfigRevision: "sha256:current",
+		EndpointSamples: []model.EndpointBlockSample{{
+			PoolID: "pool", Endpoint: "pool.example:3333",
+			Setup: &model.EndpointSetup{Connect: connect, Authorize: authorize},
+		}},
+	}}
+	statuses := buildVantageStatuses(observations, now, "sha256:current").Vantages
+	for _, status := range statuses {
+		if status.ID != "us-west" {
+			continue
+		}
+		if !status.ConfigCurrent || status.Incomplete || status.Stale || status.Blocks != 1 || status.ProtocolAttempts != 2 ||
+			status.LastSuccessfulRunAt == nil || !status.LastSuccessfulRunAt.Equal(now) {
+			t.Fatalf("west=%+v", status)
+		}
+		return
+	}
+	t.Fatal("US West status missing")
+}
+
 func TestRegionalNodeOrderAndLabels(t *testing.T) {
 	want := []struct {
 		id    string

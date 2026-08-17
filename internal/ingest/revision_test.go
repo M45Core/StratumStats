@@ -15,18 +15,18 @@ func TestAllowedTargetsAcceptsCurrentAndUnexpiredPreviousRevision(t *testing.T) 
 		PoolRevisions:  map[string][]model.Pool{"current-revision": current, "previous-revision": previous},
 		RevisionExpiry: map[string]time.Time{"previous-revision": now.Add(time.Hour)},
 	}
-	pools, _, err := receiver.allowedTargets("previous-revision", now)
-	if err != nil || !pools["previous"] {
+	pools, err := receiver.allowedConfiguration("previous-revision", now)
+	if err != nil || len(pools) != 1 || pools[0].ID != "previous" {
 		t.Fatalf("previous revision pools=%v err=%v", pools, err)
 	}
-	pools, _, err = receiver.allowedTargets("current-revision", now.Add(24*time.Hour))
-	if err != nil || !pools["current"] {
+	pools, err = receiver.allowedConfiguration("current-revision", now.Add(24*time.Hour))
+	if err != nil || len(pools) != 1 || pools[0].ID != "current" {
 		t.Fatalf("current revision pools=%v err=%v", pools, err)
 	}
-	if _, _, err := receiver.allowedTargets("previous-revision", now.Add(time.Hour)); err == nil {
+	if _, err := receiver.allowedConfiguration("previous-revision", now.Add(time.Hour)); err == nil {
 		t.Fatal("expired previous revision accepted")
 	}
-	if _, _, err := receiver.allowedTargets("unknown", now); err == nil {
+	if _, err := receiver.allowedConfiguration("unknown", now); err == nil {
 		t.Fatal("unknown revision accepted")
 	}
 }

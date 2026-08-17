@@ -16,8 +16,8 @@ measurements.
 
 - Compares template delivery only for the same Bitcoin block and vantage.
 - Publishes median and P95 delay, availability, protocol timing, and sample counts.
-- Repeats each region's freshness and latest observed Bitcoin block height at
-  every results section, and highlights newly observed heights live.
+- Repeats each region's freshness and latest observed previous-block hash at
+  every results section, and highlights newly observed blocks live.
 - Measures solo-pool fees only when the probe worker output is found in coinbase.
 - Verifies TLS certificates and reports failures explicitly.
 - Keeps raw JSONL evidence independently recomputable.
@@ -79,7 +79,7 @@ checks that `/api/v1/probe-config` exposes the expected revision. The current
 and immediately previous probe revisions are accepted during a one-hour grace
 window so an in-flight regional run is not rejected during endpoint removals.
 The dashboard marks a region as `Pool update pending` until that Scout's latest
-terminal run reports the active revision.
+atomic block sample reports the active revision.
 
 ### Pool registry admin
 
@@ -102,14 +102,22 @@ the newly logged one-time password.
 
 ## Measurement model
 
-StratumStats records observations rather than pool claims. Each report represents
+StratumStats records measurements rather than pool claims. Each report represents
 one configured pool endpoint and transport (`pool + host:port + TLS mode`).
-Template latency is relative to the earliest structurally valid template observed
-for the same block and vantage. Arrival is timestamped as soon as the complete
-Stratum message is read, before JSON parsing, coinbase reconstruction, or merkle
-verification; validation still determines whether the arrival is accepted. Every
-configured endpoint is eligible for that block, so an endpoint that is down
-records a missed delivery and mining loss.
+Each regional Scout sends and StratumStats stores one atomic nested sample per
+Bitcoin block. Endpoint entries are present only when Scout obtained arrival or
+new connection-setup data; the authenticated configuration roster supplies the
+eligible endpoints omitted from that compact payload.
+Template latency is relative to the earliest clean previous-block-hash
+transition observed for the same block and vantage. Arrival is timestamped as
+soon as the first byte of the Stratum message is readable by Scout, before the
+remaining message is read or parsed.
+Scout sends only the block hash, one arrival timestamp per responding endpoint,
+and setup timings that actually occurred since the preceding block.
+StratumStats authenticates the configured endpoint identities and calculates
+relative offsets before JSONL storage. Every configured endpoint is eligible
+for that block, so an endpoint that is down records a missed delivery and
+mining loss.
 Median, P95, history, and protocol timings use a rolling 24-hour window. No report,
 score, count, payout, or fee evidence uses observations older than 30 days.
 The production server checks the oldest JSONL observation weekly and atomically
@@ -121,21 +129,22 @@ service restarts.
 
 Every visible results section repeats the same region-wide status. `Region
 updated` is not a per-pool or per-section timestamp: for a remote vantage it is
-the completion time of that region's latest successful, lossless scheduled run.
-For a local collector it falls back to the newest displayed pool observation.
+the observation time of that region's latest successfully accepted atomic block
+sample. Legacy terminal run records remain supported. For a local collector it
+falls back to the newest displayed pool observation.
 
-The block-height pill is decoded from the BIP34 height in the coinbase input of
-the latest report-eligible Stratum job observed in that region. It is an
-observation from the selected vantage, not a separate chain-tip RPC, so it can
-lag until that vantage receives and completes another usable cohort. After the
-initial page render, every visible copy flashes together when the height
-changes.
+The block marker is the previous-block hash from the latest report-eligible
+Stratum transition observed in that region. It is not a separate chain-tip RPC,
+so it advances only when that vantage completes another usable block sample.
+After the initial page render, every visible copy flashes together when the
+hash changes.
 
 Protocol measurements include TCP connect, TLS handshake, `mining.subscribe`,
-`mining.authorize`, and optional `mining.ping`. Their completion timestamps are
-captured at the completed network operation or full response read, excluding
-subsequent response parsing. Coinbase reconstruction checks whether the generated
-worker script is present and redacts that destination before telemetry is stored.
+and `mining.authorize`. Connect and TLS stop at operation completion; subscribe
+and authorize stop when the first response byte is readable. Subsequent message
+transfer and parsing are excluded. They are measured only when a session
+connects or reconnects, retained by Scout, and included in the next block
+sample; absent operations are omitted.
 Shared-pool fees are not shown because they cannot be measured from the block
 coinbase.
 
@@ -144,10 +153,10 @@ and limitations in detail.
 
 Regional probe ingestion is provided by
 [StratumScout](https://github.com/M45Core/StratumScout). Each regional view
-compares observations only within the same vantage. Scheduled block samples
-enter availability and score calculations only after the complete, lossless
-probe run has been received, so an interrupted upload cannot create a partial
-scoring cohort. A completed regional cohort is also excluded when at least 20%
+compares measurements only within the same vantage. A block sample enters
+availability and score calculations only after its single authenticated request
+is validated and appended, so an interrupted upload cannot create a partial
+scoring cohort. A completed regional sample is also excluded when at least 20%
 of eligible endpoints across at least five distinct pools miss together. This
 retains the raw diagnostic evidence without treating a vantage-wide observer
 failure as independent pool downtime.
@@ -197,8 +206,8 @@ The dashboard HTML is a static shell. It loads and periodically revalidates
 The service keeps serving the previous complete response while a replacement is
 built, then swaps the new response cache into place atomically. Accepted ingest
 requests are coalesced for ten seconds, matching the browser refresh interval,
-so the observation and completion batches uploaded by multiple regions for the
-same Bitcoin block trigger one cache rebuild. Arrivals during a rebuild request
+so the atomic block samples uploaded by multiple regions for the same Bitcoin
+block trigger one cache rebuild. Arrivals during a rebuild request
 at most one follow-up rebuild.
 
 - `GET /dashboard-data` — data used by the dashboard renderer

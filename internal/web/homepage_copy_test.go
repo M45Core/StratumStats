@@ -16,7 +16,7 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 	}
 	page := httptest.NewRecorder()
 	h.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/", nil))
-	for _, want := range []string{"Bitcoin pool performance.", "Free solo pools", "Paid solo pools", "PPLNS shared pools", "Worker wallet not found", "Loading measurements…", "/static/dashboard.js"} {
+	for _, want := range []string{"Bitcoin pool performance.", "Free solo pools", "Solo pools", "PPLNS shared pools", "Worker wallet not found", "Loading measurements…", "/static/dashboard.js"} {
 		if !strings.Contains(page.Body.String(), want) {
 			t.Errorf("shell missing %q", want)
 		}
@@ -32,7 +32,7 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 
 	script := httptest.NewRecorder()
 	h.ServeHTTP(script, httptest.NewRequest(http.MethodGet, "/static/dashboard.js", nil))
-	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-line-chart", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_height", "block-height-changed", "setInterval(() => refresh(false)"} {
+	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-line-chart", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_id", "block-height-changed", "setInterval(() => refresh(false)"} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("renderer missing %q", want)
 		}

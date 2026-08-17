@@ -14,6 +14,8 @@ import (
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
+const maxJSONLRecordBytes = 2 << 20
+
 func Load(path string) ([]model.Observation, error) {
 	return LoadSince(path, time.Time{})
 }
@@ -35,7 +37,7 @@ func LoadSince(path string, cutoff time.Time) ([]model.Observation, error) {
 func loadSinceReader(reader io.Reader, cutoff time.Time) ([]model.Observation, error) {
 	var out []model.Observation
 	s := bufio.NewScanner(reader)
-	s.Buffer(make([]byte, 64*1024), 1024*1024)
+	s.Buffer(make([]byte, 64*1024), maxJSONLRecordBytes)
 	for s.Scan() {
 		var o model.Observation
 		if err := json.Unmarshal(s.Bytes(), &o); err != nil {
@@ -159,7 +161,7 @@ func oldestObservation(path string) (time.Time, bool, error) {
 	var oldest time.Time
 	exists := false
 	s := bufio.NewScanner(f)
-	s.Buffer(make([]byte, 64*1024), 1024*1024)
+	s.Buffer(make([]byte, 64*1024), maxJSONLRecordBytes)
 	for s.Scan() {
 		var observation model.Observation
 		if err := json.Unmarshal(s.Bytes(), &observation); err != nil {
@@ -206,7 +208,7 @@ func compact(path string, cutoff time.Time) (result CompactionResult, err error)
 	writer := bufio.NewWriter(temporary)
 	encoder := json.NewEncoder(writer)
 	scanner := bufio.NewScanner(source)
-	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	scanner.Buffer(make([]byte, 64*1024), maxJSONLRecordBytes)
 	for scanner.Scan() {
 		var observation model.Observation
 		if err := json.Unmarshal(scanner.Bytes(), &observation); err != nil {

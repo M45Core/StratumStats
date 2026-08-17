@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MethodologyVersion     = "2026-08-14.33"
+	MethodologyVersion     = "2026-08-17.35"
 	reportHistoryLimit     = 12
 	regionalCohortMissPct  = 20
 	regionalCohortMinPools = 5
@@ -101,7 +101,7 @@ func Compute(pools []model.Pool, observations []model.Observation, now time.Time
 
 func compute(pools []model.Pool, observations []model.Observation, now time.Time, combineVantages bool) model.Snapshot {
 	now = now.UTC()
-	return computePrepared(pools, prepareObservations(observations, now), now, combineVantages)
+	return computePrepared(pools, prepareObservations(pools, observations, now), now, combineVantages)
 }
 
 // computePrepared aggregates an already retained and de-duplicated slice. The
@@ -222,11 +222,11 @@ func computePrepared(pools []model.Pool, observations []model.Observation, now t
 		Disclosure: []string{
 			"Reports use automated endpoint observations only; no pool pays or applies for placement.",
 			"Latency is relative within the same block and vantage, reducing geographic bias.",
-			"Wire completion is timestamped before response parsing and block-template verification.",
+			"Regional Scout arrival is timestamped at the first readable Stratum byte, before message completion, parsing, and block-transition filtering.",
 			"Combined-vantage reports reduce regional latency observations to one median per Bitcoin block before computing history, median, and P95.",
 			"No observation older than 30 days is used; block-template latency, latency history, and protocol timing use a rolling 24-hour window.",
 			"Eligible block and protocol-attempt counts are published directly with their measurements.",
-			"Scheduled block observations affect scores only after their probe run completes successfully without dropped observations.",
+			"Scheduled block measurements affect scores only after their complete atomic block sample is accepted.",
 			"A scheduled regional block cohort is excluded when at least 20% of eligible endpoints across at least five pools miss together, indicating a vantage-wide measurement failure rather than independent pool availability.",
 			"When the same block has broad observer failures in multiple regions, that block is excluded from every regional view so rolling collector maintenance cannot be scored as pool downtime.",
 			"The probe uses pseudonymous miner credentials, but a pool can still observe its source IP.",
@@ -325,7 +325,7 @@ func multiRegionFailedBlocks(excluded map[string]bool) map[string]bool {
 
 func detectMultiRegionObserverFailures(pools []model.Pool, observations []model.Observation, now time.Time) (map[string]bool, map[string]bool) {
 	now = now.UTC()
-	return detectMultiRegionObserverFailuresPrepared(pools, prepareObservations(observations, now))
+	return detectMultiRegionObserverFailuresPrepared(pools, prepareObservations(pools, observations, now))
 }
 
 func detectMultiRegionObserverFailuresPrepared(pools []model.Pool, observations []model.Observation) (map[string]bool, map[string]bool) {
@@ -359,10 +359,9 @@ func detectMultiRegionObserverFailuresPrepared(pools []model.Pool, observations 
 	return failedBlocks, expandMultiRegionObserverFailures(observations, excluded)
 }
 
-// completedScheduledRuns returns the remote run IDs whose terminal record
-// proves that the whole scheduled collection was uploaded without loss. Block
-// records can arrive in earlier batches, so an interrupted server upload may
-// leave useful diagnostics in JSONL without leaving a complete scoring cohort.
+// completedScheduledRuns returns legacy remote runs with a terminal record and
+// the synthetic completion records produced centrally when atomic block samples
+// are expanded for reporting.
 func completedScheduledRuns(observations []model.Observation) map[string]bool {
 	completed := make(map[string]bool)
 	for _, observation := range observations {
@@ -409,7 +408,7 @@ type PreparedReports struct {
 // global evidence once, and records the multi-region failure set once.
 func Prepare(pools []model.Pool, observations []model.Observation, now time.Time) *PreparedReports {
 	now = now.UTC()
-	observations = prepareObservations(observations, now)
+	observations = prepareObservations(pools, observations, now)
 	global := computePrepared(pools, observations, now, false)
 	failedBlocks, multiRegionExcludedCohorts := detectMultiRegionObserverFailuresPrepared(pools, observations)
 	globalReports := make(map[string]model.PoolReport, len(global.Reports))
@@ -504,8 +503,118 @@ func uniqueObservations(observations []model.Observation) []model.Observation {
 	return unique
 }
 
-func prepareObservations(observations []model.Observation, now time.Time) []model.Observation {
-	return uniqueObservations(RetainObservations(observations, now))
+func prepareObservations(pools []model.Pool, observations []model.Observation, now time.Time) []model.Observation {
+	return expandBlockSamples(pools, uniqueObservations(RetainObservations(observations, now)))
+}
+
+// expandBlockSamples converts each atomic, nested block record into the flat
+// in-memory shape consumed by the report engine. The expansion happens only on
+// the central collector: Scout uploads one object and JSONL stores one line.
+func expandBlockSamples(pools []model.Pool, observations []model.Observation) []model.Observation {
+	expanded := make([]model.Observation, 0, len(observations))
+	configured := configuredEndpointIdentities(pools)
+	for _, sample := range observations {
+		if sample.RecordType != model.RecordTypeBlockSample {
+			expanded = append(expanded, sample)
+			continue
+		}
+		eligible := sample.EligibleEndpoints
+		if len(eligible) == 0 {
+			eligible = configured
+		}
+		provided := make(map[string]model.EndpointBlockSample, len(sample.EndpointSamples))
+		for _, endpointSample := range sample.EndpointSamples {
+			provided[endpointReportKey(endpointSample.PoolID, endpointSample.Endpoint, endpointSample.TLS)] = endpointSample
+		}
+		runID := sample.RunID
+		if runID == "" {
+			runID = sample.ObservationID
+		}
+		for index, identity := range eligible {
+			endpointSample, hasSample := provided[endpointReportKey(identity.PoolID, identity.Endpoint, identity.TLS)]
+			block := model.Observation{
+				Version:       model.ObservationVersion,
+				ObservationID: sample.ObservationID + "/block/" + strconv.Itoa(index),
+				Source:        sample.Source, RunID: runID, MachineID: sample.MachineID,
+				AgentVersion: sample.AgentVersion, ConfigRevision: sample.ConfigRevision,
+				ObservedAt: sample.ObservedAt, Vantage: sample.Vantage,
+				BlockID: sample.BlockID, PoolID: identity.PoolID, Endpoint: identity.Endpoint,
+				Eligible: true, TLS: identity.TLS,
+			}
+			if hasSample && endpointSample.OffsetMS != nil {
+				block.Arrived = true
+				block.OffsetMS = *endpointSample.OffsetMS
+				block.BlockHeight = sample.BlockHeight
+			}
+			if hasSample && endpointSample.Coinbase != nil {
+				evidence := endpointSample.Coinbase
+				block.CoinbaseAnalyzed = true
+				block.WorkerWalletInCoinbase = evidence.WorkerWalletInCoinbase
+				block.CoinbaseTotalSats = evidence.CoinbaseTotalSats
+				block.WorkerPayoutSats = evidence.WorkerPayoutSats
+				block.CoinbaseOutputs = evidence.CoinbaseOutputs
+				block.CoinbaseOutputCount = evidence.CoinbaseOutputCount
+				block.CoinbaseOutputsTruncated = evidence.CoinbaseOutputsTruncated
+				block.CoinbaseOmittedSats = evidence.CoinbaseOmittedSats
+				block.EstimatedPoolFeePct = evidence.EstimatedPoolFeePct
+			}
+			expanded = append(expanded, block)
+			if hasSample && endpointSample.Setup != nil {
+				expanded = appendSetupObservations(expanded, sample, runID, identity, index, endpointSample.Setup)
+			}
+		}
+		startedAt := sample.ObservedAt.UTC()
+		expanded = append(expanded, model.Observation{
+			Version:       model.ObservationVersion,
+			ObservationID: sample.ObservationID + "/complete",
+			Source:        sample.Source, RunID: runID, MachineID: sample.MachineID,
+			AgentVersion: sample.AgentVersion, ConfigRevision: sample.ConfigRevision,
+			RecordType: model.RecordTypeProbeRun, ObservedAt: sample.ObservedAt, Vantage: sample.Vantage,
+			RunStartedAt: &startedAt, RunStatus: "ok", ConfiguredEndpoints: len(eligible),
+			AcceptedBlocks: 1, UploadedObservations: 1,
+		})
+	}
+	return expanded
+}
+
+func configuredEndpointIdentities(pools []model.Pool) []model.EndpointIdentity {
+	identities := make([]model.EndpointIdentity, 0)
+	for _, pool := range pools {
+		for _, endpoint := range pool.Endpoints {
+			identities = append(identities, model.EndpointIdentity{
+				PoolID: pool.ID, Endpoint: endpointAddress(endpoint), TLS: endpoint.TLS,
+			})
+		}
+	}
+	return identities
+}
+
+func appendSetupObservations(out []model.Observation, block model.Observation, runID string, identity model.EndpointIdentity, endpointIndex int, setup *model.EndpointSetup) []model.Observation {
+	for _, timing := range []struct {
+		method string
+		sample *model.ProtocolSample
+	}{
+		{model.ProtocolConnect, setup.Connect},
+		{model.ProtocolTLSHandshake, setup.TLS},
+		{model.ProtocolSubscribe, setup.Subscribe},
+		{model.ProtocolAuthorize, setup.Authorize},
+	} {
+		if timing.sample == nil {
+			continue
+		}
+		duration := timing.sample.DurationMS
+		out = append(out, model.Observation{
+			Version:       model.ObservationVersion,
+			ObservationID: block.ObservationID + "/setup/" + strconv.Itoa(endpointIndex) + "/" + timing.method,
+			Source:        block.Source, RunID: runID, MachineID: block.MachineID,
+			AgentVersion: block.AgentVersion, ConfigRevision: block.ConfigRevision,
+			RecordType: model.RecordTypeProtocol, Endpoint: identity.Endpoint,
+			ProtocolMethod: timing.method, DurationMS: &duration, ResponseStatus: timing.sample.ResponseStatus,
+			ObservedAt: timing.sample.ObservedAt, Vantage: block.Vantage, PoolID: identity.PoolID,
+			TLS: identity.TLS, ErrorCategory: timing.sample.ErrorCategory,
+		})
+	}
+	return out
 }
 
 // RetainObservations applies the hard report horizon before observations enter
@@ -756,7 +865,7 @@ func build(a *accumulator, now time.Time, combineVantages bool) model.PoolReport
 		MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median, availability, blocks),
 		Availability: round(availability, 1), TLSObserved: a.tls,
 		ConnectTiming: timingStats(a, model.ProtocolConnect), TLSTiming: timingStats(a, model.ProtocolTLSHandshake),
-		SubscribeTiming: timingStats(a, model.ProtocolSubscribe), AuthorizeTiming: timingStats(a, model.ProtocolAuthorize), PingTiming: timingStats(a, model.ProtocolPing),
+		SubscribeTiming: timingStats(a, model.ProtocolSubscribe), AuthorizeTiming: timingStats(a, model.ProtocolAuthorize),
 		CoinbaseSamples: coinbaseSamples, WorkerAddressObservedPct: workerAddressObservedPct, WorkerAddressStatus: workerAddressStatus,
 		LatestPoolFeePct: latestPoolFeePct, PreviousPoolFeePct: previousPoolFeePct,
 		PoolFeeChanged: poolFeeChanges > 0, PoolFeeChanges: poolFeeChanges, PoolFeeSamples: len(feeSamples), PoolFeeLastChangedAt: poolFeeLastChangedAt,

@@ -24,8 +24,6 @@ func TestProtocolTimingsRemainSeparateFromBlockSamples(t *testing.T) {
 		protocol(model.ProtocolConnect, model.ProtocolStatusOK, 20),
 		protocol(model.ProtocolConnect, model.ProtocolStatusOK, 30),
 		protocol(model.ProtocolConnect, model.ProtocolStatusTimeout, 1000),
-		protocol(model.ProtocolPing, model.ProtocolStatusOK, 15),
-		protocol(model.ProtocolPing, model.ProtocolStatusUnsupported, 2),
 	}
 
 	snapshot := Compute([]model.Pool{{ID: "pool", Name: "Pool"}}, observations, time.Time{})
@@ -41,9 +39,6 @@ func TestProtocolTimingsRemainSeparateFromBlockSamples(t *testing.T) {
 	}
 	if report.ConnectTiming.P95MS == nil || *report.ConnectTiming.P95MS != 30 {
 		t.Fatalf("connect p95=%v", report.ConnectTiming.P95MS)
-	}
-	if report.PingTiming.Attempts != 2 || report.PingTiming.Successes != 1 || report.PingTiming.Unsupported != 1 {
-		t.Fatalf("ping timing=%+v", report.PingTiming)
 	}
 }
 
