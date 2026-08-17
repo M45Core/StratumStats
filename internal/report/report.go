@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MethodologyVersion     = "2026-08-17.35"
+	MethodologyVersion     = "2026-08-17.36"
 	reportHistoryLimit     = 12
 	regionalCohortMissPct  = 20
 	regionalCohortMinPools = 5

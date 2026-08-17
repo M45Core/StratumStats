@@ -127,15 +127,18 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			}
 			continue
 		}
-		if report.CoinbaseSamples > 0 {
-			switch report.WorkerAddressStatus {
-			case "not_observed":
-				pool.UnsafeReason = fmt.Sprintf("worker wallet not found in %d decoded coinbase payouts", report.CoinbaseSamples)
-				pool.WalletEvidence = "missing"
-			case "varied":
-				pool.UnsafeReason = fmt.Sprintf("worker wallet not found in some of %d decoded coinbase payouts", report.CoinbaseSamples)
-				pool.WalletEvidence = "missing"
-			}
+		switch report.WorkerAddressStatus {
+		case "always_observed":
+			// Positive worker-address evidence is required for the measured solo lists.
+		case "not_observed":
+			pool.UnsafeReason = fmt.Sprintf("worker wallet not found in %d decoded coinbase payouts", report.CoinbaseSamples)
+			pool.WalletEvidence = "missing"
+		case "varied":
+			pool.UnsafeReason = fmt.Sprintf("worker wallet not found in some of %d decoded coinbase payouts", report.CoinbaseSamples)
+			pool.WalletEvidence = "missing"
+		default:
+			pool.UnsafeReason = "worker wallet payout not yet verified"
+			pool.WalletEvidence = "pending"
 		}
 		if pool.UnsafeReason != "" {
 			if pool.WalletEvidence == "missing" {

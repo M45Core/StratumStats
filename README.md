@@ -16,7 +16,7 @@ measurements.
 
 - Compares template delivery only for the same Bitcoin block and vantage.
 - Publishes median and P95 delay, availability, protocol timing, and sample counts.
-- Repeats each region's freshness and latest observed previous-block hash at
+- Repeats each region's freshness and latest coinbase-derived block height at
   every results section, and highlights newly observed blocks live.
 - Measures solo-pool fees only when the probe worker output is found in coinbase.
 - Verifies TLS certificates and reports failures explicitly.
@@ -106,18 +106,23 @@ StratumStats records measurements rather than pool claims. Each report represent
 one configured pool endpoint and transport (`pool + host:port + TLS mode`).
 Each regional Scout sends and StratumStats stores one atomic nested sample per
 Bitcoin block. Endpoint entries are present only when Scout obtained arrival or
-new connection-setup data; the authenticated configuration roster supplies the
+new connection-setup data; an arrival may also carry the minimum coinbase source
+needed by the webpage. The authenticated configuration roster supplies the
 eligible endpoints omitted from that compact payload.
 Template latency is relative to the earliest clean previous-block-hash
 transition observed for the same block and vantage. Arrival is timestamped as
 soon as the first byte of the Stratum message is readable by Scout, before the
 remaining message is read or parsed.
 Scout sends only the block hash, one arrival timestamp per responding endpoint,
-and setup timings that actually occurred since the preceding block.
-StratumStats authenticates the configured endpoint identities and calculates
-relative offsets before JSONL storage. Every configured endpoint is eligible
-for that block, so an endpoint that is down records a missed delivery and
-mining loss.
+setup timings that actually occurred since the preceding block, and coinbase
+reconstruction inputs for the accepted notification. It does not send merkle
+branches, header fields, transaction indicators, or structural validation.
+StratumStats authenticates the configured endpoint identities, calculates
+relative offsets, and immediately derives block height, payout destinations,
+worker-payment evidence, and measurable solo-pool fees. The raw reconstruction
+inputs are discarded before JSONL storage. Every configured endpoint is
+eligible for that block, so an endpoint that is down records a missed delivery
+and mining loss.
 Median, P95, history, and protocol timings use a rolling 24-hour window. No report,
 score, count, payout, or fee evidence uses observations older than 30 days.
 The production server checks the oldest JSONL observation weekly and atomically
@@ -133,11 +138,11 @@ the observation time of that region's latest successfully accepted atomic block
 sample. Legacy terminal run records remain supported. For a local collector it
 falls back to the newest displayed pool observation.
 
-The block marker is the previous-block hash from the latest report-eligible
-Stratum transition observed in that region. It is not a separate chain-tip RPC,
-so it advances only when that vantage completes another usable block sample.
-After the initial page render, every visible copy flashes together when the
-hash changes.
+The block marker is decoded from the BIP34 height in the latest available
+coinbase observed in that region. It is not a separate chain-tip RPC, so it may
+lag until that vantage completes another block sample containing a decodable
+coinbase. After the initial page render, every visible copy flashes together
+when the height changes.
 
 Protocol measurements include TCP connect, TLS handshake, `mining.subscribe`,
 and `mining.authorize`. Connect and TLS stop at operation completion; subscribe

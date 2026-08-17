@@ -2,9 +2,12 @@ package probe
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"testing"
+
+	"github.com/M45Core/StratumStats/internal/model"
 )
 
 func TestAnalyzeCoinbaseFindsWorkerOutputs(t *testing.T) {
@@ -16,6 +19,24 @@ func TestAnalyzeCoinbaseFindsWorkerOutputs(t *testing.T) {
 	}
 	if !summary.WorkerWalletSeen || summary.WorkerSats != 5_000_000_000 || summary.TotalSats != 5_000_000_000 || len(summary.Outputs) != 0 {
 		t.Fatalf("summary=%+v", summary)
+	}
+}
+
+func TestAnalyzeCoinbaseSourceDerivesOnlyDashboardEvidence(t *testing.T) {
+	workerScript, _ := hex.DecodeString("76a914111111111111111111111111111111111111111188ac")
+	workerHash := sha256.Sum256(workerScript)
+	source := model.CoinbaseSource{
+		Coinbase1:   "0100000001" + zeroHex(32) + "ffffffff0c03a1bb0d",
+		Coinbase2:   "ffffffff01" + "205fa01200000000" + "19" + hex.EncodeToString(workerScript) + "00000000",
+		ExtraNonce1: "01020304", ExtraNonce2Size: 4,
+		WorkerScriptSHA256: hex.EncodeToString(workerHash[:]),
+	}
+	height, evidence, err := AnalyzeCoinbaseSource(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if height != 900_000 || !evidence.WorkerWalletInCoinbase || evidence.CoinbaseTotalSats != 312_500_000 || evidence.WorkerPayoutSats != 312_500_000 || evidence.EstimatedPoolFeePct == nil || *evidence.EstimatedPoolFeePct != 0 {
+		t.Fatalf("height=%d evidence=%+v", height, evidence)
 	}
 }
 

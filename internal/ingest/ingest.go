@@ -22,10 +22,11 @@ import (
 	"time"
 
 	"github.com/M45Core/StratumStats/internal/model"
+	"github.com/M45Core/StratumStats/internal/probe"
 )
 
 const (
-	BlockEnvelopeVersion = 2
+	BlockEnvelopeVersion = 3
 	maxCompressedBytes   = 256 << 10
 	maxDecompressedBytes = 1 << 20
 	maxRequestClockSkew  = 5 * time.Minute
@@ -256,6 +257,8 @@ func (receiver Receiver) validateBlockEnvelope(envelope Envelope, now time.Time)
 	}
 	seen := make(map[endpointIdentity]bool, len(forwarded.EndpointSamples))
 	arrivals := make(map[endpointIdentity]time.Time, len(forwarded.EndpointSamples))
+	coinbases := make(map[endpointIdentity]model.CoinbaseEvidence, len(forwarded.EndpointSamples))
+	heightCounts := make(map[uint64]int)
 	var first time.Time
 	for index := range forwarded.EndpointSamples {
 		endpointSample := forwarded.EndpointSamples[index]
@@ -281,6 +284,17 @@ func (receiver Receiver) validateBlockEnvelope(envelope Envelope, now time.Time)
 		if first.IsZero() || receivedAt.Before(first) {
 			first = receivedAt
 		}
+		if endpointSample.Coinbase != nil {
+			// Coinbase is best-effort webpage evidence. A pool's malformed
+			// transaction must not discard the block-arrival measurements.
+			height, evidence, err := probe.AnalyzeCoinbaseSource(*endpointSample.Coinbase)
+			if err == nil {
+				coinbases[identity] = evidence
+				if height > 0 {
+					heightCounts[height]++
+				}
+			}
+		}
 	}
 	if len(arrivals) == 0 {
 		return nil, errors.New("block sample needs an arrival")
@@ -294,6 +308,10 @@ func (receiver Receiver) validateBlockEnvelope(envelope Envelope, now time.Time)
 		if receivedAt, ok := arrivals[identity]; ok {
 			offset := float64(receivedAt.Sub(first).Microseconds()) / 1000
 			endpointSample.OffsetMS = &offset
+		}
+		if coinbase, ok := coinbases[identity]; ok {
+			coinbaseCopy := coinbase
+			endpointSample.Coinbase = &coinbaseCopy
 		}
 		if endpointSample.OffsetMS == nil && endpointSample.Setup == nil {
 			continue
@@ -317,10 +335,21 @@ func (receiver Receiver) validateBlockEnvelope(envelope Envelope, now time.Time)
 		Version: model.ObservationVersion, ObservationID: envelope.BatchID,
 		Source: RemoteSource, RunID: envelope.BatchID, ConfigRevision: envelope.ConfigRevision,
 		RecordType: model.RecordTypeBlockSample, ObservedAt: first.UTC(), Vantage: vantage,
-		BlockID:         forwarded.BlockID,
+		BlockID: forwarded.BlockID, BlockHeight: mostObservedHeight(heightCounts),
 		EndpointSamples: derived, EligibleEndpoints: eligible,
 	}
 	return []model.Observation{sample}, nil
+}
+
+func mostObservedHeight(counts map[uint64]int) uint64 {
+	var selected uint64
+	best := 0
+	for height, count := range counts {
+		if count > best || (count == best && (selected == 0 || height < selected)) {
+			selected, best = height, count
+		}
+	}
+	return selected
 }
 
 func validateEndpointSetup(setup *model.EndpointSetup, tlsEndpoint bool, sentAt time.Time) error {

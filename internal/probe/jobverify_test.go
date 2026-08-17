@@ -9,7 +9,7 @@ import (
 func TestVerifyJob(t *testing.T) {
 	workerScript, _ := hex.DecodeString("76a914111111111111111111111111111111111111111188ac")
 	coinbase1 := "0100000001" + zeroHex(32) + "ffffffff0c03a1bb0d"
-	coinbase2 := "ffffffff01" + "00f2052a01000000" + "19" + hex.EncodeToString(workerScript) + "00000000"
+	coinbase2 := "ffffffff01" + "205fa01200000000" + "19" + hex.EncodeToString(workerScript) + "00000000"
 	j := Job{PrevHash: zeroHex(32), Coinbase1: coinbase1, Coinbase2: coinbase2, MerkleBranches: []string{zeroHex(32)}, Version: "20000000", Bits: "17034219", NTime: "66ad0000", ExtraNonce1: "01020304", ExtraNonce2Size: 4, WorkerScript: workerScript}
 	v := VerifyJob(j)
 	if !v.Valid {
@@ -39,7 +39,7 @@ func TestVerifyJobMatchesForwardedWorkerScriptHash(t *testing.T) {
 	job := Job{
 		PrevHash:       zeroHex(32),
 		Coinbase1:      "0100000001" + zeroHex(32) + "ffffffff0c03a1bb0d",
-		Coinbase2:      "ffffffff01" + "00f2052a01000000" + "19" + hex.EncodeToString(workerScript) + "00000000",
+		Coinbase2:      "ffffffff01" + "205fa01200000000" + "19" + hex.EncodeToString(workerScript) + "00000000",
 		MerkleBranches: []string{zeroHex(32)}, Version: "20000000", Bits: "17034219", NTime: "66ad0000",
 		ExtraNonce1: "01020304", ExtraNonce2Size: 4, WorkerScriptSHA256: workerScriptHash[:],
 	}

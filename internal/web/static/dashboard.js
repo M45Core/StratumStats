@@ -6,7 +6,7 @@
   const transportStorageKey = "stratumstats.selectedTransport";
   const groups = [
     ["free_pools", "free-pools-list", "free-solo-pools", "Free solo", "Overall score: highest first"],
-    ["normal_pools", "normal-pools-list", "non-free-solo-pools", "Solo", "Overall score: highest first"],
+    ["normal_pools", "normal-pools-list", "non-free-solo-pools", "Paid solo", "Overall score: highest first"],
     ["pplns_pools", "pplns-pools-list", "pplns-share-pools", "PPLNS shared", "Overall score: highest first"],
     ["other_pools", "other-pools-list", "other-non-solo-pools", "Other shared", "Overall score: highest first"],
     ["no_recent_data_pools", "no-recent-data-pools-list", "no-recent-data-pools", "No recent data", "Alphabetical"],
@@ -17,7 +17,7 @@
   let refreshing = false;
   let currentETag = "";
   let renderedVantage = "";
-  let renderedBlockID = "";
+  let renderedBlockHeight = null;
 
   const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
   const metric = (value) => value == null ? "" : Number(value);
@@ -27,7 +27,6 @@
   const btc = (sats) => `${Math.floor(Number(sats) / 100000000)}.${String(Number(sats) % 100000000).padStart(8, "0")} BTC`;
   const iso = (value) => value ? new Date(value).toISOString() : "";
   const absoluteTime = (value) => new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
-  const shortBlockID = (value) => value.length <= 20 ? value : `${value.slice(0, 10)}…${value.slice(-10)}`;
 
   function relativeAge(timestamp, now = Date.now()) {
     const elapsedSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
@@ -104,7 +103,7 @@
     const destinations = pool.latest_payout_destinations || [];
     if (!destinations.length) {
       if (pool.is_solo && pool.latest_coinbase_total_sats) return '<p class="details-empty">The test miner address is private. No other payment was recorded.</p>';
-      return `<p class="details-empty">No payment details were collected for this endpoint.${pool.is_solo ? "" : " These would describe the block itself, not later payments to miners."}</p>`;
+      return `<p class="details-empty">${pool.is_solo ? "Payment" : "Block payment"} details will appear after a new block is checked.${pool.is_solo ? "" : " These are not later payments to miners."}</p>`;
     }
     const rows = destinations.map((destination) => {
       const destinationCode = destination.address
@@ -124,7 +123,7 @@
     const chart = pool.latency_chart;
     const points = (chart.points || []).map((point) => `<g class="latency-chart-point" tabindex="0" aria-label="${escapeHTML(absoluteTime(point.observed_at))}, ${fixed(point.value)} ms"><title>${escapeHTML(absoluteTime(point.observed_at))} — ${fixed(point.value)} ms</title><circle cx="${fixed(point.x, 1)}" cy="${fixed(point.y, 1)}" r="6"></circle><text x="${fixed(point.label_x, 1)}" y="${fixed(point.label_y, 1)}" text-anchor="${escapeHTML(point.text_anchor)}">${fixed(point.value)} ms</text></g>`).join("");
     const hidden = history.map((point) => `<li>${escapeHTML(absoluteTime(point.observed_at))}: ${fixed(point.value)} ms</li>`).join("");
-    return `<div class="latency-chart-shell"><svg class="latency-line-chart" viewBox="0 0 640 204" role="img" aria-labelledby="latency-chart-title-${escapeHTML(pool.row_id)} latency-chart-desc-${escapeHTML(pool.row_id)}"><title id="latency-chart-title-${escapeHTML(pool.row_id)}">Recent block-template latency for ${escapeHTML(pool.pool_name)} endpoint ${escapeHTML(pool.endpoint)}</title><desc id="latency-chart-desc-${escapeHTML(pool.row_id)}">Line graph of ${chart.points.length} endpoint block-template latency samples from the last 24 hours. ${pool.combined_vantage ? "Each point is the median across US regions for one Bitcoin block. " : ""}Lower is better.</desc><g class="latency-chart-grid" aria-hidden="true"><line x1="56" y1="18" x2="624" y2="18"></line><line x1="56" y1="58" x2="624" y2="58"></line><line x1="56" y1="98" x2="624" y2="98"></line><line x1="56" y1="138" x2="624" y2="138"></line><line x1="56" y1="178" x2="624" y2="178"></line><text x="49" y="24" text-anchor="end">${fixed(chart.max_value)} ms</text><text x="49" y="104" text-anchor="end">${fixed(chart.mid_value)} ms</text><text x="49" y="184" text-anchor="end">0 ms</text></g><path class="latency-chart-area" d="${escapeHTML(chart.area_path)}" aria-hidden="true"></path><polyline class="latency-chart-line" points="${escapeHTML(chart.polyline)}" aria-hidden="true"></polyline>${points}</svg><div class="latency-chart-times">${timeHTML(chart.start.observed_at)}<span>time</span>${timeHTML(chart.end.observed_at)}</div></div><ol class="visually-hidden latency-chart-data">${hidden}</ol><p>${pool.combined_vantage ? "Median regional delay for each Bitcoin block;" : "Relative delay until this endpoint's first valid template arrives;"} lower is better.</p>`;
+    return `<div class="latency-chart-shell"><svg class="latency-line-chart" viewBox="0 0 640 204" role="img" aria-labelledby="latency-chart-title-${escapeHTML(pool.row_id)} latency-chart-desc-${escapeHTML(pool.row_id)}"><title id="latency-chart-title-${escapeHTML(pool.row_id)}">Recent block-template latency for ${escapeHTML(pool.pool_name)} endpoint ${escapeHTML(pool.endpoint)}</title><desc id="latency-chart-desc-${escapeHTML(pool.row_id)}">Line graph of ${chart.points.length} endpoint block-template latency samples from the last 24 hours. ${pool.combined_vantage ? "Each point is the median across US regions for one Bitcoin block. " : ""}Lower is better.</desc><g class="latency-chart-grid" aria-hidden="true"><line x1="56" y1="18" x2="624" y2="18"></line><line x1="56" y1="58" x2="624" y2="58"></line><line x1="56" y1="98" x2="624" y2="98"></line><line x1="56" y1="138" x2="624" y2="138"></line><line x1="56" y1="178" x2="624" y2="178"></line><text x="49" y="24" text-anchor="end">${fixed(chart.max_value)} ms</text><text x="49" y="104" text-anchor="end">${fixed(chart.mid_value)} ms</text><text x="49" y="184" text-anchor="end">0 ms</text></g><path class="latency-chart-area" d="${escapeHTML(chart.area_path)}" aria-hidden="true"></path><polyline class="latency-chart-line" points="${escapeHTML(chart.polyline)}" aria-hidden="true"></polyline>${points}</svg><div class="latency-chart-times">${timeHTML(chart.start.observed_at)}<span>time</span>${timeHTML(chart.end.observed_at)}</div></div><ol class="visually-hidden latency-chart-data">${hidden}</ol><p>${pool.combined_vantage ? "Median regional delay for each Bitcoin block;" : "Relative delay until this endpoint's first clean block transition arrives;"} lower is better.</p>`;
   }
 
   function feeHistoryHTML(pool) {
@@ -167,12 +166,12 @@
     renderControls(data);
     document.querySelector("[data-demo-notice]").hidden = !data.demo;
     const snapshot = data.snapshot;
-    const blockID = String(snapshot.latest_block_id || "");
-    const blockChanged = renderedVantage === data.selected_vantage && renderedBlockID && blockID && blockID !== renderedBlockID;
+    const blockHeight = Number(snapshot.latest_block_height) || null;
+    const heightChanged = renderedVantage === data.selected_vantage && renderedBlockHeight !== null && blockHeight !== null && blockHeight !== renderedBlockHeight;
     const update = data.data_updated_at ? `Region updated ${timeHTML(data.data_updated_at)}` : `No regional data in the last ${snapshot.retention_window_days} days`;
-    const block = blockID ? `<span class="block-height-pill${blockChanged ? " block-height-changed" : ""}" data-block-id title="Latest previous-block hash observed in this region">Block <strong>${escapeHTML(shortBlockID(blockID))}</strong></span>` : "";
+    const height = blockHeight ? `<span class="block-height-pill${heightChanged ? " block-height-changed" : ""}" data-block-height title="Latest solved Bitcoin block observed in this region">Block <strong>${blockHeight.toLocaleString()}</strong></span>` : "";
     const configState = data.vantage_status && !data.vantage_status.config_current ? `<span class="config-pending-pill" title="This regional Scout has not reported the active pool configuration yet">Pool update pending</span>` : "";
-    const regionSummary = `<div class="region-summary" aria-label="Regional measurement status" data-region-summary><span class="region-update-pill">${update}</span>${configState}${block}</div>`;
+    const regionSummary = `<div class="region-summary" aria-label="Regional measurement status" data-region-summary><span class="region-update-pill">${update}</span>${configState}${height}</div>`;
     const jump = document.querySelector("[data-section-jump]");
     jump.innerHTML = '<span class="control-label">Jump to</span>';
     let visible = 0;
@@ -189,9 +188,9 @@
     }
     jump.hidden = visible === 0;
     expanded.forEach((id) => setDetailsState(document.querySelector(`.measurement-row[data-pool-id="${CSS.escape(id)}"]`), true));
-    if (blockChanged) document.querySelector("[data-live-status]").textContent = `New Bitcoin block ${shortBlockID(blockID)} observed in ${data.selected_label}.`;
+    if (heightChanged) document.querySelector("[data-live-status]").textContent = `New Bitcoin block ${blockHeight.toLocaleString()} observed in ${data.selected_label}.`;
     renderedVantage = data.selected_vantage;
-    renderedBlockID = blockID;
+    renderedBlockHeight = blockHeight;
     document.querySelector("[data-live-footnote]").innerHTML = `${escapeHTML(data.selected_label)}. Median, P95, history, and Stratum timings use the latest ${snapshot.latency_window_hours} hours. No observation older than ${snapshot.retention_window_days} days is used; availability uses eligible block observations within that window. Estimated mining loss combines missed eligible deliveries with median relative delay during available time; values below 0.1% display as &lt;0.1% and receive full mining-loss score. It is not measured revenue loss. Score weights: availability 40%, mining loss 25%, P95 20%, connection/setup responsiveness 10%, and observed fee stability 5% when available. A recent fee increase subtracts up to 15 additional points over 30 days; observed fees above 2.5% subtract up to 10 more points; an invalid TLS certificate subtracts 10 points. A solo pool whose worker wallet is not found receives a score of 0.`;
     updateRelativeTimes();
   }

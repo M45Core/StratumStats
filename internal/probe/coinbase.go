@@ -28,6 +28,64 @@ type coinbaseSummary struct {
 	OmittedSats      uint64
 }
 
+// AnalyzeCoinbaseSource reconstructs only the coinbase transaction needed by
+// the dashboard. It deliberately does not inspect merkle branches, header
+// fields, difficulty, or any other structural job data.
+func AnalyzeCoinbaseSource(source model.CoinbaseSource) (uint64, model.CoinbaseEvidence, error) {
+	if source.ExtraNonce2Size < 1 || source.ExtraNonce2Size > 32 {
+		return 0, model.CoinbaseEvidence{}, fmt.Errorf("extranonce2 size is outside 1..32")
+	}
+	decode := func(name, value string) ([]byte, error) {
+		if value == "" {
+			return nil, fmt.Errorf("%s is empty", name)
+		}
+		decoded, err := hex.DecodeString(value)
+		if err != nil {
+			return nil, fmt.Errorf("%s is not hex", name)
+		}
+		return decoded, nil
+	}
+	coinbase1, err := decode("coinbase1", source.Coinbase1)
+	if err != nil {
+		return 0, model.CoinbaseEvidence{}, err
+	}
+	coinbase2, err := decode("coinbase2", source.Coinbase2)
+	if err != nil {
+		return 0, model.CoinbaseEvidence{}, err
+	}
+	extraNonce1, err := decode("extranonce1", source.ExtraNonce1)
+	if err != nil {
+		return 0, model.CoinbaseEvidence{}, err
+	}
+	workerScriptHash, err := decode("worker script hash", source.WorkerScriptSHA256)
+	if err != nil {
+		return 0, model.CoinbaseEvidence{}, err
+	}
+	if len(workerScriptHash) != sha256.Size {
+		return 0, model.CoinbaseEvidence{}, fmt.Errorf("worker script hash is %d bytes, want %d", len(workerScriptHash), sha256.Size)
+	}
+	coinbase := make([]byte, 0, len(coinbase1)+len(extraNonce1)+source.ExtraNonce2Size+len(coinbase2))
+	coinbase = append(coinbase, coinbase1...)
+	coinbase = append(coinbase, extraNonce1...)
+	coinbase = append(coinbase, make([]byte, source.ExtraNonce2Size)...)
+	coinbase = append(coinbase, coinbase2...)
+	summary, err := analyzeCoinbaseWithWorkerHash(coinbase, nil, workerScriptHash)
+	if err != nil {
+		return 0, model.CoinbaseEvidence{}, err
+	}
+	evidence := model.CoinbaseEvidence{
+		WorkerWalletInCoinbase: summary.WorkerWalletSeen,
+		CoinbaseTotalSats:      summary.TotalSats, WorkerPayoutSats: summary.WorkerSats,
+		CoinbaseOutputs: summary.Outputs, CoinbaseOutputCount: summary.OutputCount,
+		CoinbaseOutputsTruncated: summary.OutputsTruncated, CoinbaseOmittedSats: summary.OmittedSats,
+	}
+	if summary.WorkerWalletSeen && summary.TotalSats > 0 {
+		fee := 100 * float64(summary.TotalSats-summary.WorkerSats) / float64(summary.TotalSats)
+		evidence.EstimatedPoolFeePct = &fee
+	}
+	return summary.BlockHeight, evidence, nil
+}
+
 // analyzeCoinbase parses both legacy and witness transaction serialization.
 // Matching uses the exact scriptPubKey generated for this probe session.
 func analyzeCoinbase(raw, workerScript []byte) (coinbaseSummary, error) {

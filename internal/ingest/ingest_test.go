@@ -18,6 +18,17 @@ import (
 	"github.com/M45Core/StratumStats/internal/model"
 )
 
+func testCoinbaseSource() *model.CoinbaseSource {
+	workerScript, _ := hex.DecodeString("76a914111111111111111111111111111111111111111188ac")
+	workerHash := sha256.Sum256(workerScript)
+	return &model.CoinbaseSource{
+		Coinbase1:   "0100000001" + strings.Repeat("00", 32) + "ffffffff0c03a1bb0d",
+		Coinbase2:   "ffffffff01" + "205fa01200000000" + "19" + hex.EncodeToString(workerScript) + "00000000",
+		ExtraNonce1: "01020304", ExtraNonce2Size: 4,
+		WorkerScriptSHA256: hex.EncodeToString(workerHash[:]),
+	}
+}
+
 func testBlockEnvelope(now time.Time) (Envelope, []model.Pool) {
 	blockID := strings.Repeat("a", 64)
 	first, second := now.Add(-30*time.Second), now.Add(-30*time.Second+25_500*time.Microsecond)
@@ -29,7 +40,7 @@ func testBlockEnvelope(now time.Time) (Envelope, []model.Pool) {
 	sample := &model.BlockSample{
 		BlockID: blockID,
 		EndpointSamples: []model.ForwardedEndpointSample{
-			{PoolID: "pool", Endpoint: "one.example:3333", ReceivedAt: &first, Setup: &model.EndpointSetup{Connect: connect}},
+			{PoolID: "pool", Endpoint: "one.example:3333", ReceivedAt: &first, Setup: &model.EndpointSetup{Connect: connect}, Coinbase: testCoinbaseSource()},
 			{PoolID: "pool", Endpoint: "two.example:443", TLS: true, ReceivedAt: &second},
 		},
 	}
@@ -103,9 +114,19 @@ func TestReceiverAcceptsOneAtomicBlockSample(t *testing.T) {
 	}
 	got := appended[0]
 	if got.RecordType != model.RecordTypeBlockSample || got.Source != RemoteSource || got.Vantage != "us-west" ||
-		got.RunID != envelope.BatchID || got.BlockID != envelope.Sample.BlockID || got.BlockHeight != 0 ||
+		got.RunID != envelope.BatchID || got.BlockID != envelope.Sample.BlockID || got.BlockHeight != 900_000 ||
 		len(got.EndpointSamples) != 2 || len(got.EligibleEndpoints) != 2 {
 		t.Fatalf("block sample=%+v", got)
+	}
+	if got.EndpointSamples[0].Coinbase == nil || !got.EndpointSamples[0].Coinbase.WorkerWalletInCoinbase || got.EndpointSamples[0].Coinbase.EstimatedPoolFeePct == nil || *got.EndpointSamples[0].Coinbase.EstimatedPoolFeePct != 0 {
+		t.Fatalf("coinbase evidence=%+v", got.EndpointSamples[0].Coinbase)
+	}
+	encoded, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(encoded, []byte(`"coinbase1"`)) || bytes.Contains(encoded, []byte(`"worker_script_sha256"`)) {
+		t.Fatalf("persisted sample retained forwarded coinbase source: %s", encoded)
 	}
 	if got.EndpointSamples[0].Setup == nil || got.EndpointSamples[0].Setup.Connect == nil || got.EndpointSamples[0].Setup.Subscribe != nil {
 		t.Fatalf("optional setup=%+v", got.EndpointSamples[0].Setup)
@@ -136,6 +157,22 @@ func TestReceiverAcceptsSingleArrivalBlockSample(t *testing.T) {
 	if response.Code != http.StatusAccepted || len(appended) != 1 ||
 		len(appended[0].EndpointSamples) != 1 || len(appended[0].EligibleEndpoints) != 2 {
 		t.Fatalf("status=%d body=%s appended=%+v", response.Code, response.Body.String(), appended)
+	}
+}
+
+func TestReceiverKeepsArrivalWhenCoinbaseCannotBeDecoded(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	envelope, pools := testBlockEnvelope(now)
+	envelope.Sample.EndpointSamples[0].Coinbase.Coinbase1 = "not-hex"
+	var appended []model.Observation
+	receiver := testReceiver(now, pools, &appended)
+	response := httptest.NewRecorder()
+	receiver.ServeHTTP(response, signedRequest(t, envelope, []byte("secret"), now))
+	if response.Code != http.StatusAccepted || len(appended) != 1 {
+		t.Fatalf("status=%d body=%s appended=%+v", response.Code, response.Body.String(), appended)
+	}
+	if appended[0].BlockHeight != 0 || appended[0].EndpointSamples[0].OffsetMS == nil || appended[0].EndpointSamples[0].Coinbase != nil {
+		t.Fatalf("malformed coinbase affected arrival sample: %+v", appended[0])
 	}
 }
 
