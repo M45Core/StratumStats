@@ -169,8 +169,8 @@ Neither the misses nor the surviving measurements in an excluded cohort affect
 availability, latency, payout evidence, fees, or score; the original JSONL
 records remain available for diagnosis. The dashboard payload publishes the
 number of excluded cohorts as `snapshot.excluded_regional_cohorts`.
-The production Fly regions are IAD (`us-east`), FRA (`europe`), LAX
-(`us-west`), NRT (`japan`), and SIN (`singapore`). IAD is the default view.
+The production Fly regions are EWR (`us-east`), FRA (`europe`), LAX
+(`us-west`), NRT (`japan`), and SIN (`singapore`). EWR is the default view.
 The embedded [`regions.json`](internal/model/regions.json) catalogs all current
 Fly regions with friendly city/country names; `enabled` controls ingestion and
 dashboard tabs, `order` controls display/default order, and `continent` is kept

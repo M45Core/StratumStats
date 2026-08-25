@@ -31,7 +31,7 @@ func TestRemoteCoinbaseSourcePopulatesDisplayedDashboardData(t *testing.T) {
 		workerPayoutSats  = uint64(306_250_000)
 		poolFeeSats       = uint64(6_250_000)
 	)
-	now := time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 	receivedAt := now.Add(-30 * time.Second)
 	workerScript, _ := hex.DecodeString("76a914111111111111111111111111111111111111111188ac")
 	workerHash := sha256.Sum256(workerScript)

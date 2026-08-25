@@ -90,7 +90,7 @@ func testReceiver(now time.Time, pools []model.Pool, appended *[]model.Observati
 
 func TestRegionVantagesMatchesDeployedNodes(t *testing.T) {
 	want := map[string]string{
-		"iad": "us-east", "fra": "europe", "lax": "us-west", "nrt": "japan", "sin": "singapore",
+		"ewr": "us-east", "fra": "europe", "lax": "us-west", "nrt": "japan", "sin": "singapore",
 	}
 	if len(RegionVantages) != len(want) {
 		t.Fatalf("RegionVantages=%v", RegionVantages)
