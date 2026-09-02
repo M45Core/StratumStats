@@ -29,10 +29,20 @@ func TestDemoUsesSyntheticNamesWideLatencyRangeAndSparseOutages(t *testing.T) {
 	}
 
 	observations := demoData(pools)
+	var oldest, newest time.Time
 	for _, observation := range observations {
 		if observation.RecordType == "" && observation.Arrived && (observation.OffsetMS < 10 || observation.OffsetMS > 10_000) {
 			t.Fatalf("demo block delay %.1f ms is outside 10–10,000 ms", observation.OffsetMS)
 		}
+		if observation.RecordType == "" && (oldest.IsZero() || observation.ObservedAt.Before(oldest)) {
+			oldest = observation.ObservedAt
+		}
+		if observation.RecordType == "" && observation.ObservedAt.After(newest) {
+			newest = observation.ObservedAt
+		}
+	}
+	if newest.Sub(oldest) != 24*time.Hour {
+		t.Fatalf("demo history span=%s, want 24h", newest.Sub(oldest))
 	}
 	snapshot := report.Compute(pools, observations, time.Now().UTC())
 	issues := 0

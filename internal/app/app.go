@@ -420,25 +420,27 @@ func oneOf(value string, allowed ...string) bool {
 	return false
 }
 
+const demoHistoryIntervals = 144 // 24 hours at ten-minute intervals, inclusive.
+
 func demoData(pools []model.Pool) []model.Observation {
 	rng := rand.New(rand.NewSource(81)) // #nosec G404 -- reproducible synthetic demo data is intentional.
-	out := make([]model.Observation, 0, len(pools)*120)
+	out := make([]model.Observation, 0, len(pools)*(demoHistoryIntervals+1))
 	now := time.Now().UTC()
 	demoVantages := productionVantages()
-	for i := 0; i < 120; i++ {
+	for i := 0; i <= demoHistoryIntervals; i++ {
 		for p, pool := range pools {
 			for endpointIndex, endpoint := range pool.Endpoints {
 				target := demoLatencyTarget(p, len(pools)) * (1 + float64(endpointIndex)*0.08)
-				jitter := 0.7 + 0.6*float64((i*37+p*11+endpointIndex*7)%120)/119
+				jitter := 0.7 + 0.6*float64((i*37+p*11+endpointIndex*7)%demoHistoryIntervals)/float64(demoHistoryIntervals-1)
 				offset := math.Max(10, math.Min(10_000, target*jitter))
 				arrived := true
 				switch p {
 				case 12:
 					arrived = i != 37 || endpointIndex != 0 // one missed delivery on one endpoint
 				case 24:
-					arrived = i%30 != 0 || endpointIndex != 0 // four missed deliveries on one endpoint
+					arrived = i%30 != 0 || endpointIndex != 0 // periodic misses on one endpoint
 				}
-				observation := model.Observation{Version: model.ObservationVersion, ObservedAt: now.Add(-time.Duration(120-i) * 10 * time.Minute), Vantage: demoVantages[i%len(demoVantages)], BlockID: fmt.Sprintf("demo-%03d", i), PoolID: pool.ID, Endpoint: net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port)), Eligible: true, Arrived: arrived, OffsetMS: offset, EmptyFirst: rng.Float64() < float64(p)*.018, TLS: endpoint.TLS, CoinbaseAnalyzed: arrived}
+				observation := model.Observation{Version: model.ObservationVersion, ObservedAt: now.Add(-time.Duration(demoHistoryIntervals-i) * 10 * time.Minute), Vantage: demoVantages[i%len(demoVantages)], BlockID: fmt.Sprintf("demo-%03d", i), PoolID: pool.ID, Endpoint: net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port)), Eligible: true, Arrived: arrived, OffsetMS: offset, EmptyFirst: rng.Float64() < float64(p)*.018, TLS: endpoint.TLS, CoinbaseAnalyzed: arrived}
 				if arrived {
 					observation.BlockHeight = uint64(900_000 + i)
 				}

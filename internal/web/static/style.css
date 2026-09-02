@@ -46,7 +46,7 @@
 .payout-destinations,.fee-change-list{list-style:none;margin:0;padding:0}
 .latency-chart-shell{margin-top:4px;border:1px solid var(--line);border-radius:4px;background:linear-gradient(180deg,rgba(140,207,255,.035),rgba(140,207,255,.008));padding:8px 8px 6px}
 .latency-line-chart{display:block;width:100%;height:auto;max-height:250px;overflow:visible}
-.latency-chart-grid line{stroke:#26322e;stroke-width:1;stroke-dasharray:2 4;vector-effect:non-scaling-stroke}
+.latency-chart-grid line{stroke:#26322e;stroke-width:1;stroke-dasharray:2 4;vector-effect:non-scaling-stroke}.latency-chart-grid line[x1][y1="18"]{stroke:#34423d}.latency-chart-grid text{dominant-baseline:middle}
 .latency-chart-grid text{fill:var(--muted);font:17px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .latency-chart-area{fill:rgba(140,207,255,.08)}
 .latency-chart-line{fill:none;stroke:#8ccfff;stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
