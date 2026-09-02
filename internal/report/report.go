@@ -45,13 +45,14 @@ type accumulator struct {
 	offsets        map[string]metricSample
 	tls            bool
 	coinbase       map[string]coinbaseSample
+	invalidJobs    map[string]coinbaseSample
 	timings        map[string]*timingAccumulator
 }
 
 func newAccumulator(pool model.Pool, endpoint model.Endpoint) *accumulator {
 	return &accumulator{
 		pool: pool, endpoint: endpoint, address: endpointAddress(endpoint),
-		blocks: map[string]bool{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{},
+		blocks: map[string]bool{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{}, invalidJobs: map[string]coinbaseSample{},
 	}
 }
 
@@ -177,6 +178,12 @@ func computePrepared(pools []model.Pool, observations []model.Observation, now t
 		globalKey := endpointReportKey(o.PoolID, a.address, a.endpoint.TLS) + "\x00" + key
 		eligibleEndpointSamples[globalKey] = true
 		a.blocks[key] = true
+		if o.ErrorCategory == "invalid_job" {
+			old, exists := a.invalidJobs[key]
+			if !exists || o.ObservedAt.After(old.observation.ObservedAt) || (o.ObservedAt.Equal(old.observation.ObservedAt) && order > old.order) {
+				a.invalidJobs[key] = coinbaseSample{observation: o, order: order}
+			}
+		}
 		if o.Arrived && o.OffsetMS >= 0 {
 			templateDeliveries[globalKey] = true
 			if old, exists := a.offsets[key]; !exists || o.OffsetMS < old.value {
@@ -857,6 +864,17 @@ func build(a *accumulator, now time.Time, combineVantages bool) model.PoolReport
 		value := a.lastObservedAt.UTC()
 		lastObservedAt = &value
 	}
+	var latestInvalidJobAt *time.Time
+	latestInvalidJobBlockID := ""
+	latestInvalidJobOrder := -1
+	for _, sample := range a.invalidJobs {
+		if latestInvalidJobAt == nil || sample.observation.ObservedAt.After(*latestInvalidJobAt) || (sample.observation.ObservedAt.Equal(*latestInvalidJobAt) && sample.order > latestInvalidJobOrder) {
+			observedAt := sample.observation.ObservedAt.UTC()
+			latestInvalidJobAt = &observedAt
+			latestInvalidJobBlockID = sample.observation.BlockID
+			latestInvalidJobOrder = sample.order
+		}
+	}
 	report := model.PoolReport{
 		PoolID: a.pool.ID, PoolName: a.pool.Name, Category: a.pool.Category, Products: a.pool.Products,
 		Endpoint: a.address, EndpointTLS: a.endpoint.TLS, EndpointRegion: a.endpoint.Region,
@@ -872,6 +890,7 @@ func build(a *accumulator, now time.Time, combineVantages bool) model.PoolReport
 		LatestCoinbaseObservedAt: latestCoinbaseObservedAt, LatestCoinbaseTotalSats: latestCoinbaseTotalSats,
 		LatestCoinbaseOutputCount: latestCoinbaseOutputCount, LatestPayoutDestinations: latestPayoutDestinations,
 		LatestPayoutDestinationsTruncated: latestPayoutDestinationsTruncated, LatestPayoutOmittedSats: latestPayoutOmittedSats,
+		InvalidJobCount: len(a.invalidJobs), LatestInvalidJobAt: latestInvalidJobAt, LatestInvalidJobBlockID: latestInvalidJobBlockID,
 		TemplateLatencyHistory: recentMetricHistory(latencySamples, 1), PoolFeeHistory: recentMetricHistory(feeSamples, 2),
 	}
 	applyOverallScore(&report, now)

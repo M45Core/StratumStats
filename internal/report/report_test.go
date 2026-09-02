@@ -41,6 +41,21 @@ func TestComputeReportsAvailabilityAndLatency(t *testing.T) {
 	}
 }
 
+func TestComputeReportsInvalidJobWarningDetails(t *testing.T) {
+	now := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+	pool := model.Pool{ID: "pool", Name: "Pool"}
+	observations := []model.Observation{
+		{ObservedAt: now.Add(-25 * 24 * time.Hour), Vantage: "us-east", BlockID: "older-invalid", PoolID: pool.ID, Eligible: true, ErrorCategory: "invalid_job"},
+		{ObservedAt: now.Add(-time.Hour), Vantage: "us-east", BlockID: "latest-invalid", PoolID: pool.ID, Eligible: true, ErrorCategory: "invalid_job"},
+		{ObservedAt: now.Add(-time.Minute), Vantage: "us-east", BlockID: "unrelated-error", PoolID: pool.ID, Eligible: true, ErrorCategory: "connection_failed"},
+	}
+
+	got := Compute([]model.Pool{pool}, observations, now).Reports[0]
+	if got.InvalidJobCount != 2 || got.LatestInvalidJobAt == nil || !got.LatestInvalidJobAt.Equal(now.Add(-time.Hour)) || got.LatestInvalidJobBlockID != "latest-invalid" {
+		t.Fatalf("invalid job details=%+v", got)
+	}
+}
+
 func TestComputeDeduplicatesArrivalsByVantageAndBlock(t *testing.T) {
 	pool := model.Pool{ID: "pool", Name: "Pool"}
 	observations := []model.Observation{

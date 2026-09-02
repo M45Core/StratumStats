@@ -32,13 +32,24 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 
 	script := httptest.NewRecorder()
 	h.ServeHTTP(script, httptest.NewRequest(http.MethodGet, "/static/dashboard.js", nil))
-	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-line-chart", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_height", "block-height-changed", "setInterval(() => refresh(false)"} {
+	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-line-chart", "Warning: invalid mining job detected", "Invalid mining job details", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_height", "block-height-changed", "setInterval(() => refresh(false)"} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("renderer missing %q", want)
 		}
 	}
 	if strings.Contains(script.Body.String(), "DOMParser") || strings.Contains(script.Body.String(), "response.text()") {
 		t.Fatal("dashboard still downloads and parses rendered HTML")
+	}
+
+	style := httptest.NewRecorder()
+	h.ServeHTTP(style, httptest.NewRequest(http.MethodGet, "/static/style.css", nil))
+	for _, want := range []string{".job-validation-warning", ".job-warning-details", ".measurement-row>.measurement-details{grid-column:1/-1"} {
+		if !strings.Contains(style.Body.String(), want) {
+			t.Errorf("dashboard style missing %q", want)
+		}
+	}
+	if strings.Contains(style.Body.String(), "grid-template-columns:subgrid") {
+		t.Fatal("per-section subgrid sizing can misalign expanded detail panels")
 	}
 }
 

@@ -32,7 +32,7 @@ func TestDashboardDataGroupsPoolsByMeasuredEvidence(t *testing.T) {
 	fee, freeFee := 0.75, 0.0
 	pools := []model.Pool{{ID: "paid", Name: "Paid", Category: "solo"}, {ID: "free", Name: "Free", Category: "solo"}, {ID: "missing", Name: "Missing", Category: "solo"}, {ID: "pending", Name: "Pending", Category: "solo"}, {ID: "pplns", Name: "PPLNS", Category: "shared", Products: []string{"PPLNS"}}, {ID: "other", Name: "Other", Category: "shared"}}
 	observations := []model.Observation{
-		{ObservedAt: now, Vantage: "us-east", BlockID: "paid", PoolID: "paid", Eligible: true, Arrived: true, OffsetMS: 10, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
+		{ObservedAt: now, Vantage: "us-east", BlockID: "paid", PoolID: "paid", Eligible: true, Arrived: true, OffsetMS: 10, ErrorCategory: "invalid_job", CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &fee},
 		{ObservedAt: now, Vantage: "us-east", BlockID: "free", PoolID: "free", Eligible: true, Arrived: true, OffsetMS: 20, CoinbaseAnalyzed: true, WorkerWalletInCoinbase: true, EstimatedPoolFeePct: &freeFee},
 		{ObservedAt: now, Vantage: "us-east", BlockID: "missing", PoolID: "missing", Eligible: true, Arrived: true, OffsetMS: 30, CoinbaseAnalyzed: true},
 		{ObservedAt: now, Vantage: "us-east", BlockID: "pending", PoolID: "pending", Eligible: true, Arrived: true, OffsetMS: 35},
@@ -56,6 +56,9 @@ func TestDashboardDataGroupsPoolsByMeasuredEvidence(t *testing.T) {
 	}
 	if !normal["paid"] {
 		t.Fatalf("solo=%+v", payload.NormalPools)
+	}
+	if payload.NormalPools[0].InvalidJobCount != 1 || payload.NormalPools[0].LatestInvalidJobAt == nil || payload.NormalPools[0].LatestInvalidJobBlockID != "paid" {
+		t.Fatalf("invalid job warning=%+v", payload.NormalPools[0])
 	}
 	if len(payload.MissingWalletPools) != 1 || payload.MissingWalletPools[0].OverallScore == nil || *payload.MissingWalletPools[0].OverallScore != 0 {
 		t.Fatalf("missing=%+v", payload.MissingWalletPools)
