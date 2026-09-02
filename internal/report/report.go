@@ -15,7 +15,7 @@ import (
 
 const (
 	MethodologyVersion     = "2026-08-17.36"
-	reportHistoryLimit     = 12
+	feeHistoryLimit        = 12
 	regionalCohortMissPct  = 20
 	regionalCohortMinPools = 5
 	// LatencyWindow is the rolling period used for block-template and protocol timing statistics.
@@ -891,7 +891,11 @@ func build(a *accumulator, now time.Time, combineVantages bool) model.PoolReport
 		LatestCoinbaseOutputCount: latestCoinbaseOutputCount, LatestPayoutDestinations: latestPayoutDestinations,
 		LatestPayoutDestinationsTruncated: latestPayoutDestinationsTruncated, LatestPayoutOmittedSats: latestPayoutOmittedSats,
 		InvalidJobCount: len(a.invalidJobs), LatestInvalidJobAt: latestInvalidJobAt, LatestInvalidJobBlockID: latestInvalidJobBlockID,
-		TemplateLatencyHistory: recentMetricHistory(latencySamples, 1), PoolFeeHistory: recentMetricHistory(feeSamples, 2),
+		// Template deliveries occur about once per block, so retaining all of the
+		// rolling-window points makes the dashboard history an actual 24-hour
+		// timeline instead of a recent-sample excerpt. Fee history remains capped
+		// because its detail view only reports changes.
+		TemplateLatencyHistory: recentMetricHistory(latencySamples, 1, 0), PoolFeeHistory: recentMetricHistory(feeSamples, 2, feeHistoryLimit),
 	}
 	applyOverallScore(&report, now)
 	return report
@@ -903,7 +907,7 @@ func recordLatestObservation(a *accumulator, observedAt time.Time) {
 	}
 }
 
-func recentMetricHistory(samples []metricSample, places int) []model.MetricHistoryPoint {
+func recentMetricHistory(samples []metricSample, places, limit int) []model.MetricHistoryPoint {
 	if len(samples) == 0 {
 		return nil
 	}
@@ -913,8 +917,8 @@ func recentMetricHistory(samples []metricSample, places int) []model.MetricHisto
 		}
 		return samples[i].at.Before(samples[j].at)
 	})
-	if len(samples) > reportHistoryLimit {
-		samples = samples[len(samples)-reportHistoryLimit:]
+	if limit > 0 && len(samples) > limit {
+		samples = samples[len(samples)-limit:]
 	}
 	history := make([]model.MetricHistoryPoint, 0, len(samples))
 	for _, sample := range samples {

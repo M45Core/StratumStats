@@ -42,13 +42,13 @@ type latencyChartPoint struct {
 }
 
 type latencyHistoryChart struct {
-	Points   []latencyChartPoint      `json:"points,omitempty"`
-	Polyline string                   `json:"polyline,omitempty"`
-	AreaPath string                   `json:"area_path,omitempty"`
-	MaxValue float64                  `json:"max_value"`
-	MidValue float64                  `json:"mid_value"`
-	Start    model.MetricHistoryPoint `json:"start"`
-	End      model.MetricHistoryPoint `json:"end"`
+	Points      []latencyChartPoint `json:"points,omitempty"`
+	Polyline    string              `json:"polyline,omitempty"`
+	AreaPath    string              `json:"area_path,omitempty"`
+	MaxValue    float64             `json:"max_value"`
+	MidValue    float64             `json:"mid_value"`
+	WindowStart time.Time           `json:"window_start"`
+	WindowEnd   time.Time           `json:"window_end"`
 }
 
 type dashboardPage struct {
@@ -112,7 +112,7 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			PoolReport: report, Website: websiteByPoolID[report.PoolID], RowID: endpointRowID(report), SortName: report.PoolName + " " + report.Endpoint,
 			LatencyClass: latencyClass(report.MedianMS), MiningLossClass: miningLossClass(report.EstimatedMiningLossPct),
 			IsSolo: isSolo, FeeSortValue: feeSortValue, CombinedVantage: selectedVantage == "us-all",
-			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
+			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory, snapshot.GeneratedAt), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
 		}
 		displayedPools = append(displayedPools, pool)
 		if report.MedianMS == nil {
@@ -269,7 +269,7 @@ func buildFeeChangeHistory(history []model.MetricHistoryPoint) []feeChangePoint 
 	return changes
 }
 
-func buildLatencyHistoryChart(history []model.MetricHistoryPoint) latencyHistoryChart {
+func buildLatencyHistoryChart(history []model.MetricHistoryPoint, windowEnd time.Time) latencyHistoryChart {
 	if len(history) == 0 {
 		return latencyHistoryChart{}
 	}
@@ -279,18 +279,21 @@ func buildLatencyHistoryChart(history []model.MetricHistoryPoint) latencyHistory
 		chartTop    = 18.0
 		chartBottom = 178.0
 	)
+	windowEnd = windowEnd.UTC()
+	windowStart := windowEnd.Add(-24 * time.Hour)
 	maximum := latencyChartCeiling(historyMaximum(history))
 	chart := latencyHistoryChart{
-		Points:   make([]latencyChartPoint, 0, len(history)),
-		MaxValue: maximum, MidValue: maximum / 2,
-		Start: history[0], End: history[len(history)-1],
+		Points:      make([]latencyChartPoint, 0, len(history)),
+		MaxValue:    maximum,
+		MidValue:    maximum / 2,
+		WindowStart: windowStart,
+		WindowEnd:   windowEnd,
 	}
 	polyline := new(strings.Builder)
 	for index, sample := range history {
-		x := (chartLeft + chartRight) / 2
-		if len(history) > 1 {
-			x = chartLeft + float64(index)*(chartRight-chartLeft)/float64(len(history)-1)
-		}
+		elapsed := sample.ObservedAt.Sub(windowStart)
+		progress := math.Max(0, math.Min(1, elapsed.Seconds()/(24*time.Hour).Seconds()))
+		x := chartLeft + progress*(chartRight-chartLeft)
 		y := chartBottom - sample.Value/maximum*(chartBottom-chartTop)
 		labelY := y - 11
 		if labelY < chartTop+7 {

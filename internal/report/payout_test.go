@@ -75,7 +75,7 @@ func TestComputePoolFeeIgnoresSubHundredthNoise(t *testing.T) {
 	}
 }
 
-func TestComputePublishesLatestPayoutSplitAndBoundedHistory(t *testing.T) {
+func TestComputePublishesLatestPayoutSplitAndFullLatencyHistory(t *testing.T) {
 	pool := model.Pool{ID: "solo", Name: "Solo", Category: "solo"}
 	started := time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC)
 	observations := make([]model.Observation, 0, 14)
@@ -102,10 +102,10 @@ func TestComputePublishesLatestPayoutSplitAndBoundedHistory(t *testing.T) {
 	}
 
 	got := Compute([]model.Pool{pool}, observations, started.Add(14*time.Hour)).Reports[0]
-	if len(got.TemplateLatencyHistory) != reportHistoryLimit || len(got.PoolFeeHistory) != reportHistoryLimit {
-		t.Fatalf("history lengths=%d/%d, want %d", len(got.TemplateLatencyHistory), len(got.PoolFeeHistory), reportHistoryLimit)
+	if len(got.TemplateLatencyHistory) != 14 || len(got.PoolFeeHistory) != feeHistoryLimit {
+		t.Fatalf("history lengths=%d/%d, want 14/%d", len(got.TemplateLatencyHistory), len(got.PoolFeeHistory), feeHistoryLimit)
 	}
-	if got.TemplateLatencyHistory[0].Value != 20 || got.TemplateLatencyHistory[11].Value != 130 ||
+	if got.TemplateLatencyHistory[0].Value != 0 || got.TemplateLatencyHistory[13].Value != 130 ||
 		got.PoolFeeHistory[0].Value != 0.2 || got.PoolFeeHistory[11].Value != 1.3 {
 		t.Fatalf("unexpected recent histories: latency=%+v fee=%+v", got.TemplateLatencyHistory, got.PoolFeeHistory)
 	}

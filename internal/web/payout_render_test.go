@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -104,5 +105,20 @@ func TestBuildFeeChangeHistoryOmitsStableSamples(t *testing.T) {
 	got := buildFeeChangeHistory(history)
 	if len(got) != 2 || got[0].Previous != 1 || got[0].Value != 1.25 || got[1].Previous != 1.25 || got[1].Value != .75 {
 		t.Fatalf("history=%+v", got)
+	}
+}
+
+func TestBuildLatencyHistoryChartUsesTheFullRollingWindow(t *testing.T) {
+	windowEnd := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
+	history := []model.MetricHistoryPoint{
+		{ObservedAt: windowEnd.Add(-23 * time.Hour), Value: 10},
+		{ObservedAt: windowEnd.Add(-time.Hour), Value: 20},
+	}
+	chart := buildLatencyHistoryChart(history, windowEnd)
+	if !chart.WindowStart.Equal(windowEnd.Add(-24*time.Hour)) || !chart.WindowEnd.Equal(windowEnd) {
+		t.Fatalf("window=%s to %s", chart.WindowStart, chart.WindowEnd)
+	}
+	if math.Abs(chart.Points[0].X-(56+568.0/24)) > 0.001 || math.Abs(chart.Points[1].X-(56+568.0*23/24)) > 0.001 {
+		t.Fatalf("point positions=%+v", chart.Points)
 	}
 }
