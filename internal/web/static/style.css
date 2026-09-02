@@ -35,7 +35,7 @@
 .details-plus{display:inline-grid;place-items:center;width:14px;height:14px;border:1px solid #52635d;border-radius:50%;font-size:11px;line-height:1;transition:transform .15s ease}
 .details-toggle[aria-expanded=true]{color:var(--mint)}
 .details-toggle[aria-expanded=true] .details-plus{transform:rotate(45deg);border-color:var(--mint)}
-.details-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(430px,.85fr);background:#0d1211}
+.details-grid{display:grid;grid-template-columns:minmax(320px,480px) minmax(0,1fr);min-width:0;overflow:hidden;background:#0d1211}
 .payout-details,.history-details{min-width:0;padding:20px}
 .payout-details h3,.history-details h3{margin:2px 0 0;font:700 20px/1.15 Georgia,serif}
 .payout-details p,.history-details p{margin:0}

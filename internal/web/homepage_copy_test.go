@@ -43,7 +43,7 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 
 	style := httptest.NewRecorder()
 	h.ServeHTTP(style, httptest.NewRequest(http.MethodGet, "/static/style.css", nil))
-	for _, want := range []string{".job-validation-warning", ".job-warning-details", ".measurement-row>.measurement-details{grid-column:1/-1"} {
+	for _, want := range []string{".job-validation-warning", ".job-warning-details", ".measurement-row>.measurement-details{grid-column:1/-1", ".details-grid{display:grid;grid-template-columns:minmax(320px,480px) minmax(0,1fr);min-width:0;overflow:hidden"} {
 		if !strings.Contains(style.Body.String(), want) {
 			t.Errorf("dashboard style missing %q", want)
 		}
