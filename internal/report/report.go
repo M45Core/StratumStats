@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MethodologyVersion     = "2026-08-17.36"
+	MethodologyVersion     = "2026-09-04.37"
 	feeHistoryLimit        = 12
 	regionalCohortMissPct  = 20
 	regionalCohortMinPools = 5
@@ -29,6 +29,7 @@ type metricSample struct {
 	order   int
 	value   float64
 	blockID string
+	win     bool
 }
 
 type coinbaseSample struct {
@@ -42,6 +43,7 @@ type accumulator struct {
 	address        string
 	lastObservedAt time.Time
 	blocks         map[string]bool
+	blockTimes     map[string]time.Time
 	offsets        map[string]metricSample
 	tls            bool
 	coinbase       map[string]coinbaseSample
@@ -52,7 +54,7 @@ type accumulator struct {
 func newAccumulator(pool model.Pool, endpoint model.Endpoint) *accumulator {
 	return &accumulator{
 		pool: pool, endpoint: endpoint, address: endpointAddress(endpoint),
-		blocks: map[string]bool{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{}, invalidJobs: map[string]coinbaseSample{},
+		blocks: map[string]bool{}, blockTimes: map[string]time.Time{}, offsets: map[string]metricSample{}, coinbase: map[string]coinbaseSample{}, invalidJobs: map[string]coinbaseSample{},
 	}
 }
 
@@ -178,6 +180,9 @@ func computePrepared(pools []model.Pool, observations []model.Observation, now t
 		globalKey := endpointReportKey(o.PoolID, a.address, a.endpoint.TLS) + "\x00" + key
 		eligibleEndpointSamples[globalKey] = true
 		a.blocks[key] = true
+		if previous, exists := a.blockTimes[key]; !exists || o.ObservedAt.Before(previous) {
+			a.blockTimes[key] = o.ObservedAt
+		}
 		if o.ErrorCategory == "invalid_job" {
 			old, exists := a.invalidJobs[key]
 			if !exists || o.ObservedAt.After(old.observation.ObservedAt) || (o.ObservedAt.Equal(old.observation.ObservedAt) && order > old.order) {
@@ -187,7 +192,7 @@ func computePrepared(pools []model.Pool, observations []model.Observation, now t
 		if o.Arrived && o.OffsetMS >= 0 {
 			templateDeliveries[globalKey] = true
 			if old, exists := a.offsets[key]; !exists || o.OffsetMS < old.value {
-				a.offsets[key] = metricSample{at: o.ObservedAt, order: order, value: o.OffsetMS, blockID: o.BlockID}
+				a.offsets[key] = metricSample{at: o.ObservedAt, order: order, value: o.OffsetMS, blockID: o.BlockID, win: o.OffsetMS == 0}
 			}
 		}
 		if o.Arrived && o.CoinbaseAnalyzed {
@@ -719,6 +724,7 @@ func medianLatencyByBlock(samples []metricSample) []metricSample {
 		}
 		sort.Float64s(values)
 		canonical.value = percentile(values, .5)
+		canonical.win = canonical.value == 0
 		canonical.blockID = blockID
 		combined = append(combined, canonical)
 	}
@@ -745,8 +751,18 @@ func build(a *accumulator, now time.Time, combineVantages bool) model.PoolReport
 	if combineVantages {
 		latencySamples = medianLatencyByBlock(latencySamples)
 	}
+	winEligibleBlocks := recentWinEligibleBlocks(a.blockTimes, now, combineVantages)
+	wins := 0
 	for _, sample := range latencySamples {
 		offsetValues = append(offsetValues, sample.value)
+		if sample.win {
+			wins++
+		}
+	}
+	var winPercentage *float64
+	if winEligibleBlocks > 0 {
+		value := round(100*float64(wins)/float64(winEligibleBlocks), 1)
+		winPercentage = &value
 	}
 	var median, p95 *float64
 	if len(offsetValues) > 0 {
@@ -880,6 +896,7 @@ func build(a *accumulator, now time.Time, combineVantages bool) model.PoolReport
 		Endpoint: a.address, EndpointTLS: a.endpoint.TLS, EndpointRegion: a.endpoint.Region,
 		LastObservedAt: lastObservedAt,
 		Blocks:         blocks, Arrivals: arrivals, EligibleChecks: eligibleChecks, DeliveryChecks: deliveryChecks,
+		Wins: wins, WinEligibleBlocks: winEligibleBlocks, WinPercentage: winPercentage,
 		MedianMS: median, P95MS: p95, EstimatedMiningLossPct: estimatedMiningLoss(median, availability, blocks),
 		Availability: round(availability, 1), TLSObserved: a.tls,
 		ConnectTiming: timingStats(a, model.ProtocolConnect), TLSTiming: timingStats(a, model.ProtocolTLSHandshake),
@@ -922,9 +939,30 @@ func recentMetricHistory(samples []metricSample, places, limit int) []model.Metr
 	}
 	history := make([]model.MetricHistoryPoint, 0, len(samples))
 	for _, sample := range samples {
-		history = append(history, model.MetricHistoryPoint{ObservedAt: sample.at.UTC(), Value: round(sample.value, places)})
+		history = append(history, model.MetricHistoryPoint{ObservedAt: sample.at.UTC(), Value: round(sample.value, places), Win: sample.win})
 	}
 	return history
+}
+
+func recentWinEligibleBlocks(blockTimes map[string]time.Time, now time.Time, combineVantages bool) int {
+	if !combineVantages {
+		count := 0
+		for _, observedAt := range blockTimes {
+			if withinLatencyWindow(observedAt, now) {
+				count++
+			}
+		}
+		return count
+	}
+	blocks := make(map[string]bool)
+	for key, observedAt := range blockTimes {
+		if !withinLatencyWindow(observedAt, now) {
+			continue
+		}
+		_, blockID := observationKeyParts(key)
+		blocks[blockID] = true
+	}
+	return len(blocks)
 }
 
 func withinLatencyWindow(observedAt, now time.Time) bool {

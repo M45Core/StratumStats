@@ -32,7 +32,7 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 
 	script := httptest.NewRecorder()
 	h.ServeHTTP(script, httptest.NewRequest(http.MethodGet, "/static/dashboard.js", nil))
-	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", "fetch(`/pool-history?${params}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-bar-chart", "Warning: invalid mining job detected", "Invalid mining job details", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_height", "block-height-changed", "setInterval(() => refresh(false)"} {
+	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", "fetch(`/pool-history?${params}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "data-sort-wins", "First to block", "latency-chart-bar", "latency-chart-win", "Warning: invalid mining job detected", "Invalid mining job details", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_height", "block-height-changed", "setInterval(() => refresh(false)"} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("renderer missing %q", want)
 		}
@@ -43,7 +43,7 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 
 	style := httptest.NewRecorder()
 	h.ServeHTTP(style, httptest.NewRequest(http.MethodGet, "/static/style.css", nil))
-	for _, want := range []string{".job-validation-warning", ".job-warning-details", ".measurement-row>.measurement-details{grid-column:1/-1", ".details-grid{display:grid;grid-template-columns:minmax(320px,480px) minmax(0,1fr);min-width:0;overflow:hidden"} {
+	for _, want := range []string{".job-validation-warning", ".job-warning-details", ".latency-chart-win", ".win-compact", ".measurement-row>.measurement-details{grid-column:1/-1", ".details-grid{display:grid;grid-template-columns:minmax(320px,480px) minmax(0,1fr);min-width:0;overflow:hidden"} {
 		if !strings.Contains(style.Body.String(), want) {
 			t.Errorf("dashboard style missing %q", want)
 		}

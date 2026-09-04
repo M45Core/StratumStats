@@ -41,6 +41,25 @@ func TestComputeReportsAvailabilityAndLatency(t *testing.T) {
 	}
 }
 
+func TestComputePublishesRecentFirstToBlockWins(t *testing.T) {
+	now := time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)
+	pool := model.Pool{ID: "pool", Name: "Pool"}
+	observations := []model.Observation{
+		{ObservedAt: now.Add(-23 * time.Hour), Vantage: "us-east", BlockID: "win-one", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 0},
+		{ObservedAt: now.Add(-2 * time.Hour), Vantage: "us-east", BlockID: "late", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 40},
+		{ObservedAt: now.Add(-time.Hour), Vantage: "us-east", BlockID: "win-two", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 0},
+		{ObservedAt: now.Add(-25 * time.Hour), Vantage: "us-east", BlockID: "old-win", PoolID: pool.ID, Eligible: true, Arrived: true, OffsetMS: 0},
+	}
+
+	report := Compute([]model.Pool{pool}, observations, now).Reports[0]
+	if report.Wins != 2 || report.WinEligibleBlocks != 3 || report.WinPercentage == nil || *report.WinPercentage != 66.7 {
+		t.Fatalf("wins=%d eligible=%d percentage=%v, want 2/3/66.7", report.Wins, report.WinEligibleBlocks, report.WinPercentage)
+	}
+	if len(report.TemplateLatencyHistory) != 3 || !report.TemplateLatencyHistory[0].Win || report.TemplateLatencyHistory[1].Win || !report.TemplateLatencyHistory[2].Win {
+		t.Fatalf("history win markers=%+v", report.TemplateLatencyHistory)
+	}
+}
+
 func TestComputeReportsInvalidJobWarningDetails(t *testing.T) {
 	now := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
 	pool := model.Pool{ID: "pool", Name: "Pool"}

@@ -50,7 +50,7 @@
 .latency-chart-grid text{fill:var(--muted);font:17px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .latency-chart-bar{outline:none}
 .latency-chart-bar rect{fill:#8ccfff;stroke:#8ccfff;stroke-width:1;vector-effect:non-scaling-stroke;transition:fill .15s,stroke .15s}
-.latency-chart-bar:hover rect,.latency-chart-bar:focus rect{fill:var(--mint);stroke:var(--mint)}
+.latency-chart-bar:hover rect,.latency-chart-bar:focus rect{fill:var(--mint);stroke:var(--mint)}.latency-chart-win rect{fill:var(--amber);stroke:var(--amber)}.latency-chart-win-note{color:var(--amber)}
 .latency-chart-reference line{stroke-width:1.25;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}.latency-chart-reference text{font:12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.latency-chart-reference-median line{stroke:#65e5aa}.latency-chart-reference-median text{fill:#98f4c5}.latency-chart-reference-p95 line{stroke:#f2b566}.latency-chart-reference-p95 text{fill:#ffd092}
 .latency-chart-hover-note{color:var(--mint)}
 .latency-chart-times{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 8px 2px 40px;color:var(--muted);font-size:8px}
@@ -92,6 +92,8 @@
 .details-empty{padding:18px;border:1px dashed #33403c;color:var(--muted);font-size:10px}
 @media(max-width:900px){.details-grid{grid-template-columns:1fr}.history-details{border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:600px){.detail-heading{display:block}.detail-meta{align-items:flex-start;margin-top:8px}}
+
+.measurement-head,.measurement-row{grid-template-columns:.55fr 1.25fr 1.4fr .75fr .9fr .9fr .9fr 1.1fr 1.1fr 1.05fr;min-width:1410px}.win-compact strong{color:var(--amber)}
 
 .donation-banner{max-width:1180px;margin:16px auto 0;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid #815f31;border-left:4px solid var(--amber);border-radius:5px;background:linear-gradient(90deg,#2a2013,#181713);box-shadow:0 8px 28px rgba(0,0,0,.18)}
 .donation-copy strong{display:block;color:var(--amber);font:700 18px/1.2 Georgia,serif}
