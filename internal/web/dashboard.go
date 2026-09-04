@@ -3,9 +3,7 @@ package web
 import (
 	"fmt"
 	"hash/fnv"
-	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/M45Core/StratumStats/internal/model"
@@ -13,42 +11,23 @@ import (
 
 type dashboardPool struct {
 	model.PoolReport
-	Website          string              `json:"website,omitempty"`
-	RowID            string              `json:"row_id"`
-	SortName         string              `json:"sort_name"`
-	LatencyClass     string              `json:"latency_class"`
-	MiningLossClass  string              `json:"mining_loss_class"`
-	UnsafeReason     string              `json:"unsafe_reason,omitempty"`
-	WalletEvidence   string              `json:"wallet_evidence,omitempty"`
-	IsSolo           bool                `json:"is_solo"`
-	FeeSortValue     *float64            `json:"fee_sort_value"`
-	CombinedVantage  bool                `json:"combined_vantage"`
-	LatencyChart     latencyHistoryChart `json:"latency_chart"`
-	FeeChangeHistory []feeChangePoint    `json:"fee_change_history,omitempty"`
+	Website             string           `json:"website,omitempty"`
+	RowID               string           `json:"row_id"`
+	SortName            string           `json:"sort_name"`
+	LatencyClass        string           `json:"latency_class"`
+	MiningLossClass     string           `json:"mining_loss_class"`
+	UnsafeReason        string           `json:"unsafe_reason,omitempty"`
+	WalletEvidence      string           `json:"wallet_evidence,omitempty"`
+	IsSolo              bool             `json:"is_solo"`
+	FeeSortValue        *float64         `json:"fee_sort_value"`
+	CombinedVantage     bool             `json:"combined_vantage"`
+	LatencyHistoryCount int              `json:"latency_history_count"`
+	FeeChangeHistory    []feeChangePoint `json:"fee_change_history,omitempty"`
 }
 
 type feeChangePoint struct {
 	model.MetricHistoryPoint
 	Previous float64 `json:"previous"`
-}
-
-type latencyChartPoint struct {
-	model.MetricHistoryPoint
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	LabelX     float64 `json:"label_x"`
-	LabelY     float64 `json:"label_y"`
-	TextAnchor string  `json:"text_anchor"`
-}
-
-type latencyHistoryChart struct {
-	Points      []latencyChartPoint `json:"points,omitempty"`
-	Polyline    string              `json:"polyline,omitempty"`
-	AreaPath    string              `json:"area_path,omitempty"`
-	MaxValue    float64             `json:"max_value"`
-	MidValue    float64             `json:"mid_value"`
-	WindowStart time.Time           `json:"window_start"`
-	WindowEnd   time.Time           `json:"window_end"`
 }
 
 type dashboardPage struct {
@@ -103,6 +82,9 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 		if report.EndpointTLS != (selectedTransport == "tls") {
 			continue
 		}
+		latencyHistoryCount := min(len(report.TemplateLatencyHistory), poolHistoryLimit)
+		// The chart is fetched separately when this endpoint's details open.
+		report.TemplateLatencyHistory = nil
 		isSolo := report.Category == "solo"
 		var feeSortValue *float64
 		if isSolo {
@@ -112,7 +94,7 @@ func buildDashboardPage(snapshot model.Snapshot, pools []model.Pool, demo bool, 
 			PoolReport: report, Website: websiteByPoolID[report.PoolID], RowID: endpointRowID(report), SortName: report.PoolName + " " + report.Endpoint,
 			LatencyClass: latencyClass(report.MedianMS), MiningLossClass: miningLossClass(report.EstimatedMiningLossPct),
 			IsSolo: isSolo, FeeSortValue: feeSortValue, CombinedVantage: selectedVantage == "us-all",
-			LatencyChart: buildLatencyHistoryChart(report.TemplateLatencyHistory, snapshot.GeneratedAt), FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
+			LatencyHistoryCount: latencyHistoryCount, FeeChangeHistory: buildFeeChangeHistory(report.PoolFeeHistory),
 		}
 		displayedPools = append(displayedPools, pool)
 		if report.MedianMS == nil {
@@ -267,78 +249,4 @@ func buildFeeChangeHistory(history []model.MetricHistoryPoint) []feeChangePoint 
 		previous = point.Value
 	}
 	return changes
-}
-
-func buildLatencyHistoryChart(history []model.MetricHistoryPoint, windowEnd time.Time) latencyHistoryChart {
-	if len(history) == 0 {
-		return latencyHistoryChart{}
-	}
-	const (
-		chartLeft   = 56.0
-		chartRight  = 624.0
-		chartTop    = 18.0
-		chartBottom = 178.0
-	)
-	windowEnd = windowEnd.UTC()
-	windowStart := windowEnd.Add(-24 * time.Hour)
-	maximum := latencyChartCeiling(historyMaximum(history))
-	chart := latencyHistoryChart{
-		Points:      make([]latencyChartPoint, 0, len(history)),
-		MaxValue:    maximum,
-		MidValue:    maximum / 2,
-		WindowStart: windowStart,
-		WindowEnd:   windowEnd,
-	}
-	polyline := new(strings.Builder)
-	for index, sample := range history {
-		elapsed := sample.ObservedAt.Sub(windowStart)
-		progress := math.Max(0, math.Min(1, elapsed.Seconds()/(24*time.Hour).Seconds()))
-		x := chartLeft + progress*(chartRight-chartLeft)
-		y := chartBottom - sample.Value/maximum*(chartBottom-chartTop)
-		labelY := y - 11
-		if labelY < chartTop+7 {
-			labelY = y + 21
-		}
-		labelX, textAnchor := x, "middle"
-		if index == 0 {
-			labelX, textAnchor = x+5, "start"
-		} else if index == len(history)-1 {
-			labelX, textAnchor = x-5, "end"
-		}
-		point := latencyChartPoint{MetricHistoryPoint: sample, X: x, Y: y, LabelX: labelX, LabelY: labelY, TextAnchor: textAnchor}
-		chart.Points = append(chart.Points, point)
-		if index > 0 {
-			polyline.WriteByte(32)
-		}
-		fmt.Fprintf(polyline, "%.1f,%.1f", x, y)
-	}
-	chart.Polyline = polyline.String()
-	last := chart.Points[len(chart.Points)-1]
-	chart.AreaPath = fmt.Sprintf("M %.1f %.1f L %s L %.1f %.1f Z", chart.Points[0].X, chartBottom, chart.Polyline, last.X, chartBottom)
-	return chart
-}
-
-func latencyChartCeiling(maximum float64) float64 {
-	step := 10.0
-	switch {
-	case maximum > 5000:
-		step = 1000
-	case maximum > 1000:
-		step = 500
-	case maximum > 500:
-		step = 100
-	case maximum > 100:
-		step = 50
-	}
-	return math.Max(step, math.Ceil(maximum/step)*step)
-}
-
-func historyMaximum(history []model.MetricHistoryPoint) float64 {
-	maximum := 1.0
-	for _, point := range history {
-		if point.Value > maximum {
-			maximum = point.Value
-		}
-	}
-	return maximum
 }

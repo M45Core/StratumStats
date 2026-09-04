@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,7 +71,7 @@ func TestDashboardDataGroupsPoolsByMeasuredEvidence(t *testing.T) {
 	}
 }
 
-func TestDashboardDataContainsClientDetailModelWithoutWorkerDestination(t *testing.T) {
+func TestDashboardDataDefersPoolHistoryWithoutExposingWorkerDestination(t *testing.T) {
 	previousFee, latestFee := 1.0, 1.25
 	const workerAddress = "12ZEw5Hcv1hTb6YUQJ69y1V7uhcoDz92PH"
 	now := time.Now().UTC().Add(-time.Minute)
@@ -87,7 +86,7 @@ func TestDashboardDataContainsClientDetailModelWithoutWorkerDestination(t *testi
 	}
 	payload := dashboardPayload(t, h, "/dashboard-data")
 	got := payload.NormalPools[0]
-	if len(got.TemplateLatencyHistory) != 2 || len(got.LatencyChart.Points) != 2 || len(got.FeeChangeHistory) != 1 {
+	if len(got.TemplateLatencyHistory) != 0 || got.LatencyHistoryCount != 2 || len(got.FeeChangeHistory) != 1 {
 		t.Fatalf("detail history=%+v", got)
 	}
 	if len(got.LatestPayoutDestinations) != 1 || got.LatestPayoutDestinations[0].Address != "bc1public" {
@@ -97,6 +96,22 @@ func TestDashboardDataContainsClientDetailModelWithoutWorkerDestination(t *testi
 	if strings.Contains(string(body), workerAddress) {
 		t.Fatal("dashboard payload exposed worker destination")
 	}
+	if strings.Contains(string(body), "template_latency_history") || strings.Contains(string(body), "latency_chart") {
+		t.Fatalf("dashboard payload eagerly included graph data: %s", body)
+	}
+
+	historyResponse := httptest.NewRecorder()
+	h.ServeHTTP(historyResponse, httptest.NewRequest(http.MethodGet, "/pool-history?vantage=us-east&pool="+got.RowID, nil))
+	if historyResponse.Code != http.StatusOK || historyResponse.Header().Get("ETag") == "" {
+		t.Fatalf("pool history status=%d headers=%v body=%s", historyResponse.Code, historyResponse.Header(), historyResponse.Body.String())
+	}
+	var history poolHistoryResponse
+	if err := json.Unmarshal(historyResponse.Body.Bytes(), &history); err != nil {
+		t.Fatal(err)
+	}
+	if history.RowID != got.RowID || len(history.TemplateLatencyHistory) != 2 {
+		t.Fatalf("pool history=%+v", history)
+	}
 }
 
 func TestBuildFeeChangeHistoryOmitsStableSamples(t *testing.T) {
@@ -105,20 +120,5 @@ func TestBuildFeeChangeHistoryOmitsStableSamples(t *testing.T) {
 	got := buildFeeChangeHistory(history)
 	if len(got) != 2 || got[0].Previous != 1 || got[0].Value != 1.25 || got[1].Previous != 1.25 || got[1].Value != .75 {
 		t.Fatalf("history=%+v", got)
-	}
-}
-
-func TestBuildLatencyHistoryChartUsesTheFullRollingWindow(t *testing.T) {
-	windowEnd := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
-	history := []model.MetricHistoryPoint{
-		{ObservedAt: windowEnd.Add(-23 * time.Hour), Value: 10},
-		{ObservedAt: windowEnd.Add(-time.Hour), Value: 20},
-	}
-	chart := buildLatencyHistoryChart(history, windowEnd)
-	if !chart.WindowStart.Equal(windowEnd.Add(-24*time.Hour)) || !chart.WindowEnd.Equal(windowEnd) {
-		t.Fatalf("window=%s to %s", chart.WindowStart, chart.WindowEnd)
-	}
-	if math.Abs(chart.Points[0].X-(56+568.0/24)) > 0.001 || math.Abs(chart.Points[1].X-(56+568.0*23/24)) > 0.001 {
-		t.Fatalf("point positions=%+v", chart.Points)
 	}
 }

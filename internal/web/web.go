@@ -84,6 +84,36 @@ func (s Server) Handler() (http.Handler, error) {
 		}
 		writeCachedDashboard(w, r, response)
 	})
+	mux.HandleFunc("GET /pool-history", func(w http.ResponseWriter, r *http.Request) {
+		vantage := r.URL.Query().Get("vantage")
+		if !validVantage(vantage) {
+			http.Error(w, "unknown vantage", http.StatusBadRequest)
+			return
+		}
+		transport := r.URL.Query().Get("transport")
+		if transport == "" {
+			transport = "plain"
+		}
+		if transport != "plain" && transport != "tls" {
+			http.Error(w, "unknown transport", http.StatusBadRequest)
+			return
+		}
+		rowID := r.URL.Query().Get("pool")
+		if rowID == "" {
+			http.Error(w, "pool is required", http.StatusBadRequest)
+			return
+		}
+		response, ok, err := dashboardResponses.poolHistory(vantage+"\x00"+transport, rowID)
+		if err != nil {
+			http.Error(w, "pool history unavailable", http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.Error(w, "pool history not found", http.StatusNotFound)
+			return
+		}
+		writeCachedDashboard(w, r, response)
+	})
 	mux.HandleFunc("GET /coinbase", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	})

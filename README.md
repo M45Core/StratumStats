@@ -208,6 +208,8 @@ add approval protection if desired.
 
 The dashboard HTML is a static shell. It loads and periodically revalidates
 `GET /dashboard-data`, whose JSON is generated only when observations change.
+Latency graph points are excluded from that main payload and fetched for one
+endpoint only when its details panel is opened.
 The service keeps serving the previous complete response while a replacement is
 built, then swaps the new response cache into place atomically. Accepted ingest
 requests are coalesced for ten seconds, matching the browser refresh interval,
@@ -216,6 +218,7 @@ block trigger one cache rebuild. Arrivals during a rebuild request
 at most one follow-up rebuild.
 
 - `GET /dashboard-data` — data used by the dashboard renderer
+- `GET /pool-history` — one endpoint's latency graph data, fetched when its details are opened
 - `GET /api/v1/probe-config` — probe-compatible endpoint configuration
 - `GET /healthz` — liveness
 
@@ -231,6 +234,7 @@ StratumStats sends cache headers suited to each endpoint:
 | --- | --- | --- |
 | `/`, `/methodology`, `/static/*` | `public, max-age=300` | These responses change only when the binary is replaced. The short lifetime prevents an old shell or script surviving a deployment for long. |
 | `/dashboard-data` | `private, no-cache` with `ETag` | Browsers retain the selected region and transport response, then revalidate it. The client also sends the ETag as a `generation` query parameter so conditional refreshes survive proxies that discard `If-None-Match`. Unchanged data returns an empty `304`; updated data returns the atomically replaced response. |
+| `/pool-history` | `private, no-cache` with `ETag` | The browser requests graph points for only the endpoint whose details panel is opened. |
 | `/api/v1/probe-config` | `no-cache` | Scouts revalidate the current revision after startup or a `SIGUSR1` registry reload. |
 | `/api/v1/ingest`, `/healthz` | `no-store` | Writes and liveness checks must never be cached. |
 

@@ -17,7 +17,9 @@
   let refreshing = false;
   let currentETag = "";
   let renderedVantage = "";
+  let renderedTransport = "plain";
   let renderedBlockHeight = null;
+  let renderedPools = new Map();
 
   const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
   const metric = (value) => value == null ? "" : Number(value);
@@ -131,11 +133,20 @@
     return `<aside class="job-warning-details" aria-label="Invalid mining job details"><div><strong>Invalid mining job detected</strong><p>This endpoint supplied a job that failed structural validation. The rejected job is not accepted as a template delivery; a later corrected job can still count.</p></div><div class="job-warning-meta"><span>${escapeHTML(checks)}</span>${timeHTML(pool.latest_invalid_job_at, true)}${block}</div></aside>`;
   }
 
-  function latencyHistoryHTML(pool) {
-    const history = pool.template_latency_history || [];
+  function latencyChartCeiling(history) {
+    const maximum = history.reduce((current, point) => Math.max(current, Number(point.value) || 0), 1);
+    let step = 10;
+    if (maximum > 5000) step = 1000;
+    else if (maximum > 1000) step = 500;
+    else if (maximum > 500) step = 100;
+    else if (maximum > 100) step = 50;
+    return Math.max(step, Math.ceil(maximum / step) * step);
+  }
+
+  function latencyHistoryHTML(pool, history) {
     if (!history.length) return "<p class=\"details-empty\">No template deliveries recorded in the last 24 hours.</p>";
-    const chart = pool.latency_chart;
-    const chartPoints = (chart.points || []).slice(-144);
+    const maximum = latencyChartCeiling(history);
+    const chartPoints = history.slice(-144).map((point) => ({ ...point, y: 178 - Number(point.value) / maximum * 160 }));
     const barStep = chartPoints.length < 2 ? 0 : 568 / (chartPoints.length - 1);
     const barWidth = Math.max(2, Math.min(8, barStep * 0.72 || 8));
     const bars = chartPoints.map((point, index) => {
@@ -144,15 +155,15 @@
       const x = chartPoints.length === 1 ? 340 : 56 + index * barStep;
       return `<g class="latency-chart-bar"${keyboard} aria-label="${escapeHTML(label)}"><title>${escapeHTML(label)}</title><rect x="${fixed(x - barWidth / 2, 1)}" y="${fixed(point.y, 1)}" width="${fixed(barWidth, 1)}" height="${fixed(178 - point.y, 1)}" rx="1.5"></rect></g>`;
     }).join("");
-    const referenceLine = (value, kind, label) => value == null ? "" : `<g class="latency-chart-reference latency-chart-reference-${kind}" aria-label="${label} ${fixed(value)} ms"><line x1="56" y1="${fixed(178 - Number(value) / Number(chart.max_value) * 160, 1)}" x2="624" y2="${fixed(178 - Number(value) / Number(chart.max_value) * 160, 1)}"></line><text x="618" y="${fixed(174 - Number(value) / Number(chart.max_value) * 160, 1)}" text-anchor="end">${label} ${fixed(value)} ms</text></g>`;
+    const referenceLine = (value, kind, label) => value == null ? "" : `<g class="latency-chart-reference latency-chart-reference-${kind}" aria-label="${label} ${fixed(value)} ms"><line x1="56" y1="${fixed(178 - Number(value) / maximum * 160, 1)}" x2="624" y2="${fixed(178 - Number(value) / maximum * 160, 1)}"></line><text x="618" y="${fixed(174 - Number(value) / maximum * 160, 1)}" text-anchor="end">${label} ${fixed(value)} ms</text></g>`;
     const references = `${referenceLine(pool.median_ms, "median", "Median")}${referenceLine(pool.p95_ms, "p95", "P95")}`;
     const timeGuides = [0, 6, 12, 18, 24].map((hours) => {
       const x = 56 + 568 * hours / 24;
       const label = hours === 0 ? "oldest" : hours === 24 ? "newest" : "";
       return `<line x1="${fixed(x, 1)}" y1="18" x2="${fixed(x, 1)}" y2="178"></line><text x="${fixed(x, 1)}" y="202" text-anchor="${hours === 0 ? "start" : hours === 24 ? "end" : "middle"}">${label}</text>`;
     }).join("");
-    const hidden = history.map((point) => `<li>${escapeHTML(absoluteTime(point.observed_at))}: ${fixed(point.value)} ms</li>`).join("");
-    return `<div class="latency-chart-shell"><svg class="latency-bar-chart" viewBox="0 0 640 218" role="img" aria-labelledby="latency-chart-title-${escapeHTML(pool.row_id)} latency-chart-desc-${escapeHTML(pool.row_id)}"><title id="latency-chart-title-${escapeHTML(pool.row_id)}">24-hour block-template latency for ${escapeHTML(pool.pool_name)} endpoint ${escapeHTML(pool.endpoint)}</title><desc id="latency-chart-desc-${escapeHTML(pool.row_id)}">Chronological bar graph of up to 144 recent endpoint block-template latency samples. Bars are evenly spaced; hover or focus a bar for its exact timestamp and delay. The horizontal reference lines show the median and P95 delay. ${pool.combined_vantage ? "Each bar is the median across US regions for one Bitcoin block. " : ""}Lower is better.</desc><g class="latency-chart-grid" aria-hidden="true"><line x1="56" y1="18" x2="624" y2="18"></line><line x1="56" y1="98" x2="624" y2="98"></line><line x1="56" y1="178" x2="624" y2="178"></line>${timeGuides}<text x="49" y="24" text-anchor="end">${fixed(chart.max_value)} ms</text><text x="49" y="104" text-anchor="end">${fixed(chart.mid_value)} ms</text><text x="49" y="184" text-anchor="end">0 ms</text></g>${references}${bars}</svg><div class="latency-chart-times">${timeHTML(chartPoints[0].observed_at)}<span>up to 144 latest blocks</span>${timeHTML(chartPoints.at(-1).observed_at)}</div></div><ol class="visually-hidden latency-chart-data">${hidden}</ol><p>${pool.combined_vantage ? "Median regional delay for each Bitcoin block;" : "Relative delay until this endpoint first receives a clean block transition;"} lower is better. <span class="latency-chart-hover-note">Hover or focus a bar for its timestamp and delay.</span></p>`;
+    const hidden = chartPoints.map((point) => `<li>${escapeHTML(absoluteTime(point.observed_at))}: ${fixed(point.value)} ms</li>`).join("");
+    return `<div class="latency-chart-shell"><svg class="latency-bar-chart" viewBox="0 0 640 218" role="img" aria-labelledby="latency-chart-title-${escapeHTML(pool.row_id)} latency-chart-desc-${escapeHTML(pool.row_id)}"><title id="latency-chart-title-${escapeHTML(pool.row_id)}">24-hour block-template latency for ${escapeHTML(pool.pool_name)} endpoint ${escapeHTML(pool.endpoint)}</title><desc id="latency-chart-desc-${escapeHTML(pool.row_id)}">Chronological bar graph of up to 144 recent endpoint block-template latency samples. Bars are evenly spaced; hover or focus a bar for its exact timestamp and delay. The horizontal reference lines show the median and P95 delay. ${pool.combined_vantage ? "Each bar is the median across US regions for one Bitcoin block. " : ""}Lower is better.</desc><g class="latency-chart-grid" aria-hidden="true"><line x1="56" y1="18" x2="624" y2="18"></line><line x1="56" y1="98" x2="624" y2="98"></line><line x1="56" y1="178" x2="624" y2="178"></line>${timeGuides}<text x="49" y="24" text-anchor="end">${fixed(maximum)} ms</text><text x="49" y="104" text-anchor="end">${fixed(maximum / 2)} ms</text><text x="49" y="184" text-anchor="end">0 ms</text></g>${references}${bars}</svg><div class="latency-chart-times">${timeHTML(chartPoints[0].observed_at)}<span>up to 144 latest blocks</span>${timeHTML(chartPoints.at(-1).observed_at)}</div></div><ol class="visually-hidden latency-chart-data">${hidden}</ol><p>${pool.combined_vantage ? "Median regional delay for each Bitcoin block;" : "Relative delay until this endpoint first receives a clean block transition;"} lower is better. <span class="latency-chart-hover-note">Hover or focus a bar for its timestamp and delay.</span></p>`;
   }
 
   function feeHistoryHTML(pool) {
@@ -171,7 +182,7 @@
     const security = pool.tls_handshake_timing?.certificate_errors ? '<small><span class="tls-error-label" title="The pool security certificate could not be verified">Security error</span></small>' : pool.tls_handshake_timing?.errors ? '<small><span class="tls-error-label" title="A secure connection failed">Secure connection failed</span></small>' : "";
     const jobWarning = pool.invalid_job_count ? '<small class="job-validation-warning">Warning: invalid mining job detected</small>' : "";
     const fee = pool.is_solo && pool.latest_pool_fee_pct != null ? `<strong>${feePct(pool.latest_pool_fee_pct)}</strong>${pool.pool_fee_changed ? `<small class="fee-changed">changed ${feePct(pool.previous_pool_fee_pct)} → ${feePct(pool.latest_pool_fee_pct)}</small>` : ""}` : `<strong>—</strong><small>${pool.is_solo && pool.unsafe_reason ? "not available" : "not measured"}</small>`;
-    return `<article class="measurement-row${pool.invalid_job_count ? " measurement-row-job-warning" : ""}" data-pool-id="${rowID}" data-pool-base-id="${escapeHTML(pool.pool_id)}" data-update-label="${escapeHTML(`${pool.pool_name} ${pool.endpoint}`)}" data-sort-score="${fixed(pool.overall_score, 6)}" data-sort-pool="${escapeHTML(pool.sort_name)}" data-sort-median="${fixed(pool.median_ms, 6)}" data-sort-p95="${fixed(pool.p95_ms, 6)}" data-sort-loss="${fixed(pool.estimated_mining_loss_pct, 6)}" data-sort-availability="${fixed(pool.availability_pct, 6)}" data-sort-connection="${fixed(connection?.median_ms, 6)}" data-sort-setup="${fixed(pool.subscribe_timing?.median_ms, 6)}" data-sort-fee="${fixed(pool.fee_sort_value, 6)}"><div class="score-compact">${scoreHTML(pool)}</div><div class="measurement-pool"><strong>${poolName}</strong><small class="endpoint-address">${escapeHTML(pool.endpoint)}${pool.endpoint_region ? ` · ${escapeHTML(pool.endpoint_region)}` : ""}</small>${security}${jobWarning}${pool.unsafe_reason ? `<small class="worker-wallet-status worker-wallet-${escapeHTML(pool.wallet_evidence)}">${escapeHTML(pool.unsafe_reason)}</small>` : ""}<button type="button" class="details-toggle" aria-expanded="false" aria-controls="payout-history-${rowID}" aria-label="Show details for ${escapeHTML(pool.pool_name)} endpoint ${escapeHTML(pool.endpoint)}" title="Show validation, payment, and recent performance details"><span>More details</span><span class="details-plus" aria-hidden="true">+</span></button></div><div class="template-median">${pool.median_ms != null ? `<strong>${fixed(pool.median_ms)} ms</strong><div class="median-bar-track" role="img" aria-label="Median block delay ${fixed(pool.median_ms)} ms; P95 delay ${fixed(pool.p95_ms)} ms"><span class="median-bar ${escapeHTML(pool.latency_class)}"></span>${pool.p95_ms == null ? "" : `<span class="median-p95-marker ${latencyBarPositionClass(pool.p95_ms)}" title="P95 delay: ${fixed(pool.p95_ms)} ms"></span>`}</div>` : '<strong>—</strong><div class="median-bar-track" aria-hidden="true"></div>'}</div><div class="p95-value"><strong>${pool.p95_ms == null ? "—" : `${fixed(pool.p95_ms)} ms`}</strong></div><div class="mining-loss-compact">${pool.estimated_mining_loss_pct != null ? `<strong>${miningLoss(pool.estimated_mining_loss_pct)}</strong><div class="mining-loss-bar-track" aria-hidden="true"><span class="mining-loss-bar ${escapeHTML(pool.mining_loss_class)}"></span></div>` : '<strong>—</strong><small>not measured</small><div class="mining-loss-bar-track" aria-hidden="true"></div>'}</div><div class="availability-compact"><strong>${fixed(pool.availability_pct, 1)}%</strong></div><div class="stacked-stat connection-timing ${tlsClass}"><span>${tls && !pool.tls_handshake_timing?.attempts ? "<strong>—</strong>" : timingHTML(connection)}</span></div><div class="stacked-stat"><span><a class="jargon-link" href="/methodology#subscribe" title="Starts a Stratum mining session">Sub</a> ${timingHTML(pool.subscribe_timing)}</span><span><a class="jargon-link" href="/methodology#authorize" title="Pool accepts the worker identity">Auth</a> ${timingHTML(pool.authorize_timing)}</span></div><div class="fee-compact">${fee}</div><div id="payout-history-${rowID}" class="measurement-details" hidden>${invalidJobDetailsHTML(pool)}<div class="details-grid"><section class="payout-details" aria-label="Latest coinbase payout"><div class="detail-heading"><div><p>Latest coinbase payout</p><h3>${pool.latest_coinbase_total_sats ? btc(pool.latest_coinbase_total_sats) : "Payment details not available"}</h3></div><div class="detail-meta">${timeHTML(pool.latest_coinbase_observed_at)}<span>${pool.latest_coinbase_output_count} payments</span><span>${pool.coinbase_samples} block checks</span></div></div>${payoutHTML(pool)}</section><section class="history-details" aria-label="Recent performance"><div class="history-block"><div class="history-heading"><div><p>Recent history</p><h3>Block-template latency</h3></div><span>up to 144 latest ${pool.combined_vantage ? "blocks" : "checks"} · ${Math.min(144, (pool.template_latency_history || []).length)} shown</span></div>${latencyHistoryHTML(pool)}</div>${feeHistoryHTML(pool)}</section></div></div></article>`;
+    return `<article class="measurement-row${pool.invalid_job_count ? " measurement-row-job-warning" : ""}" data-pool-id="${rowID}" data-pool-base-id="${escapeHTML(pool.pool_id)}" data-update-label="${escapeHTML(`${pool.pool_name} ${pool.endpoint}`)}" data-sort-score="${fixed(pool.overall_score, 6)}" data-sort-pool="${escapeHTML(pool.sort_name)}" data-sort-median="${fixed(pool.median_ms, 6)}" data-sort-p95="${fixed(pool.p95_ms, 6)}" data-sort-loss="${fixed(pool.estimated_mining_loss_pct, 6)}" data-sort-availability="${fixed(pool.availability_pct, 6)}" data-sort-connection="${fixed(connection?.median_ms, 6)}" data-sort-setup="${fixed(pool.subscribe_timing?.median_ms, 6)}" data-sort-fee="${fixed(pool.fee_sort_value, 6)}"><div class="score-compact">${scoreHTML(pool)}</div><div class="measurement-pool"><strong>${poolName}</strong><small class="endpoint-address">${escapeHTML(pool.endpoint)}${pool.endpoint_region ? ` · ${escapeHTML(pool.endpoint_region)}` : ""}</small>${security}${jobWarning}${pool.unsafe_reason ? `<small class="worker-wallet-status worker-wallet-${escapeHTML(pool.wallet_evidence)}">${escapeHTML(pool.unsafe_reason)}</small>` : ""}<button type="button" class="details-toggle" aria-expanded="false" aria-controls="payout-history-${rowID}" aria-label="Show details for ${escapeHTML(pool.pool_name)} endpoint ${escapeHTML(pool.endpoint)}" title="Show validation, payment, and recent performance details"><span>More details</span><span class="details-plus" aria-hidden="true">+</span></button></div><div class="template-median">${pool.median_ms != null ? `<strong>${fixed(pool.median_ms)} ms</strong><div class="median-bar-track" role="img" aria-label="Median block delay ${fixed(pool.median_ms)} ms; P95 delay ${fixed(pool.p95_ms)} ms"><span class="median-bar ${escapeHTML(pool.latency_class)}"></span>${pool.p95_ms == null ? "" : `<span class="median-p95-marker ${latencyBarPositionClass(pool.p95_ms)}" title="P95 delay: ${fixed(pool.p95_ms)} ms"></span>`}</div>` : '<strong>—</strong><div class="median-bar-track" aria-hidden="true"></div>'}</div><div class="p95-value"><strong>${pool.p95_ms == null ? "—" : `${fixed(pool.p95_ms)} ms`}</strong></div><div class="mining-loss-compact">${pool.estimated_mining_loss_pct != null ? `<strong>${miningLoss(pool.estimated_mining_loss_pct)}</strong><div class="mining-loss-bar-track" aria-hidden="true"><span class="mining-loss-bar ${escapeHTML(pool.mining_loss_class)}"></span></div>` : '<strong>—</strong><small>not measured</small><div class="mining-loss-bar-track" aria-hidden="true"></div>'}</div><div class="availability-compact"><strong>${fixed(pool.availability_pct, 1)}%</strong></div><div class="stacked-stat connection-timing ${tlsClass}"><span>${tls && !pool.tls_handshake_timing?.attempts ? "<strong>—</strong>" : timingHTML(connection)}</span></div><div class="stacked-stat"><span><a class="jargon-link" href="/methodology#subscribe" title="Starts a Stratum mining session">Sub</a> ${timingHTML(pool.subscribe_timing)}</span><span><a class="jargon-link" href="/methodology#authorize" title="Pool accepts the worker identity">Auth</a> ${timingHTML(pool.authorize_timing)}</span></div><div class="fee-compact">${fee}</div><div id="payout-history-${rowID}" class="measurement-details" hidden>${invalidJobDetailsHTML(pool)}<div class="details-grid"><section class="payout-details" aria-label="Latest coinbase payout"><div class="detail-heading"><div><p>Latest coinbase payout</p><h3>${pool.latest_coinbase_total_sats ? btc(pool.latest_coinbase_total_sats) : "Payment details not available"}</h3></div><div class="detail-meta">${timeHTML(pool.latest_coinbase_observed_at)}<span>${pool.latest_coinbase_output_count} payments</span><span>${pool.coinbase_samples} block checks</span></div></div>${payoutHTML(pool)}</section><section class="history-details" aria-label="Recent performance"><div class="history-block"><div class="history-heading"><div><p>Recent history</p><h3>Block-template latency</h3></div><span>up to 144 latest ${pool.combined_vantage ? "blocks" : "checks"} · <span data-latency-history-count>${pool.latency_history_count || 0}</span> shown</span></div><div data-latency-history aria-live="polite"><p class="details-empty">Open details to load this graph.</p></div></div>${feeHistoryHTML(pool)}</section></div></div></article>`;
   }
 
   function listHTML(pools) {
@@ -204,6 +215,12 @@
     const regionSummary = `<div class="region-summary" aria-label="Regional measurement status" data-region-summary><span class="region-update-pill">${update}</span>${configState}${height}</div>`;
     const jump = document.querySelector("[data-section-jump]");
     jump.innerHTML = '<span class="control-label">Jump to</span>';
+    renderedPools = new Map();
+    for (const [field] of groups) {
+      for (const pool of data[field] || []) renderedPools.set(pool.row_id, pool);
+    }
+    renderedVantage = data.selected_vantage;
+    renderedTransport = data.selected_transport;
     let visible = 0;
     for (const [field, listID, sectionID, label, order] of groups) {
       const pools = data[field] || [];
@@ -217,9 +234,12 @@
       }
     }
     jump.hidden = visible === 0;
-    expanded.forEach((id) => setDetailsState(document.querySelector(`.measurement-row[data-pool-id="${CSS.escape(id)}"]`), true));
+    expanded.forEach((id) => {
+      const row = document.querySelector(`.measurement-row[data-pool-id="${CSS.escape(id)}"]`);
+      setDetailsState(row, true);
+      loadPoolHistory(row);
+    });
     if (heightChanged) document.querySelector("[data-live-status]").textContent = `New Bitcoin block ${blockHeight.toLocaleString()} observed in ${data.selected_label}.`;
-    renderedVantage = data.selected_vantage;
     renderedBlockHeight = blockHeight;
     document.querySelector("[data-live-footnote]").innerHTML = `${escapeHTML(data.selected_label)}. Median, P95, history, and Stratum timings use the latest ${snapshot.latency_window_hours} hours. No observation older than ${snapshot.retention_window_days} days is used; availability uses eligible block observations within that window. Estimated mining loss combines missed eligible deliveries with median relative delay during available time; values below 0.1% display as &lt;0.1% and receive full mining-loss score. It is not measured revenue loss. Score weights: availability 40%, mining loss 25%, P95 20%, connection/setup responsiveness 10%, and observed fee stability 5% when available. A recent fee increase subtracts up to 15 additional points over 30 days; observed fees above 2.5% subtract up to 10 more points; an invalid TLS certificate subtracts 10 points. A solo pool whose worker wallet is not found receives a score of 0.`;
     updateRelativeTimes();
@@ -232,6 +252,35 @@
     button.setAttribute("aria-expanded", String(expanded));
     button.querySelector("span").textContent = expanded ? "Fewer details" : "More details";
     panel.hidden = !expanded;
+  }
+
+  async function loadPoolHistory(row) {
+    const target = row?.querySelector("[data-latency-history]");
+    if (!target || row.dataset.historyState === "loading" || row.dataset.historyState === "loaded") return;
+    const pool = renderedPools.get(row.dataset.poolId);
+    if (!pool) return;
+    row.dataset.historyState = "loading";
+    target.setAttribute("aria-busy", "true");
+    target.innerHTML = '<p class="details-empty">Loading recent latency history…</p>';
+    try {
+      const params = new URLSearchParams({ vantage: renderedVantage, transport: renderedTransport, pool: row.dataset.poolId });
+      const response = await fetch(`/pool-history?${params}`, { cache: "no-cache" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!row.isConnected || data.row_id !== row.dataset.poolId) return;
+      const history = data.template_latency_history || [];
+      target.innerHTML = latencyHistoryHTML(pool, history);
+      row.querySelector("[data-latency-history-count]").textContent = history.length;
+      row.dataset.historyState = "loaded";
+      updateRelativeTimes();
+    } catch (error) {
+      if (!row.isConnected) return;
+      console.warn("StratumStats pool history update failed", error);
+      row.dataset.historyState = "error";
+      target.innerHTML = '<p class="details-empty">Recent latency history is temporarily unavailable. Close and reopen details to retry.</p>';
+    } finally {
+      if (row.isConnected) target.removeAttribute("aria-busy");
+    }
   }
 
   function placeRows(list, rows) {
@@ -300,7 +349,10 @@
   document.addEventListener("click", (event) => {
     const details = event.target.closest(".details-toggle");
     if (details) {
-      setDetailsState(details.closest(".measurement-row"), details.getAttribute("aria-expanded") !== "true");
+      const row = details.closest(".measurement-row");
+      const expanded = details.getAttribute("aria-expanded") !== "true";
+      setDetailsState(row, expanded);
+      if (expanded) loadPoolHistory(row);
       return;
     }
     const sort = event.target.closest(".sort-button");

@@ -22,10 +22,29 @@ type cachedDashboardResponse struct {
 	etag     string
 }
 
+const poolHistoryLimit = 144
+
+type poolHistoryResponse struct {
+	RowID                  string                     `json:"row_id"`
+	TemplateLatencyHistory []model.MetricHistoryPoint `json:"template_latency_history"`
+}
+
+type cachedPoolHistory struct {
+	data     poolHistoryResponse
+	once     sync.Once
+	response cachedDashboardResponse
+	err      error
+}
+
+type cachedDashboardEntry struct {
+	dashboard     cachedDashboardResponse
+	poolHistories map[string]*cachedPoolHistory
+}
+
 type dashboardResponseCache struct {
 	mu      sync.RWMutex
 	rebuild sync.Mutex
-	entries map[string]cachedDashboardResponse
+	entries map[string]cachedDashboardEntry
 }
 
 var dashboardGzipWriters = sync.Pool{
@@ -88,8 +107,8 @@ func (scheduler *dashboardRefreshScheduler) run() {
 	}
 }
 
-func encodeDashboard(page dashboardPage) (cachedDashboardResponse, error) {
-	body, err := json.Marshal(page)
+func encodeCachedJSON(value any) (cachedDashboardResponse, error) {
+	body, err := json.Marshal(value)
 	if err != nil {
 		return cachedDashboardResponse{}, err
 	}
@@ -114,8 +133,26 @@ func encodeDashboard(page dashboardPage) (cachedDashboardResponse, error) {
 func (cache *dashboardResponseCache) response(key string) (cachedDashboardResponse, bool) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
-	response, ok := cache.entries[key]
-	return response, ok
+	entry, ok := cache.entries[key]
+	return entry.dashboard, ok
+}
+
+func (cache *dashboardResponseCache) poolHistory(key, rowID string) (cachedDashboardResponse, bool, error) {
+	cache.mu.RLock()
+	entry, ok := cache.entries[key]
+	if !ok {
+		cache.mu.RUnlock()
+		return cachedDashboardResponse{}, false, nil
+	}
+	history, ok := entry.poolHistories[rowID]
+	cache.mu.RUnlock()
+	if !ok {
+		return cachedDashboardResponse{}, false, nil
+	}
+	history.once.Do(func() {
+		history.response, history.err = encodeCachedJSON(history.data)
+	})
+	return history.response, true, history.err
 }
 
 func (cache *dashboardResponseCache) rebuildFrom(snapshots *snapshotCache, pools []model.Pool, demo bool, configRevision string) error {
@@ -131,7 +168,7 @@ func (cache *dashboardResponseCache) rebuildFrom(snapshots *snapshotCache, pools
 	if !demo {
 		hideStaleRegionalVantages(available, statuses)
 	}
-	entries := make(map[string]cachedDashboardResponse, (len(vantageLabels)+1)*2)
+	entries := make(map[string]cachedDashboardEntry, (len(vantageLabels)+1)*2)
 	vantages := make([]string, 0, len(vantageLabels)+1)
 	vantages = append(vantages, "")
 	for vantage := range vantageLabels {
@@ -139,15 +176,19 @@ func (cache *dashboardResponseCache) rebuildFrom(snapshots *snapshotCache, pools
 	}
 	for _, vantage := range vantages {
 		for _, transport := range []string{"plain", "tls"} {
-			page, err := buildDashboard(snapshots, pools, demo, vantage, transport, now, available, statuses, configRevision)
+			page, histories, err := buildDashboard(snapshots, pools, demo, vantage, transport, now, available, statuses, configRevision)
 			if err != nil {
 				return err
 			}
-			response, err := encodeDashboard(page)
+			response, err := encodeCachedJSON(page)
 			if err != nil {
 				return err
 			}
-			entries[vantage+"\x00"+transport] = response
+			cachedHistories := make(map[string]*cachedPoolHistory, len(histories))
+			for rowID, history := range histories {
+				cachedHistories[rowID] = &cachedPoolHistory{data: history}
+			}
+			entries[vantage+"\x00"+transport] = cachedDashboardEntry{dashboard: response, poolHistories: cachedHistories}
 		}
 	}
 	cache.mu.Lock()
@@ -207,7 +248,7 @@ func acceptsGzip(header string) bool {
 	return false
 }
 
-func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, requestedVantage, transport string, now time.Time, available map[string]bool, statuses vantageStatusResponse, configRevision string) (dashboardPage, error) {
+func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, requestedVantage, transport string, now time.Time, available map[string]bool, statuses vantageStatusResponse, configRevision string) (dashboardPage, map[string]poolHistoryResponse, error) {
 	vantage := requestedVantage
 	if vantage == "" {
 		if !demo && available["unknown"] {
@@ -226,7 +267,19 @@ func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, request
 	}
 	snapshot, err := cache.snapshot(vantage, now)
 	if err != nil {
-		return dashboardPage{}, err
+		return dashboardPage{}, nil, err
+	}
+	histories := make(map[string]poolHistoryResponse)
+	for _, report := range snapshot.Reports {
+		if report.EndpointTLS != (transport == "tls") {
+			continue
+		}
+		history := report.TemplateLatencyHistory
+		if len(history) > poolHistoryLimit {
+			history = history[len(history)-poolHistoryLimit:]
+		}
+		rowID := endpointRowID(report)
+		histories[rowID] = poolHistoryResponse{RowID: rowID, TemplateLatencyHistory: history}
 	}
 	page := buildDashboardPage(snapshot, pools, demo, vantage, selectedVantageStatus(statuses, vantage), transport)
 	page.ConfigRevision = configRevision
@@ -235,5 +288,5 @@ func buildDashboard(cache *snapshotCache, pools []model.Pool, demo bool, request
 	page.Snapshot.Reports = nil
 	page.Snapshot.Disclosure = nil
 	page.AvailableVantages = available
-	return page, nil
+	return page, histories, nil
 }

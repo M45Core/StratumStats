@@ -32,7 +32,7 @@ func TestStaticDashboardShellAndClientRenderer(t *testing.T) {
 
 	script := httptest.NewRecorder()
 	h.ServeHTTP(script, httptest.NewRequest(http.MethodGet, "/static/dashboard.js", nil))
-	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-line-chart", "Warning: invalid mining job detected", "Invalid mining job details", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_height", "block-height-changed", "setInterval(() => refresh(false)"} {
+	for _, want := range []string{"fetch(`/dashboard-data?${requestParams}`", "fetch(`/pool-history?${params}`", `requestParams.set("generation", currentETag)`, `"If-None-Match": currentETag`, "response.status === 304", "response.json()", "currentETag", "data-sort-score", "latency-bar-chart", "Warning: invalid mining job detected", "Invalid mining job details", `section.querySelector("[data-section-meta]")`, "data-region-summary", "latest_block_height", "block-height-changed", "setInterval(() => refresh(false)"} {
 		if !strings.Contains(script.Body.String(), want) {
 			t.Errorf("renderer missing %q", want)
 		}
