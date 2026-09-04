@@ -251,6 +251,37 @@ server {
     listen 80;
     server_name stats.example.com;
 
+    # Keep administrative pages and redirects out of every cache, including a
+    # broader cache policy in this server block. The application supplies
+    # Cache-Control: no-store; hide then re-emit that upstream value so nginx
+    # cannot replace it with a public max-age value.
+    location ^~ /admin/ {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
+        proxy_cache_bypass 1;
+        proxy_no_cache 1;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control $upstream_http_cache_control always;
+    }
+
+    # This redirect is also an admin response, but does not match /admin/.
+    location = /admin {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
+        proxy_cache_bypass 1;
+        proxy_no_cache 1;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control $upstream_http_cache_control always;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8081;
         proxy_http_version 1.1;

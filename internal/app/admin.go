@@ -431,30 +431,96 @@ func remoteAddress(request *http.Request) string {
 }
 
 func cookieIsSecure(request *http.Request) bool {
-	return request.TLS != nil || strings.EqualFold(request.Header.Get("X-Forwarded-Proto"), "https")
+	return request.TLS != nil || (fromTrustedProxy(request) && strings.EqualFold(request.Header.Get("X-Forwarded-Proto"), "https"))
 }
 
 func requestIsSecure(request *http.Request) bool {
-	if forwarded := request.Header.Get("X-Forwarded-Proto"); forwarded != "" {
-		return strings.EqualFold(forwarded, "https")
+	if fromTrustedProxy(request) {
+		forwarded := request.Header.Get("X-Forwarded-Proto")
+		if forwarded != "" {
+			return strings.EqualFold(forwarded, "https")
+		}
 	}
 	if request.TLS != nil {
 		return true
 	}
+	return fromTrustedProxy(request)
+}
+
+func fromTrustedProxy(request *http.Request) bool {
 	host, _, err := net.SplitHostPort(request.RemoteAddr)
-	return err == nil && net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback()
+	if err != nil {
+		host = request.RemoteAddr
+	}
+	address := net.ParseIP(host)
+	return address != nil && address.IsLoopback()
+}
+
+func normalizedAuthority(host, scheme string) (string, bool) {
+	if host == "" {
+		return "", false
+	}
+	name, port, err := net.SplitHostPort(host)
+	if err != nil {
+		// A bare hostname or IP address has the scheme's default port.
+		name = host
+		port = ""
+	}
+	if name == "" || strings.ContainsAny(name, "@/?#") {
+		return "", false
+	}
+	name = strings.ToLower(name)
+	if port == "" {
+		switch scheme {
+		case "https":
+			port = "443"
+		case "http":
+			port = "80"
+		default:
+			return "", false
+		}
+	}
+	return net.JoinHostPort(name, port), true
+}
+
+func originRequestScheme(request *http.Request) string {
+	if fromTrustedProxy(request) {
+		if forwarded := request.Header.Get("X-Forwarded-Proto"); forwarded != "" {
+			if strings.EqualFold(forwarded, "https") {
+				return "https"
+			}
+			return "http"
+		}
+	}
+	if request.TLS != nil {
+		return "https"
+	}
+	return "http"
 }
 
 func sameOrigin(request *http.Request) bool {
-	if site := request.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
-		return false
-	}
 	origin := request.Header.Get("Origin")
-	if origin == "" {
-		return true
+	if origin != "" {
+		parsed, err := url.Parse(origin)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return false
+		}
+		scheme := strings.ToLower(parsed.Scheme)
+		if scheme != "http" && scheme != "https" {
+			return false
+		}
+		originHost, originOK := normalizedAuthority(parsed.Host, scheme)
+		requestScheme := originRequestScheme(request)
+		requestHost, requestOK := normalizedAuthority(request.Host, requestScheme)
+		return originOK && requestOK && scheme == requestScheme && originHost == requestHost
 	}
-	parsed, err := url.Parse(origin)
-	return err == nil && parsed.Host == request.Host
+
+	// Fetch Metadata is a useful fallback when older clients omit Origin. It is
+	// deliberately not consulted when a complete Origin is available: browsers
+	// can report a conservative value after a navigation, while Origin carries
+	// the actual authority that submitted this unsafe request.
+	site := request.Header.Get("Sec-Fetch-Site")
+	return site == "" || site == "same-origin" || site == "none"
 }
 
 func adminSecurityHeaders(response http.ResponseWriter) {
