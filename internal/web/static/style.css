@@ -49,8 +49,8 @@
 .latency-chart-grid line{stroke:#26322e;stroke-width:1;stroke-dasharray:2 4;vector-effect:non-scaling-stroke}.latency-chart-grid line[x1][y1="18"]{stroke:#34423d}.latency-chart-grid text{dominant-baseline:middle}
 .latency-chart-grid text{fill:var(--muted);font:17px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .latency-chart-bar{outline:none}
-.latency-chart-bar rect{fill:#8ccfff;stroke:#8ccfff;stroke-width:1;vector-effect:non-scaling-stroke;transition:fill .15s,stroke .15s}
-.latency-chart-bar:hover rect,.latency-chart-bar:focus rect{fill:var(--mint);stroke:var(--mint)}.latency-chart-win rect{fill:var(--amber);stroke:var(--amber)}.latency-chart-win-note{color:var(--amber)}
+.latency-chart-hit-area{fill:transparent;pointer-events:all}.latency-chart-value-bar{fill:#8ccfff;stroke:#8ccfff;stroke-width:1;vector-effect:non-scaling-stroke;transition:fill .15s,stroke .15s}
+.latency-chart-bar:hover .latency-chart-value-bar,.latency-chart-bar:focus .latency-chart-value-bar{fill:var(--mint);stroke:var(--mint)}.latency-chart-win .latency-chart-value-bar{fill:var(--amber);stroke:var(--amber)}.latency-chart-win-note{color:var(--amber)}
 .latency-chart-reference line{stroke-width:1.25;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}.latency-chart-reference text{font:12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.latency-chart-reference-median line{stroke:#65e5aa}.latency-chart-reference-median text{fill:#98f4c5}.latency-chart-reference-p95 line{stroke:#f2b566}.latency-chart-reference-p95 text{fill:#ffd092}
 .latency-chart-hover-note{color:var(--mint)}
 .latency-chart-times{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 8px 2px 40px;color:var(--muted);font-size:8px}
@@ -93,7 +93,8 @@
 @media(max-width:900px){.details-grid{grid-template-columns:1fr}.history-details{border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:600px){.detail-heading{display:block}.detail-meta{align-items:flex-start;margin-top:8px}}
 
-.measurement-head,.measurement-row{grid-template-columns:.55fr 1.25fr 1.4fr .75fr .9fr .9fr .9fr 1.1fr 1.1fr 1.05fr;min-width:1410px}.win-compact strong{color:var(--amber)}
+.measurement-head,.measurement-row{grid-template-columns:.55fr 1.8fr 1.4fr .75fr .9fr .9fr 1.5fr 1.05fr;min-width:1280px}.measurement-pool strong,.measurement-pool strong a{white-space:nowrap}.measurement-pool strong{overflow:hidden;text-overflow:ellipsis}.measurement-pool strong a{overflow:hidden;text-overflow:ellipsis}.fee-compact,.fee-compact strong{white-space:nowrap!important}.win-compact{display:none!important}
+.connection-setup{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.connection-setup>span{min-width:0;color:var(--muted);font-size:9px;letter-spacing:.025em;text-transform:uppercase}.connection-setup>span>b{display:block;margin-bottom:3px;font-size:8px;font-weight:800;letter-spacing:.08em}.connection-setup>span>strong{display:block;color:var(--ink);font-size:11px}.connection-setup>span>small{display:block;margin-top:2px;color:var(--muted);font-size:8px;line-height:1.25;text-transform:none;letter-spacing:0}
 
 .donation-banner{max-width:1180px;margin:16px auto 0;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid #815f31;border-left:4px solid var(--amber);border-radius:5px;background:linear-gradient(90deg,#2a2013,#181713);box-shadow:0 8px 28px rgba(0,0,0,.18)}
 .donation-copy strong{display:block;color:var(--amber);font:700 18px/1.2 Georgia,serif}
@@ -106,8 +107,8 @@
 @media(max-width:760px){.donation-banner{margin:14px 18px 0;align-items:flex-start;flex-direction:column}.donation-link{width:100%;justify-content:flex-start;flex-wrap:wrap}.donation-link code{width:100%}}
 
 .tls-error-label,.tls-timing-error,.tls-timing-error a,.tls-timing-error strong,.tls-timing-error small{color:var(--red)!important}
-.stacked-stat>span.tls-timing-error{padding-left:5px;border-left:2px solid var(--red);background:rgba(255,122,122,.045)}
-.stacked-stat>span.tls-unavailable,.stacked-stat>span.tls-unavailable a,.stacked-stat>span.tls-unavailable strong{color:#66736e!important}
+.stacked-stat>span.tls-timing-error,.connection-setup>span.tls-timing-error{padding-left:5px;border-left:2px solid var(--red);background:rgba(255,122,122,.045)}
+.stacked-stat>span.tls-unavailable,.stacked-stat>span.tls-unavailable a,.stacked-stat>span.tls-unavailable strong,.connection-setup>span.tls-unavailable,.connection-setup>span.tls-unavailable a,.connection-setup>span.tls-unavailable strong{color:#66736e!important}
 .timing-cert-error{font-weight:900;letter-spacing:.03em}
 .worker-wallet-status.worker-wallet-missing{color:var(--red)!important;font-weight:800}.worker-wallet-status.worker-wallet-pending{color:var(--amber)!important}.job-validation-warning{color:var(--red)!important;font-weight:900}.measurement-row-job-warning{box-shadow:inset 3px 0 0 rgba(255,122,122,.8)}
 .job-warning-details{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:15px 20px;border-left:4px solid var(--red);border-bottom:1px solid #4b3030;background:#1c1212}.job-warning-details strong{display:block;color:var(--red);font-size:12px}.job-warning-details p{max-width:760px;margin:4px 0 0;color:#d9baba;font-size:9px;line-height:1.5}.job-warning-meta{display:grid;justify-items:end;gap:3px;min-width:250px;color:#d9baba;font-size:8.5px;text-align:right}.job-warning-meta time{color:var(--ink)}.job-warning-meta code{display:block;max-width:360px;color:#f0cece;overflow-wrap:anywhere}@media(max-width:700px){.job-warning-details{display:block;padding:14px}.job-warning-meta{justify-items:start;min-width:0;margin-top:10px;text-align:left}.job-warning-meta code{max-width:100%}}
@@ -157,14 +158,13 @@
   .measurement-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-width:0;min-height:0;margin-bottom:12px;overflow:visible;border:1px solid var(--line)!important;border-radius:5px;background:var(--panel)!important;box-shadow:0 8px 24px rgba(0,0,0,.14)}
   .measurement-row:last-child{margin-bottom:0}
   .measurement-row>div:not(.measurement-details){min-width:0;padding:12px;white-space:normal}
-  .score-compact::before,.template-median::before,.p95-value::before,.mining-loss-compact::before,.availability-compact::before,.stacked-stat::before,.fee-compact::before{display:block;margin-bottom:6px;color:var(--muted);font-size:8px;font-weight:800;line-height:1.3;letter-spacing:.08em;text-transform:uppercase}
+  .score-compact::before,.template-median::before,.p95-value::before,.mining-loss-compact::before,.availability-compact::before,.stacked-stat::before,.connection-setup::before,.fee-compact::before{display:block;margin-bottom:6px;color:var(--muted);font-size:8px;font-weight:800;line-height:1.3;letter-spacing:.08em;text-transform:uppercase}
   .score-compact::before{content:"Score"}
   .template-median::before{content:"Median block delay"}
   .p95-value::before{content:"P95 delay"}
   .mining-loss-compact::before{content:"Est. mining loss"}
   .availability-compact::before{content:"Availability"}
-  .stacked-stat:nth-of-type(7)::before{content:"Connection"}
-  .stacked-stat:nth-of-type(8)::before{content:"Stratum setup"}
+  .connection-setup::before{content:"Connect / setup"}
   .fee-compact::before{content:"Measured pool fee"}
   .measurement-pool{grid-column:1;grid-row:1;padding:16px 12px!important;border-bottom:1px solid var(--line)}
   .measurement-pool strong{font-size:20px}
@@ -180,9 +180,8 @@
   .availability-compact{grid-column:2;grid-row:3;border-left:1px solid var(--line)}
   .mining-loss-compact,.availability-compact{border-bottom:1px solid var(--line)}
   .template-median strong,.p95-value strong,.mining-loss-compact strong,.availability-compact strong{font-size:16px}
-  .stacked-stat{border-bottom:1px solid var(--line)}
-  .stacked-stat:nth-of-type(7){grid-column:1;grid-row:4}
-  .stacked-stat:nth-of-type(8){grid-column:2;grid-row:4;border-left:1px solid var(--line)}
+  .stacked-stat,.connection-setup{border-bottom:1px solid var(--line)}
+  .connection-setup{grid-column:1/-1;grid-row:4}.connection-setup::before{grid-column:1/-1}
   .stacked-stat strong{font-size:11px}
   .stacked-stat small{margin-left:0;overflow-wrap:anywhere}
   .fee-compact{grid-column:1/-1;grid-row:5}
@@ -218,3 +217,5 @@
 
 .config-pending-pill{display:inline-flex;align-items:center;border:1px solid #80623d;border-radius:999px;padding:5px 8px;color:var(--amber);font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
 .admin-shell{display:grid;min-height:100vh;place-items:center;padding:24px}.admin-card{width:min(440px,100%);padding:34px;border:1px solid var(--line);background:var(--panel)}.admin-card h1,.admin-editor h1{font:700 clamp(34px,5vw,52px)/1.05 Georgia,serif;letter-spacing:-.04em}.admin-form{display:grid;gap:18px;margin-top:28px}.admin-form label,.admin-json-form>label{display:grid;gap:8px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.admin-form input,.admin-json-form textarea{width:100%;border:1px solid var(--line);border-radius:3px;background:#0e1513;color:var(--ink);font:inherit}.admin-form input{padding:13px}.admin-form button,.admin-actions button,.admin-link-button{border:1px solid var(--mint);border-radius:3px;padding:11px 16px;background:var(--mint);color:#08120e;font-weight:800;cursor:pointer}.admin-error,.admin-success{margin:20px 0;padding:13px;border:1px solid var(--red);background:rgba(255,107,107,.08);color:#ffd1d1}.admin-success{border-color:#416f5b;background:rgba(97,229,170,.08);color:var(--mint)}.admin-editor{width:min(1200px,calc(100% - 40px));margin:50px auto}.admin-editor-head{display:flex;align-items:flex-end;justify-content:space-between;gap:30px}.admin-editor-head p{max-width:720px;color:var(--muted)}.admin-revision{max-width:420px;overflow-wrap:anywhere;color:var(--mint)}.admin-json-form{margin-top:28px}.admin-json-form textarea{min-height:65vh;padding:18px;resize:vertical;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2}.admin-actions{display:flex;align-items:center;gap:18px;margin-top:16px}.admin-actions a{color:var(--muted);text-decoration:underline}.admin-link-button{background:transparent;color:var(--mint)}@media(max-width:700px){.admin-editor-head{align-items:flex-start;flex-direction:column}.admin-revision{font-size:9px}.admin-editor{width:min(100% - 24px,1200px);margin:28px auto}}
+
+@media(min-width:601px){.measurement-head,.measurement-row{grid-template-columns:.55fr 2.3fr 1.35fr .7fr .85fr .85fr 1.5fr .95fr;min-width:1280px}}
