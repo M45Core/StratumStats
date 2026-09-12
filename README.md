@@ -204,6 +204,25 @@ for the narrowly scoped install, move, and `systemctl reload` commands used by
 `scripts/update-pools-production.sh`. The `production` GitHub environment can
 add approval protection if desired.
 
+### Production SSH access and rollout
+
+Connect to the production host with:
+
+```bash
+ssh -p 5313 dist@m45sci.xyz
+```
+
+The source checkout is `/home/dist/StratumStats`, the installed binary is
+`/opt/stratumstats/stratumstats`, and the systemd service is `stratumstats`.
+Check the remote checkout for local changes before updating it; do not overwrite
+uncommitted work. For a clean checkout, pull the approved revision and run
+`./scripts/update-production.sh` to build, install, restart, and check health.
+Installation and restart require interactive sudo authentication; the `dist`
+account's passwordless sudo permissions cover only selected diagnostic commands.
+
+Verify local health at `http://127.0.0.1:8081/healthz` and the public dashboard at
+`https://stratumstats.m45core.com/dashboard-data` after rollout.
+
 ## HTTP endpoints
 
 The dashboard HTML is a static shell. It loads and periodically revalidates
