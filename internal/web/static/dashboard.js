@@ -308,7 +308,16 @@
       const rightRaw = right.getAttribute(`data-sort-${key}`) || "";
       if ((leftRaw === "") !== (rightRaw === "")) return leftRaw === "" ? 1 : -1;
       const comparison = type === "number" ? Number(leftRaw) - Number(rightRaw) : leftRaw.localeCompare(rightRaw, undefined, { sensitivity: "base" });
-      return comparison ? (direction === "ascending" ? comparison : -comparison) : (left.dataset.sortPool || "").localeCompare(right.dataset.sortPool || "");
+      if (comparison) return direction === "ascending" ? comparison : -comparison;
+      if (key === "score" && leftRaw !== "") {
+        for (const metric of ["median", "p95"]) {
+          const a = left.getAttribute(`data-sort-${metric}`) || "";
+          const b = right.getAttribute(`data-sort-${metric}`) || "";
+          if ((a === "") !== (b === "")) return a === "" ? 1 : -1;
+          if (Number(a) !== Number(b)) return Number(a) - Number(b);
+        }
+      }
+      return (left.dataset.sortPool || "").localeCompare(right.dataset.sortPool || "");
     });
     placeRows(list, rows);
     sortStates.set(wrapper.id, { key, type, direction });

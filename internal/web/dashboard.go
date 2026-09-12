@@ -178,6 +178,15 @@ func sortByOverallScore(pools []dashboardPool) {
 			return left.OverallScore != nil
 		}
 		if *left.OverallScore == *right.OverallScore {
+			for _, pair := range [][2]*float64{{left.MedianMS, right.MedianMS}, {left.P95MS, right.P95MS}} {
+				if pair[0] == nil || pair[1] == nil {
+					if pair[0] != pair[1] {
+						return pair[0] != nil
+					}
+				} else if *pair[0] != *pair[1] {
+					return *pair[0] < *pair[1]
+				}
+			}
 			return left.SortName < right.SortName
 		}
 		return *left.OverallScore > *right.OverallScore
