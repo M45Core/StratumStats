@@ -246,6 +246,25 @@
       ]
     },
     {
+      "id": "btc_pow_lab",
+      "name": "BTC PoW Lab Pool",
+      "website": "https://btcpowlab-pool.com/",
+      "category": "hybrid",
+      "endpoints": [
+        {
+          "host": "stratum.btcpowlab-pool.com",
+          "port": 3333,
+          "tls": false
+        }
+      ],
+      "operator": "Power CM Software",
+      "status": "active",
+      "products": [
+        "finder reward",
+        "community reward"
+      ]
+    },
+    {
       "id": "ckpool",
       "name": "Solo CKPool",
       "website": "https://solo.ckpool.org/",
