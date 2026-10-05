@@ -69,16 +69,6 @@
           "host": "asicpool.space",
           "port": 4335,
           "tls": false
-        },
-        {
-          "host": "asicpool.space",
-          "port": 24333,
-          "tls": true
-        },
-        {
-          "host": "asicpool.space",
-          "port": 24334,
-          "tls": true
         }
       ],
       "operator": "A.S.I.C. Mining Pool",
@@ -102,11 +92,6 @@
           "host": "asicpool.space",
           "port": 4340,
           "tls": false
-        },
-        {
-          "host": "asicpool.space",
-          "port": 24339,
-          "tls": true
         }
       ],
       "operator": "A.S.I.C. Mining Pool",
@@ -318,32 +303,14 @@
           "region": "Asia Pacific"
         },
         {
-          "host": "btc.heliospool.asia",
-          "port": 4444,
-          "tls": false,
-          "region": "Asia Pacific"
-        },
-        {
           "host": "btc.heliospool.com",
           "port": 3333,
           "tls": false,
           "region": "North America"
         },
         {
-          "host": "btc.heliospool.com",
-          "port": 4444,
-          "tls": false,
-          "region": "North America"
-        },
-        {
           "host": "btc.heliospool.eu",
           "port": 3333,
-          "tls": false,
-          "region": "Europe"
-        },
-        {
-          "host": "btc.heliospool.eu",
-          "port": 4444,
           "tls": false,
           "region": "Europe"
         }
@@ -409,12 +376,6 @@
       "website": "https://letsmine.it/",
       "category": "shared",
       "endpoints": [
-        {
-          "host": "de1.letsmine.it",
-          "port": 3432,
-          "tls": false,
-          "region": "Germany"
-        },
         {
           "host": "fr1.letsmine.it",
           "port": 3432,
