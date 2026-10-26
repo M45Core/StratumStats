@@ -328,12 +328,6 @@
       "category": "solo",
       "endpoints": [
         {
-          "host": "de1.letsmine.it",
-          "port": 3332,
-          "tls": false,
-          "region": "Germany"
-        },
-        {
           "host": "fr1.letsmine.it",
           "port": 3332,
           "tls": false,
@@ -430,25 +424,12 @@
           "port": 4333,
           "tls": true,
           "region": "United States"
-        },
-        {
-          "host": "tinyminer.m45core.com",
-          "port": 3334,
-          "tls": false,
-          "region": "United States"
-        },
-        {
-          "host": "tinyminer.m45core.com",
-          "port": 4334,
-          "tls": true,
-          "region": "United States"
         }
       ],
       "operator": "M45Core",
       "status": "active",
       "products": [
-        "SOLO",
-        "TinyMiner SOLO"
+        "SOLO"
       ]
     },
     {
@@ -784,43 +765,6 @@
         }
       ],
       "operator": "SoloMining.de",
-      "status": "active",
-      "products": [
-        "SOLO"
-      ]
-    },
-    {
-      "id": "solopool_com",
-      "name": "SoloPool.Com — Solo",
-      "website": "https://solopool.com/",
-      "category": "solo",
-      "endpoints": [
-        {
-          "host": "eu.solopool.com",
-          "port": 3333,
-          "tls": false,
-          "region": "Europe"
-        },
-        {
-          "host": "eu.solopool.com",
-          "port": 4444,
-          "tls": false,
-          "region": "Europe"
-        },
-        {
-          "host": "stratum.solopool.com",
-          "port": 3333,
-          "tls": false,
-          "region": "United States"
-        },
-        {
-          "host": "stratum.solopool.com",
-          "port": 4444,
-          "tls": false,
-          "region": "United States"
-        }
-      ],
-      "operator": "SoloPool.Com",
       "status": "active",
       "products": [
         "SOLO"
